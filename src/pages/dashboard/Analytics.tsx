@@ -1,0 +1,120 @@
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { Download, Filter, TrendingDown, TrendingUp, AlertTriangle } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
+
+const costOverruns = [
+  { project: 'Nairobi Tower', overrun: 5 },
+  { project: 'Mombasa Rd', overrun: 12 },
+  { project: 'Kisumu Bridge', overrun: -3 },
+  { project: 'Thika Hwy', overrun: 2 },
+  { project: 'Nakuru', overrun: 0 },
+  { project: 'Eldoret', overrun: 8 },
+];
+
+const cashFlow = [
+  { month: 'Jan', inflow: 15, outflow: 12 },
+  { month: 'Feb', inflow: 18, outflow: 16 },
+  { month: 'Mar', inflow: 12, outflow: 14 },
+  { month: 'Apr', inflow: 22, outflow: 18 },
+  { month: 'May', inflow: 20, outflow: 19 },
+  { month: 'Jun', inflow: 25, outflow: 21 },
+];
+
+const laborData = [
+  { week: 'W1', productivity: 72 },
+  { week: 'W2', productivity: 78 },
+  { week: 'W3', productivity: 65 },
+  { week: 'W4', productivity: 82 },
+  { week: 'W5', productivity: 88 },
+  { week: 'W6', productivity: 85 },
+];
+
+const resourceUsage = [
+  { name: 'Materials', value: 40 },
+  { name: 'Labor', value: 30 },
+  { name: 'Equipment', value: 20 },
+  { name: 'Admin', value: 10 },
+];
+const COLORS = ['hsl(168, 80%, 36%)', 'hsl(174, 72%, 40%)', 'hsl(160, 60%, 50%)', 'hsl(150, 40%, 60%)'];
+
+const Analytics = () => {
+  const { t } = useLanguage();
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold font-['Space_Grotesk']">{t('sidebar.analytics')}</h1>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm"><Filter className="w-4 h-4 mr-1" /> {t('common.filter')}</Button>
+          <Button variant="outline" size="sm"><Download className="w-4 h-4 mr-1" /> Export PDF</Button>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6">
+        <Card className="glass-card border-0">
+          <CardHeader><CardTitle className="text-base font-['Space_Grotesk']">Cost Overruns by Project (%)</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={costOverruns}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="project" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                <Bar dataKey="overrun" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-0">
+          <CardHeader><CardTitle className="text-base font-['Space_Grotesk']">Cash Flow (KES M)</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <AreaChart data={cashFlow}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                <Area type="monotone" dataKey="inflow" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.15} strokeWidth={2} />
+                <Area type="monotone" dataKey="outflow" stroke="hsl(var(--destructive))" fill="hsl(var(--destructive))" fillOpacity={0.1} strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-0">
+          <CardHeader><CardTitle className="text-base font-['Space_Grotesk']">Labor Productivity (%)</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={laborData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="week" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                <Line type="monotone" dataKey="productivity" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: 'hsl(var(--primary))' }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card border-0">
+          <CardHeader><CardTitle className="text-base font-['Space_Grotesk']">Resource Allocation</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie data={resourceUsage} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={4} dataKey="value" label={({ name, value }) => `${name} ${value}%`}>
+                  {resourceUsage.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+export default Analytics;
