@@ -41,7 +41,7 @@ const AdminOverview = () => (
     </div>
 
     <div className="grid lg:grid-cols-2 gap-6">
-      <Card className="glass-card border-0">
+      <Card className="card-3d border-0">
         <CardHeader><CardTitle className="text-base font-['Space_Grotesk']">User Growth</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={250}>
