@@ -30,7 +30,7 @@ const Documents = () => {
       </div>
 
       {view === 'list' ? (
-        <Card className="glass-card border-0">
+        <Card className="card-3d border-0">
           <CardContent className="p-4 space-y-2">
             {files.map((f, i) => (
               <div key={i} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
