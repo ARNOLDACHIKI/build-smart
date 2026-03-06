@@ -27,7 +27,7 @@ const Reports = () => {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {['Financial', 'Timeline', 'Risk', 'Compliance'].map((type) => (
-          <Card key={type} className="glass-card border-0 cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all">
+          <Card key={type} className="card-3d border-0 cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all">
             <CardContent className="p-4 text-center">
               <FileText className="w-8 h-8 text-primary mx-auto mb-2" />
               <div className="text-sm font-medium">{type} Report</div>
