@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
-import { ArrowRight, Play, BarChart3, Shield, Zap } from 'lucide-react';
+import { ArrowRight, Play, Search, HardHat, Users, Building, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Link } from 'react-router-dom';
 
@@ -13,14 +14,20 @@ const HeroSection = () => {
     { value: '10K+', label: t('hero.stats.users') },
   ];
 
+  const journeySteps = [
+    { icon: Search, text: t('hero.step1') },
+    { icon: Users, text: t('hero.step2') },
+    { icon: Building, text: t('hero.step3') },
+    { icon: MapPin, text: t('hero.step4') },
+  ];
+
   return (
     <section className="relative min-h-screen flex items-center pt-16 overflow-hidden">
-      {/* Animated background elements */}
+      {/* Animated background */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-20 left-10 w-72 h-72 rounded-full bg-primary/10 blur-3xl animate-pulse" />
         <div className="absolute bottom-20 right-10 w-96 h-96 rounded-full bg-accent/10 blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-primary/5 blur-3xl" />
-        {/* Grid pattern */}
         <div className="absolute inset-0 opacity-[0.03]" style={{
           backgroundImage: 'linear-gradient(hsl(var(--primary)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--primary)) 1px, transparent 1px)',
           backgroundSize: '60px 60px'
@@ -28,28 +35,61 @@ const HeroSection = () => {
       </div>
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <div className="text-center max-w-4xl mx-auto">
+          {/* Construction worker greeting */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="mb-8"
+          >
+            <div className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl card-3d text-sm font-medium mb-6">
+              <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center">
+                <HardHat className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <span className="text-lg font-semibold font-['Space_Grotesk'] text-foreground">{t('hero.greeting')}</span>
+            </div>
+          </motion.div>
+
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass-card text-xs font-medium text-primary mb-6">
-              <Zap className="w-3 h-3" />
-              AI-Powered Construction Management
-            </div>
-
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold font-['Space_Grotesk'] leading-[1.1] mb-6">
               {t('hero.title')}
               <br />
               <span className="gradient-text">{t('hero.titleHighlight')}</span>
             </h1>
 
-            <p className="text-lg text-muted-foreground mb-8 max-w-lg leading-relaxed">
+            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
               {t('hero.subtitle')}
             </p>
 
-            <div className="flex flex-wrap gap-4 mb-12">
+            {/* Search bar */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.4, duration: 0.5 }}
+              className="max-w-2xl mx-auto mb-8"
+            >
+              <div className="card-3d p-2 flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <Input
+                    placeholder={t('hero.searchPlaceholder')}
+                    className="pl-10 h-12 border-0 bg-transparent text-base"
+                  />
+                </div>
+                <Link to="/search">
+                  <Button size="lg" className="gradient-primary text-primary-foreground glow h-12 px-6">
+                    <Search className="w-4 h-4 mr-2" /> Search
+                  </Button>
+                </Link>
+              </div>
+            </motion.div>
+
+            <div className="flex flex-wrap justify-center gap-4 mb-12">
               <Link to="/register">
                 <Button size="lg" className="gradient-primary text-primary-foreground glow text-base px-8 h-12">
                   {t('hero.cta')} <ArrowRight className="w-4 h-4 ml-1" />
@@ -59,80 +99,48 @@ const HeroSection = () => {
                 <Play className="w-4 h-4 mr-2" /> {t('hero.learnMore')}
               </Button>
             </div>
+          </motion.div>
 
-            <div className="grid grid-cols-3 gap-6">
-              {stats.map((stat, i) => (
+          {/* Customer journey steps */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.6 }}
+            className="mb-12"
+          >
+            <p className="text-sm text-muted-foreground mb-4 font-medium">{t('hero.explore')}</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
+              {journeySteps.map((step, i) => (
                 <motion.div
                   key={i}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 + i * 0.15 }}
+                  transition={{ delay: 0.8 + i * 0.1 }}
+                  className="card-3d p-4 text-center group cursor-pointer"
                 >
-                  <div className="text-2xl sm:text-3xl font-bold font-['Space_Grotesk'] gradient-text">{stat.value}</div>
-                  <div className="text-xs sm:text-sm text-muted-foreground mt-1">{stat.label}</div>
+                  <div className="w-10 h-10 mx-auto rounded-xl gradient-primary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                    <step.icon className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">{step.text}</p>
                 </motion.div>
               ))}
             </div>
           </motion.div>
 
-          {/* Dashboard preview mockup */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, rotateY: -10 }}
-            animate={{ opacity: 1, scale: 1, rotateY: 0 }}
-            transition={{ duration: 1, delay: 0.3 }}
-            className="hidden lg:block"
-          >
-            <div className="glass-card p-6 space-y-4 relative">
-              <div className="absolute -top-3 -right-3 px-3 py-1 rounded-full gradient-primary text-primary-foreground text-xs font-medium">Live Preview</div>
-              
-              {/* Mini dashboard mockup */}
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { icon: BarChart3, label: 'Budget', value: 'KES 45M', color: 'text-primary' },
-                  { icon: Shield, label: 'Risk Score', value: 'Low', color: 'text-accent' },
-                  { icon: Zap, label: 'On Track', value: '87%', color: 'text-primary' },
-                ].map((item, i) => (
-                  <div key={i} className="glass-card p-3 text-center">
-                    <item.icon className={`w-5 h-5 mx-auto mb-1 ${item.color}`} />
-                    <div className="text-xs text-muted-foreground">{item.label}</div>
-                    <div className="text-sm font-bold mt-0.5">{item.value}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Chart mockup */}
-              <div className="glass-card p-4">
-                <div className="text-xs font-medium mb-3">Project Progress</div>
-                <div className="flex items-end gap-1.5 h-24">
-                  {[40, 65, 45, 80, 55, 90, 70, 85, 60, 75, 95, 50].map((h, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ height: 0 }}
-                      animate={{ height: `${h}%` }}
-                      transition={{ delay: 1 + i * 0.05, duration: 0.5 }}
-                      className="flex-1 rounded-t gradient-primary opacity-70"
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Activity mockup */}
-              <div className="space-y-2">
-                {['Nairobi Tower - Phase 3 complete', 'Mombasa Road - Budget updated', 'Kisumu Bridge - Risk alert'].map((text, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 1.5 + i * 0.15 }}
-                    className="flex items-center gap-2 text-xs p-2 rounded-lg bg-muted/50"
-                  >
-                    <div className="w-1.5 h-1.5 rounded-full gradient-primary flex-shrink-0" />
-                    {text}
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-6 max-w-lg mx-auto">
+            {stats.map((stat, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1 + i * 0.15 }}
+              >
+                <div className="text-2xl sm:text-3xl font-bold font-['Space_Grotesk'] gradient-text">{stat.value}</div>
+                <div className="text-xs sm:text-sm text-muted-foreground mt-1">{stat.label}</div>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </div>
     </section>

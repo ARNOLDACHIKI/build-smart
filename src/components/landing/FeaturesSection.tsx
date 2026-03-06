@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { BarChart3, Brain, Wallet, Users, FileText, ClipboardList } from 'lucide-react';
+import { BarChart3, Brain, Wallet, Users, FileText, ClipboardList, Search, Award } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const FeaturesSection = () => {
@@ -10,6 +10,8 @@ const FeaturesSection = () => {
     { icon: Brain, title: t('features.aiInsights'), desc: t('features.aiInsightsDesc') },
     { icon: Wallet, title: t('features.budgetMgmt'), desc: t('features.budgetMgmtDesc') },
     { icon: Users, title: t('features.teamCollab'), desc: t('features.teamCollabDesc') },
+    { icon: Search, title: t('features.professionalDirectory'), desc: t('features.professionalDirectoryDesc') },
+    { icon: Award, title: t('features.creditScore'), desc: t('features.creditScoreDesc') },
     { icon: FileText, title: t('features.docMgmt'), desc: t('features.docMgmtDesc') },
     { icon: ClipboardList, title: t('features.reporting'), desc: t('features.reportingDesc') },
   ];
@@ -30,7 +32,7 @@ const FeaturesSection = () => {
           <p className="text-muted-foreground max-w-2xl mx-auto">{t('features.subtitle')}</p>
         </motion.div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {features.map((f, i) => (
             <motion.div
               key={i}
@@ -38,7 +40,7 @@ const FeaturesSection = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
-              className="glass-card p-6 group hover:glow transition-all duration-300"
+              className="card-3d p-6 group hover:glow transition-all duration-300"
             >
               <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <f.icon className="w-6 h-6 text-primary-foreground" />

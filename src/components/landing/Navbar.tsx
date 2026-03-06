@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X, Sun, Moon, Globe, Building2 } from 'lucide-react';
+import { Menu, X, Sun, Moon, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import logoDark from '@/assets/logo-dark.png';
+import logoLight from '@/assets/logo-light.png';
 
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -12,27 +15,31 @@ const Navbar = () => {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 glass">
+    <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg gradient-primary flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-bold font-['Space_Grotesk'] gradient-text">BuildSmart</span>
+            <img src={theme === 'dark' ? logoDark : logoLight} alt="ICDBO" className="h-10 w-auto" />
           </Link>
 
           <div className="hidden md:flex items-center gap-6">
-            <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">{t('nav.features')}</a>
-            <a href="#pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">{t('nav.pricing')}</a>
-            <a href="#about" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">{t('nav.about')}</a>
+            <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">{t('nav.features')}</a>
+            <a href="#pricing" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">{t('nav.pricing')}</a>
+            <Link to="/search" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">{t('nav.search')}</Link>
+            <a href="#about" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">{t('nav.about')}</a>
           </div>
 
           <div className="hidden md:flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => setLanguage(language === 'en' ? 'sw' : 'en')} className="relative">
-              <Globe className="w-4 h-4" />
-              <span className="absolute -bottom-1 -right-1 text-[10px] font-bold text-primary">{language.toUpperCase()}</span>
-            </Button>
+            <Select value={language} onValueChange={(v) => setLanguage(v as 'en' | 'sw')}>
+              <SelectTrigger className="w-[130px] h-9 text-xs">
+                <Globe className="w-3.5 h-3.5 mr-1" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="en">English</SelectItem>
+                <SelectItem value="sw">Kiswahili</SelectItem>
+              </SelectContent>
+            </Select>
             <Button variant="ghost" size="icon" onClick={toggleTheme}>
               {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
             </Button>
@@ -57,11 +64,19 @@ const Navbar = () => {
             <div className="px-4 py-4 space-y-3">
               <a href="#features" className="block text-sm font-medium text-muted-foreground">{t('nav.features')}</a>
               <a href="#pricing" className="block text-sm font-medium text-muted-foreground">{t('nav.pricing')}</a>
+              <Link to="/search" className="block text-sm font-medium text-muted-foreground">{t('nav.search')}</Link>
               <a href="#about" className="block text-sm font-medium text-muted-foreground">{t('nav.about')}</a>
               <div className="flex items-center gap-2 pt-2">
-                <Button variant="ghost" size="icon" onClick={() => setLanguage(language === 'en' ? 'sw' : 'en')}>
-                  <Globe className="w-4 h-4" />
-                </Button>
+                <Select value={language} onValueChange={(v) => setLanguage(v as 'en' | 'sw')}>
+                  <SelectTrigger className="w-[130px] h-9 text-xs">
+                    <Globe className="w-3.5 h-3.5 mr-1" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="sw">Kiswahili</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Button variant="ghost" size="icon" onClick={toggleTheme}>
                   {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
                 </Button>
