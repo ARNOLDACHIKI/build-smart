@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
+import Search from "./pages/Search";
 
 import DashboardLayout from "./components/dashboard/DashboardLayout";
 import DashboardHome from "./pages/dashboard/DashboardHome";
@@ -23,6 +24,9 @@ import Team from "./pages/dashboard/Team";
 import Notifications from "./pages/dashboard/Notifications";
 import SettingsPage from "./pages/dashboard/Settings";
 import Support from "./pages/dashboard/Support";
+import Credits from "./pages/dashboard/Credits";
+import CustomerJourney from "./pages/dashboard/CustomerJourney";
+import ProfessionalSearch from "./pages/dashboard/ProfessionalSearch";
 
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminOverview from "./pages/admin/AdminOverview";
@@ -44,6 +48,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/search" element={<Search />} />
 
               {/* User Dashboard */}
               <Route path="/dashboard" element={<DashboardLayout />}>
@@ -58,6 +63,9 @@ const App = () => (
                 <Route path="notifications" element={<Notifications />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="support" element={<Support />} />
+                <Route path="credits" element={<Credits />} />
+                <Route path="journey" element={<CustomerJourney />} />
+                <Route path="search" element={<ProfessionalSearch />} />
               </Route>
 
               {/* Admin Panel */}

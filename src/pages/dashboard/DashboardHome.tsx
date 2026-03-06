@@ -1,11 +1,12 @@
 import { motion } from 'framer-motion';
-import { FolderKanban, Wallet, CheckSquare, AlertTriangle, Plus, BarChart3, FileText, Brain, TrendingUp, ArrowUpRight, ArrowDownRight, Clock } from 'lucide-react';
+import { FolderKanban, Wallet, CheckSquare, AlertTriangle, Plus, BarChart3, FileText, Brain, TrendingUp, ArrowUpRight, ArrowDownRight, Clock, Award } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Area, AreaChart } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Link } from 'react-router-dom';
 
 const budgetData = [
   { month: 'Jan', budget: 4.2, actual: 3.8 },
@@ -53,7 +54,7 @@ const DashboardHome = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold font-['Space_Grotesk']">{t('dashboard.welcome')}, James 👋</h1>
           <p className="text-sm text-muted-foreground">Here's what's happening with your projects today.</p>
@@ -64,11 +65,27 @@ const DashboardHome = () => {
         </div>
       </div>
 
+      {/* Credit Score Banner */}
+      <Link to="/dashboard/credits">
+        <Card className="card-3d border-0 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
+              <Award className="w-6 h-6 text-primary-foreground" />
+            </div>
+            <div className="flex-1">
+              <div className="text-sm font-medium">{t('dashboard.creditScore')}: <span className="text-primary font-bold">890 pts</span> - Gold Level</div>
+              <Progress value={59} className="h-1.5 mt-1 w-48" />
+            </div>
+            <Badge className="gradient-primary text-primary-foreground">6-Month Bonus Active</Badge>
+          </CardContent>
+        </Card>
+      </Link>
+
       {/* Stats */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, i) => (
           <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
-            <Card className="glass-card border-0">
+            <Card className="card-3d border-0">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -89,7 +106,7 @@ const DashboardHome = () => {
 
       {/* Charts */}
       <div className="grid lg:grid-cols-2 gap-6">
-        <Card className="glass-card border-0">
+        <Card className="card-3d border-0">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-['Space_Grotesk']">{t('dashboard.budgetUsage')}</CardTitle>
           </CardHeader>
@@ -107,7 +124,7 @@ const DashboardHome = () => {
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-0">
+        <Card className="card-3d border-0">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-['Space_Grotesk']">Project Timeline</CardTitle>
           </CardHeader>
@@ -127,7 +144,7 @@ const DashboardHome = () => {
 
       {/* AI Insights & Activity */}
       <div className="grid lg:grid-cols-2 gap-6">
-        <Card className="glass-card border-0">
+        <Card className="card-3d border-0">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-['Space_Grotesk'] flex items-center gap-2">
               <Brain className="w-4 h-4 text-primary" /> {t('dashboard.aiInsights')}
@@ -145,7 +162,7 @@ const DashboardHome = () => {
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-0">
+        <Card className="card-3d border-0">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-['Space_Grotesk']">{t('dashboard.recentActivity')}</CardTitle>
           </CardHeader>

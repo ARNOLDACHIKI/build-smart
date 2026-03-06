@@ -14,7 +14,7 @@ const Support = () => {
 
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-2">
-          <Card className="glass-card border-0">
+          <Card className="card-3d border-0">
             <CardContent className="p-6 space-y-4">
               <h3 className="font-semibold">Contact Support</h3>
               <div className="space-y-2"><Input placeholder="Subject" /></div>
@@ -27,11 +27,11 @@ const Support = () => {
         <div className="space-y-4">
           {[
             { icon: MessageCircle, title: 'Live Chat', desc: 'Chat with our support team', action: 'Start Chat' },
-            { icon: Mail, title: 'Email', desc: 'support@buildsmart.ke', action: 'Send Email' },
+            { icon: Mail, title: 'Email', desc: 'support@icdbo.com', action: 'Send Email' },
             { icon: Phone, title: 'Phone', desc: '+254 20 XXX XXXX', action: 'Call Now' },
             { icon: FileText, title: 'Documentation', desc: 'Browse help articles', action: 'View Docs' },
           ].map((item, i) => (
-            <Card key={i} className="glass-card border-0">
+            <Card key={i} className="card-3d border-0">
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"><item.icon className="w-5 h-5 text-primary" /></div>
                 <div className="flex-1"><div className="text-sm font-medium">{item.title}</div><div className="text-xs text-muted-foreground">{item.desc}</div></div>
