@@ -52,7 +52,7 @@ const Documents = () => {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {files.map((f, i) => (
-            <Card key={i} className="glass-card border-0 hover:ring-1 hover:ring-primary/30 transition-all cursor-pointer">
+            <Card key={i} className="card-3d border-0 hover:ring-1 hover:ring-primary/30 transition-all cursor-pointer">
               <CardContent className="p-4">
                 <f.icon className="w-10 h-10 text-primary mb-3" />
                 <div className="text-sm font-medium truncate">{f.name}</div>

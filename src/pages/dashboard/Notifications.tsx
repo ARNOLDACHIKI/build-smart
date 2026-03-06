@@ -42,7 +42,7 @@ const Notifications = () => {
           ))}
         </div>
 
-        <Card className="glass-card border-0 h-fit">
+        <Card className="card-3d border-0 h-fit">
           <CardContent className="p-4 space-y-4">
             <h3 className="font-semibold text-sm">Notification Preferences</h3>
             <div className="space-y-3">

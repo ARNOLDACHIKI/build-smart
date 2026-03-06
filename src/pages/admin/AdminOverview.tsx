@@ -56,7 +56,7 @@ const AdminOverview = () => (
         </CardContent>
       </Card>
 
-      <Card className="glass-card border-0">
+      <Card className="card-3d border-0">
         <CardHeader><CardTitle className="text-base font-['Space_Grotesk']">Revenue (KES M)</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={250}>

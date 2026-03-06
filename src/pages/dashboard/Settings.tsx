@@ -25,7 +25,7 @@ const SettingsPage = () => {
         </TabsList>
 
         <TabsContent value="profile" className="mt-4 space-y-4">
-          <Card className="glass-card border-0">
+          <Card className="card-3d border-0">
             <CardContent className="p-6 space-y-4">
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-16 h-16 rounded-full gradient-primary flex items-center justify-center text-primary-foreground text-xl font-bold">JK</div>

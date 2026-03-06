@@ -37,7 +37,7 @@ const Reports = () => {
         ))}
       </div>
 
-      <Card className="glass-card border-0">
+      <Card className="card-3d border-0">
         <CardContent className="p-4">
           <h3 className="font-semibold mb-4">Report History</h3>
           <div className="space-y-3">
