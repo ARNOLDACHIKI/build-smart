@@ -1,15 +1,19 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { motion } from 'framer-motion';
+import logoDark from '@/assets/logo-dark.png';
+import logoLight from '@/assets/logo-light.png';
 
 const Register = () => {
   const { t } = useLanguage();
+  const { theme } = useTheme();
   const [showPassword, setShowPassword] = useState(false);
 
   return (
@@ -20,19 +24,17 @@ const Register = () => {
           backgroundSize: '40px 40px'
         }} />
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center text-primary-foreground relative z-10 p-12">
-          <Building2 className="w-16 h-16 mx-auto mb-6" />
-          <h2 className="text-4xl font-bold font-['Space_Grotesk'] mb-4">Join BuildSmart</h2>
-          <p className="text-lg opacity-90 max-w-md">Start managing your construction projects with AI-powered insights today.</p>
+          <img src={logoDark} alt="ICDBO" className="h-24 w-auto mx-auto mb-6" />
+          <h2 className="text-3xl font-bold font-['Space_Grotesk'] mb-4">Join ICDBO Data Analytics</h2>
+          <p className="text-lg opacity-90 max-w-md">Start accessing construction sector data and connect with professionals today.</p>
+          <p className="text-sm opacity-75 mt-2">ACCESS. INCENTIVISE. ACTION.</p>
         </motion.div>
       </div>
 
       <div className="flex-1 flex items-center justify-center p-8">
         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="w-full max-w-md">
           <Link to="/" className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-9 h-9 rounded-lg gradient-primary flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-bold font-['Space_Grotesk'] gradient-text">BuildSmart</span>
+            <img src={theme === 'dark' ? logoDark : logoLight} alt="ICDBO" className="h-12 w-auto" />
           </Link>
 
           <h1 className="text-3xl font-bold font-['Space_Grotesk'] mb-2">{t('auth.createAccount')}</h1>
@@ -65,10 +67,17 @@ const Register = () => {
               <Select>
                 <SelectTrigger className="h-11"><SelectValue placeholder="Select your role" /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="developer">{t('auth.developer')}</SelectItem>
+                  <SelectItem value="financier">{t('auth.financier')}</SelectItem>
                   <SelectItem value="contractor">{t('auth.contractor')}</SelectItem>
+                  <SelectItem value="realEstate">{t('auth.realEstate')}</SelectItem>
+                  <SelectItem value="consultant">{t('auth.consultant')}</SelectItem>
+                  <SelectItem value="tenant">{t('auth.tenant')}</SelectItem>
+                  <SelectItem value="pm">{t('auth.projectManager')}</SelectItem>
+                  <SelectItem value="supplier">{t('auth.supplier')}</SelectItem>
+                  <SelectItem value="regulator">{t('auth.regulator')}</SelectItem>
                   <SelectItem value="engineer">{t('auth.engineer')}</SelectItem>
                   <SelectItem value="architect">{t('auth.architect')}</SelectItem>
-                  <SelectItem value="pm">{t('auth.projectManager')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

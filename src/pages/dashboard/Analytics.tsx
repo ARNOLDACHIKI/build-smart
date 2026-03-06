@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Download, Filter, TrendingDown, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Download, Filter } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
 
 const costOverruns = [
@@ -37,7 +37,7 @@ const resourceUsage = [
   { name: 'Equipment', value: 20 },
   { name: 'Admin', value: 10 },
 ];
-const COLORS = ['hsl(168, 80%, 36%)', 'hsl(174, 72%, 40%)', 'hsl(160, 60%, 50%)', 'hsl(150, 40%, 60%)'];
+const COLORS = ['hsl(69, 68%, 51%)', 'hsl(217, 91%, 60%)', 'hsl(38, 92%, 50%)', 'hsl(73, 42%, 31%)'];
 
 const Analytics = () => {
   const { t } = useLanguage();
@@ -53,7 +53,7 @@ const Analytics = () => {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        <Card className="glass-card border-0">
+        <Card className="card-3d border-0">
           <CardHeader><CardTitle className="text-base font-['Space_Grotesk']">Cost Overruns by Project (%)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
@@ -68,7 +68,7 @@ const Analytics = () => {
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-0">
+        <Card className="card-3d border-0">
           <CardHeader><CardTitle className="text-base font-['Space_Grotesk']">Cash Flow (KES M)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
@@ -84,7 +84,7 @@ const Analytics = () => {
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-0">
+        <Card className="card-3d border-0">
           <CardHeader><CardTitle className="text-base font-['Space_Grotesk']">Labor Productivity (%)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
@@ -99,7 +99,7 @@ const Analytics = () => {
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-0">
+        <Card className="card-3d border-0">
           <CardHeader><CardTitle className="text-base font-['Space_Grotesk']">Resource Allocation</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>

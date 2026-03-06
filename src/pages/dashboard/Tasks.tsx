@@ -54,7 +54,7 @@ const Tasks = () => {
             </div>
             <div className="space-y-3">
               {tasks.filter(t => t.status === col.key).map((task) => (
-                <Card key={task.id} className="glass-card border-0 cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all">
+                <Card key={task.id} className="card-3d border-0 cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all">
                   <CardContent className="p-3">
                     <div className="flex items-start gap-2">
                       <GripVertical className="w-4 h-4 text-muted-foreground/50 mt-0.5 flex-shrink-0" />

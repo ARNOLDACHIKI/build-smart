@@ -14,16 +14,25 @@ const translations: Translations = {
   'nav.login': { en: 'Login', sw: 'Ingia' },
   'nav.signup': { en: 'Sign Up', sw: 'Jisajili' },
   'nav.bookDemo': { en: 'Book Demo', sw: 'Omba Demo' },
+  'nav.services': { en: 'Services', sw: 'Huduma' },
+  'nav.search': { en: 'Find Professionals', sw: 'Tafuta Wataalamu' },
 
-  // Hero
-  'hero.title': { en: 'Build Smarter.', sw: 'Jenga kwa Akili.' },
-  'hero.titleHighlight': { en: 'Manage Better.', sw: 'Simamia Vizuri.' },
-  'hero.subtitle': { en: 'AI-powered construction management platform built for Kenya. Track projects, predict risks, and optimize resources with intelligent insights.', sw: 'Jukwaa la usimamizi wa ujenzi linalotumia AI lililojengwa kwa Kenya. Fuatilia miradi, tabiri hatari, na boresha rasilimali kwa ufahamu wa akili.' },
+  // Hero / Welcome
+  'hero.greeting': { en: 'How may we help you today?', sw: 'Tunaweza kukusaidia vipi leo?' },
+  'hero.title': { en: 'Informing the Construction Market.', sw: 'Kufahamisha Soko la Ujenzi.' },
+  'hero.titleHighlight': { en: 'Shaping the Future.', sw: 'Kuunda Mustakabali.' },
+  'hero.subtitle': { en: 'Access updated construction sector data to enable, incentivise, and take action. End-to-end solutions for transparent, time-saving and valuable construction projects.', sw: 'Pata data ya kisasa ya sekta ya ujenzi ili kuwezesha, kuhimiza, na kuchukua hatua. Suluhisho kamili kwa miradi ya ujenzi yenye uwazi, kuokoa muda na thamani.' },
   'hero.cta': { en: 'Start Free Trial', sw: 'Anza Jaribio Bure' },
   'hero.learnMore': { en: 'Learn More', sw: 'Jifunze Zaidi' },
   'hero.stats.projects': { en: 'Projects Managed', sw: 'Miradi Iliyosimamiwa' },
   'hero.stats.saved': { en: 'Cost Savings', sw: 'Akiba ya Gharama' },
   'hero.stats.users': { en: 'Active Users', sw: 'Watumiaji Hai' },
+  'hero.searchPlaceholder': { en: 'Search for engineers, contractors, architects in Kenya...', sw: 'Tafuta wahandisi, wakandarasi, wasanifu majengo nchini Kenya...' },
+  'hero.explore': { en: 'Explore Our Platform', sw: 'Chunguza Jukwaa Letu' },
+  'hero.step1': { en: 'Search for professionals', sw: 'Tafuta wataalamu' },
+  'hero.step2': { en: 'View portfolios & reviews', sw: 'Tazama kazi & maoni' },
+  'hero.step3': { en: 'Connect & collaborate', sw: 'Unganisha & shirikiana' },
+  'hero.step4': { en: 'Track project progress', sw: 'Fuatilia maendeleo ya mradi' },
 
   // Features
   'features.title': { en: 'Powerful Features', sw: 'Vipengele Vyenye Nguvu' },
@@ -40,6 +49,10 @@ const translations: Translations = {
   'features.docMgmtDesc': { en: 'Centralized file storage with version control and easy sharing', sw: 'Hifadhi ya faili kuu na udhibiti wa toleo' },
   'features.reporting': { en: 'Smart Reports', sw: 'Ripoti za Akili' },
   'features.reportingDesc': { en: 'Generate compliance, financial, and timeline reports automatically', sw: 'Tengeneza ripoti za ufuasi, fedha, na ratiba kiotomatiki' },
+  'features.professionalDirectory': { en: 'Professional Directory', sw: 'Orodha ya Wataalamu' },
+  'features.professionalDirectoryDesc': { en: 'Find engineers, architects, contractors and suppliers across Kenya', sw: 'Tafuta wahandisi, wasanifu, wakandarasi na wasambazaji kote Kenya' },
+  'features.creditScore': { en: 'Credit Score System', sw: 'Mfumo wa Alama za Mikopo' },
+  'features.creditScoreDesc': { en: 'Earn credits for activity, get 6 months free and unlock premium features', sw: 'Pata alama kwa shughuli, pata miezi 6 bure na fungua vipengele vya ziada' },
 
   // How it works
   'howItWorks.title': { en: 'How It Works', sw: 'Jinsi Inavyofanya Kazi' },
@@ -50,25 +63,29 @@ const translations: Translations = {
   'howItWorks.step3Title': { en: 'Get Smart Insights', sw: 'Pata Ufahamu wa Akili' },
   'howItWorks.step3Desc': { en: 'AI analyzes your data and delivers actionable recommendations', sw: 'AI inachambua data yako na kutoa mapendekezo' },
 
-  // Pricing
+  // Pricing - ICDBO packages
   'pricing.title': { en: 'Simple Pricing', sw: 'Bei Rahisi' },
-  'pricing.subtitle': { en: 'Choose the plan that fits your needs', sw: 'Chagua mpango unaofaa mahitaji yako' },
-  'pricing.free': { en: 'Free', sw: 'Bure' },
-  'pricing.pro': { en: 'Pro', sw: 'Pro' },
+  'pricing.subtitle': { en: 'Annual subscription with a 3-month free trial', sw: 'Usajili wa mwaka na jaribio la bure la miezi 3' },
+  'pricing.student': { en: 'Student', sw: 'Mwanafunzi' },
+  'pricing.basic': { en: 'Basic', sw: 'Msingi' },
+  'pricing.professional': { en: 'Professional', sw: 'Mtaalamu' },
   'pricing.enterprise': { en: 'Enterprise', sw: 'Biashara' },
-  'pricing.month': { en: '/month', sw: '/mwezi' },
+  'pricing.year': { en: '/year', sw: '/mwaka' },
   'pricing.getStarted': { en: 'Get Started', sw: 'Anza' },
   'pricing.contactSales': { en: 'Contact Sales', sw: 'Wasiliana na Mauzo' },
+  'pricing.free3months': { en: '3-month free trial included', sw: 'Jaribio la miezi 3 bure limejumuishwa' },
+  'pricing.credits6months': { en: '+ 6 months bonus credits', sw: '+ Miezi 6 ya alama za bonasi' },
 
   // Testimonials
   'testimonials.title': { en: 'Trusted by Builders', sw: 'Kuaminiwa na Wajenzi' },
 
   // Footer
-  'footer.description': { en: 'AI-powered construction management for the future of building in Kenya.', sw: 'Usimamizi wa ujenzi unaotumia AI kwa mustakabali wa ujenzi nchini Kenya.' },
+  'footer.description': { en: 'Informing the construction market. Shaping the future. User-centric end-to-end solutions for the construction industry.', sw: 'Kufahamisha soko la ujenzi. Kuunda mustakabali. Suluhisho kamili zinazolenga watumiaji kwa sekta ya ujenzi.' },
   'footer.product': { en: 'Product', sw: 'Bidhaa' },
   'footer.company': { en: 'Company', sw: 'Kampuni' },
   'footer.support': { en: 'Support', sw: 'Msaada' },
-  'footer.rights': { en: '© 2026 BuildSmart Kenya. All rights reserved.', sw: '© 2026 BuildSmart Kenya. Haki zote zimehifadhiwa.' },
+  'footer.rights': { en: '© 2026 ICDBO Data Analytics. All rights reserved.', sw: '© 2026 ICDBO Data Analytics. Haki zote zimehifadhiwa.' },
+  'footer.tagline': { en: 'ACCESS. INCENTIVISE. ACTION.', sw: 'FIKIA. HIMIZA. TENDA.' },
 
   // Auth
   'auth.email': { en: 'Email', sw: 'Barua pepe' },
@@ -87,6 +104,13 @@ const translations: Translations = {
   'auth.engineer': { en: 'Engineer', sw: 'Mhandisi' },
   'auth.architect': { en: 'Architect', sw: 'Mbunifu' },
   'auth.projectManager': { en: 'Project Manager', sw: 'Meneja wa Mradi' },
+  'auth.developer': { en: 'Developer', sw: 'Msanidi' },
+  'auth.financier': { en: 'Financier', sw: 'Mfadhili' },
+  'auth.supplier': { en: 'Supplier', sw: 'Msambazaji' },
+  'auth.consultant': { en: 'Consultant', sw: 'Mshauri' },
+  'auth.tenant': { en: 'Tenant', sw: 'Mpangaji' },
+  'auth.regulator': { en: 'Regulator', sw: 'Mdhibiti' },
+  'auth.realEstate': { en: 'Real Estate', sw: 'Mali Isiyohamishika' },
 
   // Dashboard sidebar
   'sidebar.dashboard': { en: 'Dashboard', sw: 'Dashibodi' },
@@ -99,6 +123,9 @@ const translations: Translations = {
   'sidebar.notifications': { en: 'Notifications', sw: 'Arifa' },
   'sidebar.settings': { en: 'Settings', sw: 'Mipangilio' },
   'sidebar.support': { en: 'Support', sw: 'Msaada' },
+  'sidebar.search': { en: 'Find Professionals', sw: 'Tafuta Wataalamu' },
+  'sidebar.credits': { en: 'Credits', sw: 'Alama' },
+  'sidebar.journey': { en: 'Journey Map', sw: 'Ramani ya Safari' },
 
   // Dashboard
   'dashboard.welcome': { en: 'Welcome back', sw: 'Karibu tena' },
@@ -111,6 +138,7 @@ const translations: Translations = {
   'dashboard.generateReport': { en: 'Generate Report', sw: 'Tengeneza Ripoti' },
   'dashboard.aiInsights': { en: 'AI Insights', sw: 'Ufahamu wa AI' },
   'dashboard.recentActivity': { en: 'Recent Activity', sw: 'Shughuli za Hivi Karibuni' },
+  'dashboard.creditScore': { en: 'Credit Score', sw: 'Alama za Mikopo' },
 
   // Projects
   'projects.title': { en: 'Projects', sw: 'Miradi' },
@@ -119,6 +147,26 @@ const translations: Translations = {
   'projects.budget': { en: 'Budget', sw: 'Bajeti' },
   'projects.deadline': { en: 'Deadline', sw: 'Tarehe ya Mwisho' },
   'projects.progress': { en: 'Progress', sw: 'Maendeleo' },
+
+  // Search
+  'search.title': { en: 'Find Construction Professionals', sw: 'Tafuta Wataalamu wa Ujenzi' },
+  'search.subtitle': { en: 'Search for engineers, architects, contractors and suppliers across Kenya', sw: 'Tafuta wahandisi, wasanifu, wakandarasi na wasambazaji kote Kenya' },
+  'search.results': { en: 'Results', sw: 'Matokeo' },
+  'search.viewProfile': { en: 'View Profile', sw: 'Tazama Wasifu' },
+  'search.contact': { en: 'Contact', sw: 'Wasiliana' },
+
+  // Credits
+  'credits.title': { en: 'Credit Score', sw: 'Alama za Mikopo' },
+  'credits.earned': { en: 'Credits Earned', sw: 'Alama Zilizopatikana' },
+  'credits.remaining': { en: 'Credits Remaining', sw: 'Alama Zilizobaki' },
+  'credits.freeTrial': { en: '6-Month Bonus Active', sw: 'Bonasi ya Miezi 6 Hai' },
+
+  // Customer Journey
+  'journey.title': { en: 'Your Journey', sw: 'Safari Yako' },
+  'journey.discovery': { en: 'Discovery', sw: 'Ugunduzi' },
+  'journey.onboarding': { en: 'Onboarding', sw: 'Kujiandikisha' },
+  'journey.engagement': { en: 'Engagement', sw: 'Ushiriki' },
+  'journey.retention': { en: 'Retention', sw: 'Uhifadhi' },
 
   // Common
   'common.search': { en: 'Search...', sw: 'Tafuta...' },
@@ -131,6 +179,7 @@ const translations: Translations = {
   'common.add': { en: 'Add', sw: 'Ongeza' },
   'common.view': { en: 'View', sw: 'Tazama' },
   'common.back': { en: 'Back', sw: 'Rudi' },
+  'common.language': { en: 'Language', sw: 'Lugha' },
 };
 
 interface LanguageContextType {

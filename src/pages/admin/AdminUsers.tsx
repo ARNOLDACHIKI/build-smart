@@ -27,7 +27,7 @@ const AdminUsers = () => (
       <Input placeholder="Search users..." className="pl-9" />
     </div>
 
-    <Card className="glass-card border-0">
+    <Card className="card-3d border-0">
       <CardContent className="p-0">
         <Table>
           <TableHeader>

@@ -29,7 +29,7 @@ const Notifications = () => {
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-3">
           {notifications.map((n, i) => (
-            <Card key={i} className={`glass-card border-0 ${!n.read ? 'ring-1 ring-primary/20' : 'opacity-70'}`}>
+            <Card key={i} className={`card-3d border-0 ${!n.read ? 'ring-1 ring-primary/20' : 'opacity-70'}`}>
               <CardContent className="p-4 flex items-start gap-3">
                 <n.icon className={`w-5 h-5 mt-0.5 ${typeColors[n.type as keyof typeof typeColors]}`} />
                 <div className="flex-1">
@@ -42,7 +42,7 @@ const Notifications = () => {
           ))}
         </div>
 
-        <Card className="glass-card border-0 h-fit">
+        <Card className="card-3d border-0 h-fit">
           <CardContent className="p-4 space-y-4">
             <h3 className="font-semibold text-sm">Notification Preferences</h3>
             <div className="space-y-3">

@@ -3,8 +3,8 @@ import { Star, Quote } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const testimonials = [
-  { name: 'James Kariuki', role: 'Project Manager, Nairobi', text: 'BuildSmart reduced our project delays by 40%. The AI insights are incredibly accurate for Kenyan market conditions.', rating: 5 },
-  { name: 'Amina Hassan', role: 'Civil Engineer, Mombasa', text: 'The budget tracking feature saved us millions in cost overruns. Best construction platform in East Africa.', rating: 5 },
+  { name: 'James Kariuki', role: 'Project Manager, Nairobi', text: 'ICDBO Data Analytics reduced our project delays by 40%. The insights are incredibly accurate for Kenyan market conditions.', rating: 5 },
+  { name: 'Amina Hassan', role: 'Civil Engineer, Mombasa', text: 'The budget tracking and professional directory saved us millions. Best construction platform in East Africa.', rating: 5 },
   { name: 'Peter Odhiambo', role: 'Contractor, Kisumu', text: 'From document management to risk alerts, everything is streamlined. My team productivity increased by 60%.', rating: 5 },
 ];
 
@@ -34,7 +34,7 @@ const TestimonialsSection = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.15 }}
-              className="glass-card p-6 relative"
+              className="card-3d p-6 relative"
             >
               <Quote className="w-8 h-8 text-primary/20 absolute top-4 right-4" />
               <div className="flex gap-0.5 mb-4">

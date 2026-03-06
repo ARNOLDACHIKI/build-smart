@@ -6,97 +6,98 @@
 
 @layer base {
   :root {
-    --background: 150 20% 98%;
-    --foreground: 170 30% 8%;
+    /* Light mode - adapted from ICDBO brand */
+    --background: 230 15% 95%;
+    --foreground: 230 27% 10%;
 
-    --card: 160 15% 96%;
-    --card-foreground: 170 30% 8%;
+    --card: 230 15% 92%;
+    --card-foreground: 230 27% 10%;
 
-    --popover: 150 20% 98%;
-    --popover-foreground: 170 30% 8%;
+    --popover: 230 15% 95%;
+    --popover-foreground: 230 27% 10%;
 
-    --primary: 168 80% 36%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 69 68% 51%;
+    --primary-foreground: 230 27% 10%;
 
-    --secondary: 160 25% 92%;
-    --secondary-foreground: 170 30% 15%;
+    --secondary: 230 15% 88%;
+    --secondary-foreground: 230 27% 15%;
 
-    --muted: 160 15% 93%;
-    --muted-foreground: 170 10% 45%;
+    --muted: 230 12% 90%;
+    --muted-foreground: 220 9% 46%;
 
-    --accent: 174 72% 40%;
+    --accent: 73 42% 31%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 160 20% 88%;
-    --input: 160 20% 88%;
-    --ring: 168 80% 36%;
+    --border: 228 15% 82%;
+    --input: 228 15% 82%;
+    --ring: 69 68% 51%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 160 20% 96%;
-    --sidebar-foreground: 170 20% 20%;
-    --sidebar-primary: 168 80% 36%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 174 30% 90%;
-    --sidebar-accent-foreground: 170 30% 15%;
-    --sidebar-border: 160 20% 88%;
-    --sidebar-ring: 168 80% 36%;
+    --sidebar-background: 230 15% 93%;
+    --sidebar-foreground: 230 20% 20%;
+    --sidebar-primary: 69 68% 51%;
+    --sidebar-primary-foreground: 230 27% 10%;
+    --sidebar-accent: 230 12% 88%;
+    --sidebar-accent-foreground: 230 20% 15%;
+    --sidebar-border: 228 15% 82%;
+    --sidebar-ring: 69 68% 51%;
 
-    --success: 152 69% 40%;
+    --success: 142 71% 45%;
     --warning: 38 92% 50%;
-    --info: 199 89% 48%;
+    --info: 217 91% 60%;
 
-    --glass: 160 20% 98% / 0.7;
-    --glass-border: 160 20% 88% / 0.5;
+    --glass: 230 15% 95% / 0.8;
+    --glass-border: 228 15% 82% / 0.5;
   }
 
   .dark {
-    --background: 170 30% 5%;
-    --foreground: 160 15% 93%;
+    --background: 230 27% 10%;
+    --foreground: 0 0% 100%;
 
-    --card: 170 25% 8%;
-    --card-foreground: 160 15% 93%;
+    --card: 230 24% 14%;
+    --card-foreground: 0 0% 100%;
 
-    --popover: 170 25% 8%;
-    --popover-foreground: 160 15% 93%;
+    --popover: 230 24% 14%;
+    --popover-foreground: 0 0% 100%;
 
-    --primary: 168 80% 42%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 69 68% 51%;
+    --primary-foreground: 230 27% 10%;
 
-    --secondary: 170 20% 14%;
-    --secondary-foreground: 160 15% 90%;
+    --secondary: 230 22% 12%;
+    --secondary-foreground: 228 7% 67%;
 
-    --muted: 170 20% 14%;
-    --muted-foreground: 160 10% 55%;
+    --muted: 230 22% 12%;
+    --muted-foreground: 228 7% 67%;
 
-    --accent: 174 72% 45%;
+    --accent: 73 42% 31%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62% 40%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 170 20% 15%;
-    --input: 170 20% 15%;
-    --ring: 168 80% 42%;
+    --border: 228 18% 20%;
+    --input: 228 18% 20%;
+    --ring: 69 68% 51%;
 
-    --sidebar-background: 170 25% 7%;
-    --sidebar-foreground: 160 15% 85%;
-    --sidebar-primary: 168 80% 42%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 170 20% 12%;
-    --sidebar-accent-foreground: 160 15% 90%;
-    --sidebar-border: 170 20% 15%;
-    --sidebar-ring: 168 80% 42%;
+    --sidebar-background: 230 22% 12%;
+    --sidebar-foreground: 228 7% 67%;
+    --sidebar-primary: 69 68% 51%;
+    --sidebar-primary-foreground: 230 27% 10%;
+    --sidebar-accent: 230 27% 16%;
+    --sidebar-accent-foreground: 228 7% 67%;
+    --sidebar-border: 228 18% 20%;
+    --sidebar-ring: 69 68% 51%;
 
-    --success: 152 69% 45%;
-    --warning: 38 92% 55%;
-    --info: 199 89% 55%;
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --info: 217 91% 60%;
 
-    --glass: 170 25% 8% / 0.7;
-    --glass-border: 170 20% 20% / 0.5;
+    --glass: 230 24% 14% / 0.7;
+    --glass-border: 228 18% 20% / 0.5;
   }
 }
 
@@ -126,33 +127,50 @@
     @apply glass rounded-xl shadow-lg;
   }
 
+  .card-3d {
+    @apply glass rounded-xl shadow-lg transition-all duration-300;
+    transform: perspective(1000px) rotateX(2deg) rotateY(-1deg);
+    box-shadow: 
+      0 10px 30px -10px hsl(var(--primary) / 0.15),
+      0 20px 40px -15px hsl(230 27% 10% / 0.4),
+      inset 0 1px 0 hsl(0 0% 100% / 0.05);
+  }
+
+  .card-3d:hover {
+    transform: perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(-4px);
+    box-shadow: 
+      0 15px 40px -10px hsl(var(--primary) / 0.25),
+      0 25px 50px -15px hsl(230 27% 10% / 0.5),
+      inset 0 1px 0 hsl(0 0% 100% / 0.1);
+  }
+
   .gradient-primary {
-    background: linear-gradient(135deg, hsl(168 80% 36%), hsl(174 72% 40%));
+    background: linear-gradient(135deg, hsl(69 68% 51%), hsl(73 42% 31%));
   }
 
   .dark .gradient-primary {
-    background: linear-gradient(135deg, hsl(168 80% 42%), hsl(174 72% 45%));
+    background: linear-gradient(135deg, hsl(69 68% 51%), hsl(73 50% 38%));
   }
 
   .gradient-text {
-    background: linear-gradient(135deg, hsl(168 80% 36%), hsl(174 72% 40%));
+    background: linear-gradient(135deg, hsl(69 68% 51%), hsl(73 50% 38%));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
   .dark .gradient-text {
-    background: linear-gradient(135deg, hsl(168 80% 50%), hsl(174 72% 55%));
+    background: linear-gradient(135deg, hsl(69 68% 58%), hsl(73 50% 45%));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
   .glow {
-    box-shadow: 0 0 20px hsl(168 80% 36% / 0.3), 0 0 60px hsl(168 80% 36% / 0.1);
+    box-shadow: 0 0 20px hsl(69 68% 51% / 0.3), 0 0 60px hsl(69 68% 51% / 0.1);
   }
 
   .dark .glow {
-    box-shadow: 0 0 20px hsl(168 80% 42% / 0.4), 0 0 60px hsl(168 80% 42% / 0.15);
+    box-shadow: 0 0 20px hsl(69 68% 51% / 0.4), 0 0 60px hsl(69 68% 51% / 0.15);
   }
 }

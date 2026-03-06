@@ -2,17 +2,20 @@ import { useLocation, Link } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, BarChart3, FileText, CheckSquare,
   FileArchive, Users, Bell, Settings, HelpCircle, Sun, Moon, Globe,
-  Building2, LogOut, ChevronLeft
+  LogOut, Award, Map, Search
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter,
   SidebarHeader, useSidebar,
 } from '@/components/ui/sidebar';
 import { NavLink } from '@/components/NavLink';
+import logoDark from '@/assets/logo-dark.png';
+import logoLight from '@/assets/logo-light.png';
 
 const menuItems = [
   { key: 'sidebar.dashboard', icon: LayoutDashboard, url: '/dashboard' },
@@ -22,6 +25,9 @@ const menuItems = [
   { key: 'sidebar.tasks', icon: CheckSquare, url: '/dashboard/tasks' },
   { key: 'sidebar.documents', icon: FileArchive, url: '/dashboard/documents' },
   { key: 'sidebar.team', icon: Users, url: '/dashboard/team' },
+  { key: 'sidebar.search', icon: Search, url: '/dashboard/search' },
+  { key: 'sidebar.credits', icon: Award, url: '/dashboard/credits' },
+  { key: 'sidebar.journey', icon: Map, url: '/dashboard/journey' },
   { key: 'sidebar.notifications', icon: Bell, url: '/dashboard/notifications' },
   { key: 'sidebar.settings', icon: Settings, url: '/dashboard/settings' },
   { key: 'sidebar.support', icon: HelpCircle, url: '/dashboard/support' },
@@ -37,10 +43,7 @@ const AppSidebar = () => {
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
         <Link to="/dashboard" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
-            <Building2 className="w-4 h-4 text-primary-foreground" />
-          </div>
-          {!collapsed && <span className="text-lg font-bold font-['Space_Grotesk'] gradient-text">BuildSmart</span>}
+          <img src={theme === 'dark' ? logoDark : logoLight} alt="ICDBO" className="h-8 w-auto" />
         </Link>
       </SidebarHeader>
 
@@ -64,14 +67,27 @@ const AppSidebar = () => {
       </SidebarContent>
 
       <SidebarFooter className="p-3 space-y-2">
+        {!collapsed && (
+          <Select value={language} onValueChange={(v) => setLanguage(v as 'en' | 'sw')}>
+            <SelectTrigger className="h-8 text-xs">
+              <Globe className="w-3.5 h-3.5 mr-1" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="en">English</SelectItem>
+              <SelectItem value="sw">Kiswahili</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-8 w-8">
             {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setLanguage(language === 'en' ? 'sw' : 'en')} className="h-8 w-8 relative">
-            <Globe className="w-4 h-4" />
-            {!collapsed && <span className="absolute -bottom-1 -right-0.5 text-[9px] font-bold text-primary">{language.toUpperCase()}</span>}
-          </Button>
+          {collapsed && (
+            <Button variant="ghost" size="icon" onClick={() => setLanguage(language === 'en' ? 'sw' : 'en')} className="h-8 w-8">
+              <Globe className="w-4 h-4" />
+            </Button>
+          )}
           {!collapsed && (
             <Link to="/" className="ml-auto">
               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">

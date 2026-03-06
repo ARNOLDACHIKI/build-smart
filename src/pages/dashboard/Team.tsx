@@ -26,7 +26,7 @@ const Team = () => {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {members.map((m, i) => (
-          <Card key={i} className="glass-card border-0">
+          <Card key={i} className="card-3d border-0">
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">

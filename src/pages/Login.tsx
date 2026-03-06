@@ -1,40 +1,40 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { motion } from 'framer-motion';
+import logoDark from '@/assets/logo-dark.png';
+import logoLight from '@/assets/logo-light.png';
 
 const Login = () => {
   const { t } = useLanguage();
+  const { theme } = useTheme();
   const [showPassword, setShowPassword] = useState(false);
 
   return (
     <div className="min-h-screen flex relative overflow-hidden">
-      {/* Decorative side */}
       <div className="hidden lg:flex lg:w-1/2 gradient-primary relative items-center justify-center">
         <div className="absolute inset-0 opacity-10" style={{
           backgroundImage: 'linear-gradient(white 1px, transparent 1px), linear-gradient(90deg, white 1px, transparent 1px)',
           backgroundSize: '40px 40px'
         }} />
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center text-primary-foreground relative z-10 p-12">
-          <Building2 className="w-16 h-16 mx-auto mb-6" />
-          <h2 className="text-4xl font-bold font-['Space_Grotesk'] mb-4">BuildSmart Kenya</h2>
-          <p className="text-lg opacity-90 max-w-md">AI-powered construction management for smarter, faster, and more efficient project delivery.</p>
+          <img src={logoDark} alt="ICDBO" className="h-24 w-auto mx-auto mb-6" />
+          <h2 className="text-3xl font-bold font-['Space_Grotesk'] mb-4">ICDBO Data Analytics</h2>
+          <p className="text-lg opacity-90 max-w-md">Informing the construction market. Shaping the future.</p>
+          <p className="text-sm opacity-75 mt-2">ACCESS. INCENTIVISE. ACTION.</p>
         </motion.div>
       </div>
 
-      {/* Form side */}
       <div className="flex-1 flex items-center justify-center p-8">
         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="w-full max-w-md">
           <Link to="/" className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-9 h-9 rounded-lg gradient-primary flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-bold font-['Space_Grotesk'] gradient-text">BuildSmart</span>
+            <img src={theme === 'dark' ? logoDark : logoLight} alt="ICDBO" className="h-12 w-auto" />
           </Link>
 
           <h1 className="text-3xl font-bold font-['Space_Grotesk'] mb-2">{t('nav.login')}</h1>

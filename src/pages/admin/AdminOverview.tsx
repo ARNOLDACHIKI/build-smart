@@ -27,7 +27,7 @@ const AdminOverview = () => (
 
     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {stats.map((s, i) => (
-        <Card key={i} className="glass-card border-0">
+        <Card key={i} className="card-3d border-0">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"><s.icon className="w-5 h-5 text-primary" /></div>
@@ -41,7 +41,7 @@ const AdminOverview = () => (
     </div>
 
     <div className="grid lg:grid-cols-2 gap-6">
-      <Card className="glass-card border-0">
+      <Card className="card-3d border-0">
         <CardHeader><CardTitle className="text-base font-['Space_Grotesk']">User Growth</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={250}>
@@ -56,7 +56,7 @@ const AdminOverview = () => (
         </CardContent>
       </Card>
 
-      <Card className="glass-card border-0">
+      <Card className="card-3d border-0">
         <CardHeader><CardTitle className="text-base font-['Space_Grotesk']">Revenue (KES M)</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={250}>
