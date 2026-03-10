@@ -1,0 +1,57 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String     @id @default(cuid())
+  email          String     @unique
+  password       String
+  name           String?
+  profilePicture String?
+  phone          String?
+  bio            String?
+  company        String?
+  location       String?
+  role           UserRole   @default(USER)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  
+  receivedInquiries Inquiry[] @relation("ReceivedInquiries")
+
+  @@map("users")
+}
+
+model Inquiry {
+  id          String        @id @default(cuid())
+  senderName  String
+  senderEmail String
+  senderPhone String?
+  message     String
+  recipientId String
+  recipient   User          @relation("ReceivedInquiries", fields: [recipientId], references: [id], onDelete: Cascade)
+  status      InquiryStatus @default(PENDING)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("inquiries")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  ENGINEER
+}
+
+enum InquiryStatus {
+  PENDING
+  READ
+  REPLIED
+}
