@@ -37,12 +37,31 @@ Set these in Render:
 - `FRONTEND_URL=https://your-frontend-domain.vercel.app`
 - `DEV_AUTH_BYPASS=false`
 
+## Optional environment variables
+
+Set these only if you want to customize the defaults:
+
+- `ASSISTANT_CHAT_LIMIT=12`
+- `ASSISTANT_DAILY_MESSAGE_LIMIT=50`
+- `OLLAMA_BASE_URL=http://127.0.0.1:11434`
+- `OLLAMA_MODEL=llama3.1`
+- `OLLAMA_TIMEOUT_MS=12000`
+
+## Variables you should not set in production
+
+These are only for local development and should usually be omitted in Render:
+
+- `DEV_ENGINEER_EMAIL`
+- `DEV_ENGINEER_PASSWORD`
+- `DEV_ENGINEER_NAME`
+
 ## Notes
 
 - Do **not** set `PORT`; Render injects it automatically.
 - If `DATABASE_URL` was ever shared publicly, rotate it in Neon before deploying.
 - `npx prisma migrate deploy` is included in the build so production schema changes are applied during deploy.
 - If your frontend uses a custom domain, set `FRONTEND_URL` to that final HTTPS origin.
+- If you are not running Ollama on the Render instance, leave the `OLLAMA_*` variables unset and the backend will fall back to its built-in non-Ollama behavior.
 
 ## After saving Render settings
 
