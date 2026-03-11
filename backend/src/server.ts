@@ -820,37 +820,128 @@ const MATERIAL_COST_REFERENCES: Record<string, { unit: string; min: number; max:
   blocks: { unit: "piece", min: 65, max: 140 },
 };
 
-const detectAssistantIntent = (message: string): { intent: AssistantIntentName; confidence: number } => {
-  const text = message.toLowerCase();
+const normalizeAssistantText = (message: string): string => {
+  return message
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+};
 
-  if (/\b(hello|hi|hey|good morning|good afternoon|good evening)\b/.test(text)) {
+const tokenizeAssistantText = (message: string): string[] => {
+  return normalizeAssistantText(message).split(" ").filter(Boolean);
+};
+
+const levenshteinDistance = (left: string, right: string): number => {
+  if (left === right) return 0;
+  if (left.length === 0) return right.length;
+  if (right.length === 0) return left.length;
+
+  const matrix: number[][] = Array.from({ length: left.length + 1 }, () => Array(right.length + 1).fill(0));
+
+  for (let i = 0; i <= left.length; i += 1) matrix[i][0] = i;
+  for (let j = 0; j <= right.length; j += 1) matrix[0][j] = j;
+
+  for (let i = 1; i <= left.length; i += 1) {
+    for (let j = 1; j <= right.length; j += 1) {
+      const cost = left[i - 1] === right[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost,
+      );
+    }
+  }
+
+  return matrix[left.length][right.length];
+};
+
+const tokenMatchesKeyword = (token: string, keyword: string): boolean => {
+  if (token === keyword) return true;
+  if (token.length >= 4 && keyword.length >= 4) {
+    const maxDistance = keyword.length >= 8 ? 2 : 1;
+    if (levenshteinDistance(token, keyword) <= maxDistance) return true;
+    if (token.includes(keyword) || keyword.includes(token)) return true;
+  }
+  return false;
+};
+
+const includesSemanticKeyword = (message: string, keywords: string[]): boolean => {
+  const normalized = normalizeAssistantText(message);
+  const tokens = tokenizeAssistantText(message);
+
+  return keywords.some((keyword) => {
+    const normalizedKeyword = normalizeAssistantText(keyword);
+    if (!normalizedKeyword) return false;
+    if (normalizedKeyword.includes(" ")) {
+      return normalized.includes(normalizedKeyword);
+    }
+    return tokens.some((token) => tokenMatchesKeyword(token, normalizedKeyword));
+  });
+};
+
+const detectAssistantIntent = (message: string): { intent: AssistantIntentName; confidence: number } => {
+  const text = normalizeAssistantText(message);
+  const hasGreeting = includesSemanticKeyword(message, ["hello", "hi", "hey", "good morning", "good afternoon", "good evening", "habari", "sasa"]);
+  const hasTaskWord = includesSemanticKeyword(message, ["task", "todo", "to do", "reminder", "action item"]);
+  const hasCreateWord = includesSemanticKeyword(message, ["create", "add", "set", "make", "remind", "track"]);
+  const hasScheduleWord = includesSemanticKeyword(message, ["schedule", "book", "arrange", "set up", "plan"]);
+  const hasMeetingWord = includesSemanticKeyword(message, ["meeting", "call", "consultation", "discussion", "session"]);
+  const hasBudgetWord = includesSemanticKeyword(message, ["budget", "funds", "cost", "spend", "afford"]);
+  const hasEstimateWord = includesSemanticKeyword(message, ["estimate", "quote", "how much", "rough cost", "pricing"]);
+  const hasRiskWord = includesSemanticKeyword(message, ["risk", "risks", "hazard", "challenge", "concern"]);
+  const hasStatusWord = includesSemanticKeyword(message, ["status", "progress", "update", "how far", "current phase"]);
+  const hasRegulationWord = includesSemanticKeyword(message, ["regulation", "permit", "approval", "code", "nema", "compliance", "license"]);
+  const hasPlanningWord = includesSemanticKeyword(message, ["plan", "planning", "roadmap", "timeline", "phases", "steps"]);
+  const hasAdviceWord = includesSemanticKeyword(message, ["advice", "guide", "guidance", "recommendation", "best practice", "how should"]);
+  const hasContractorWord = includesSemanticKeyword(message, ["contractor", "builder", "construction team"]);
+  const hasMaterialWord = includesSemanticKeyword(message, ["material", "cement", "steel", "sand", "ballast", "blocks"]);
+
+  if (hasGreeting && text.split(" ").length <= 6) {
     return { intent: "GREETING", confidence: 0.96 };
   }
+
   if (isContactEngineerIntent(message)) return { intent: "CONTACT_ENGINEER", confidence: 0.94 };
-  if (/\b(create|add|set|make)\b.*\btask\b|\bremind me\b/.test(text)) return { intent: "TASK_CREATION", confidence: 0.92 };
-  if (/\b(task|tasks?)\b.*\b(status|follow ?up|pending|overdue|complete|completed)\b|\b(pending|overdue|completed?)\b.*\btasks?\b|\boverdue tasks?\b/.test(text)) {
+
+  if ((hasCreateWord && hasTaskWord) || /\bremind me\b/.test(text)) return { intent: "TASK_CREATION", confidence: 0.92 };
+
+  if ((hasTaskWord && includesSemanticKeyword(message, ["status", "follow up", "pending", "overdue", "complete", "completed"])) || /\boverdue tasks?\b/.test(text)) {
     return { intent: "TASK_FOLLOWUP", confidence: 0.9 };
   }
-  if (/\b(schedule|book|arrange|set up)\b.*\b(meeting|call|consultation)\b/.test(text)) {
+
+  if ((hasScheduleWord && hasMeetingWord) || (/\btomorrow|today|next week|\d{4}-\d{2}-\d{2}\b/.test(text) && hasMeetingWord)) {
     return { intent: "SCHEDULE_MEETING", confidence: 0.92 };
   }
+
   if (isEngineerDiscoveryIntent(message)) return { intent: "ENGINEER_DISCOVERY", confidence: 0.9 };
-  if (/\b(estimate|cost estimate|how much|rough cost)\b/.test(text)) return { intent: "PROJECT_COST_ESTIMATE", confidence: 0.9 };
-  if (/\b(budget analysis|analy[sz]e budget|budget enough|reduce cost|optimi[sz]e budget)\b/.test(text)) {
+
+  if (hasEstimateWord || (/\bhow much\b/.test(text) && includesSemanticKeyword(message, ["build", "construction", "project"]))) {
+    return { intent: "PROJECT_COST_ESTIMATE", confidence: 0.9 };
+  }
+
+  if ((hasBudgetWord && includesSemanticKeyword(message, ["analyze", "analysis", "enough", "optimize", "reduce"])) || /\bbudget enough\b/.test(text)) {
     return { intent: "PROJECT_BUDGET_ANALYSIS", confidence: 0.9 };
   }
-  if (/\b(plan|planning|project plan|phases|roadmap)\b/.test(text)) return { intent: "PROJECT_PLANNING", confidence: 0.88 };
-  if (/\b(risk|risks|risk analysis|risk assessment)\b/.test(text)) return { intent: "PROJECT_RISK_ANALYSIS", confidence: 0.9 };
-  if (/\b(project status|progress update|current phase|status of project)\b/.test(text)) return { intent: "PROJECT_STATUS_QUERY", confidence: 0.88 };
-  if (/\b(regulation|permit|approval|code|nema|compliance)\b/.test(text)) return { intent: "CONSTRUCTION_REGULATIONS", confidence: 0.9 };
-  if (/\b(material|cement|steel|sand|ballast|blocks?)\b.*\b(price|cost|rate)\b|\b(price|cost)\b.*\b(cement|steel|sand|ballast|blocks?)\b/.test(text)) {
+
+  if (hasPlanningWord) return { intent: "PROJECT_PLANNING", confidence: 0.88 };
+  if (hasRiskWord) return { intent: "PROJECT_RISK_ANALYSIS", confidence: 0.9 };
+  if (hasStatusWord) return { intent: "PROJECT_STATUS_QUERY", confidence: 0.88 };
+  if (hasRegulationWord) return { intent: "CONSTRUCTION_REGULATIONS", confidence: 0.9 };
+
+  if (hasMaterialWord && includesSemanticKeyword(message, ["price", "cost", "rate", "market"])) {
     return { intent: "MATERIAL_COST_LOOKUP", confidence: 0.9 };
   }
-  if (/\b(recommend|best|top)\b.*\b(contractor|contractors)\b/.test(text)) return { intent: "CONTRACTOR_RECOMMENDATION", confidence: 0.9 };
-  if (/\b(in|near|around)\s+(nairobi|mombasa|kisumu|nakuru|eldoret|thika|nyeri|naivasha)\b.*\b(engineer|contractor|consultant|supplier|professional)s?\b|\bfind\b.*\b(in|near|around)\b/.test(text)) {
+
+  if (hasContractorWord && includesSemanticKeyword(message, ["recommend", "best", "top", "suggest"])) {
+    return { intent: "CONTRACTOR_RECOMMENDATION", confidence: 0.9 };
+  }
+
+  if ((includesSemanticKeyword(message, ["in", "near", "around", "near me", "my area"]) && extractLocationHint(message) !== null)
+    || (includesSemanticKeyword(message, ["find", "search", "list", "show"]) && includesSemanticKeyword(message, ["engineer", "contractor", "consultant", "supplier", "professional"]))) {
     return { intent: "LOCATION_BASED_SEARCH", confidence: 0.88 };
   }
-  if (/\b(advice|recommendation|best practice|how should i)\b/.test(text)) return { intent: "CONSTRUCTION_ADVICE", confidence: 0.82 };
+
+  if (hasAdviceWord) return { intent: "CONSTRUCTION_ADVICE", confidence: 0.82 };
 
   return { intent: "GENERAL_CONVERSATION", confidence: 0.6 };
 };
@@ -1021,14 +1112,56 @@ const isTargetMarketIntent = (message: string) => {
 };
 
 const isEngineerDiscoveryIntent = (message: string) => {
-  return /\b(list|find|show|recommend|search)\b.*\b(engineer|architect|consultant|contractor|professionals?)\b/i.test(message)
-    || /\b(engineers?|architects?|consultants?)\b.*\b(in|near|around)\b/i.test(message);
+  return (includesSemanticKeyword(message, ["list", "find", "show", "recommend", "search", "looking for", "connect me with"])
+    && includesSemanticKeyword(message, ["engineer", "architect", "consultant", "contractor", "professional", "expert"]))
+    || (includesSemanticKeyword(message, ["engineers", "architects", "consultants", "contractors"])
+      && includesSemanticKeyword(message, ["in", "near", "around", "within", "from"]));
 };
 
 const isContactEngineerIntent = (message: string) => {
+  const hasContactVerb = includesSemanticKeyword(message, [
+    "contact",
+    "message",
+    "reach out",
+    "email",
+    "notify",
+    "ask",
+    "talk to",
+    "speak to",
+    "connect me with",
+    "loop in",
+    "ping",
+  ]);
+
+  const hasProfessionalTerm = includesSemanticKeyword(message, [
+    "eng",
+    "engineer",
+    "architect",
+    "consultant",
+    "contractor",
+    "qs",
+    "quantity surveyor",
+    "professional",
+    "expert",
+  ]);
+
+  return hasContactVerb && hasProfessionalTerm;
+};
+
+const isRepeatContactRequestIntent = (message: string) => {
   const lower = message.toLowerCase();
-  return /\b(contact|message|reach out|email|notify|ask)\b/.test(lower)
-    && /\b(eng\.?|engineer|architect|consultant|contractor|qs|quantity\s+surveyor)\b/.test(lower);
+  return /\b(send|do|create|make|submit)\b.*\b(another|one more|same)\b/.test(lower)
+    || /\banother one\b/.test(lower)
+    || /\bone more\b/.test(lower)
+    || /\bsame (?:again|thing|request)\b/.test(lower)
+    || /\brepeat (?:that|it|request)\b/.test(lower);
+};
+
+const isAlternateContactRequestIntent = (message: string) => {
+  const lower = message.toLowerCase();
+  return /\b(send|share|route|forward|submit)\b.*\b(to|for)\b.*\b(another|different|someone else|other)\b/.test(lower)
+    || /\b(another|different|someone else|other)\s+(one|person|professional|engineer|architect|consultant|contractor)\b/.test(lower)
+    || /\bsend (?:it|that|this) to another\b/.test(lower);
 };
 
 const CONTACTABLE_ROLES: AppUserRole[] = [
@@ -2913,11 +3046,28 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
     }
   }
 
-  const detectedIntent = detectAssistantIntent(trimmedMessage);
+  let assistantInputMessage = trimmedMessage;
+  let repeatedContactFromHistory = false;
+  let sendToAnotherProfessional = false;
+  const followupContactRequested = isRepeatContactRequestIntent(trimmedMessage) || isAlternateContactRequestIntent(trimmedMessage);
+
+  if (followupContactRequested) {
+    const priorContactMessage = [...storedHistory]
+      .reverse()
+      .find((item) => item.role === "user" && isContactEngineerIntent(item.content));
+
+    if (priorContactMessage?.content) {
+      assistantInputMessage = priorContactMessage.content;
+      repeatedContactFromHistory = true;
+      sendToAnotherProfessional = isAlternateContactRequestIntent(trimmedMessage);
+    }
+  }
+
+  const detectedIntent = detectAssistantIntent(assistantInputMessage);
   const routingDebug = buildRoutingDebugInfo({
     intent: detectedIntent.intent,
     confidence: detectedIntent.confidence,
-    message: trimmedMessage,
+    message: assistantInputMessage,
   });
 
   if (detectedIntent.intent === "GREETING") {
@@ -3398,8 +3548,8 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
     }
   }
 
-  if (isContactEngineerIntent(trimmedMessage)) {
-    const requestedName = extractContactEngineerName(trimmedMessage);
+  if (isContactEngineerIntent(assistantInputMessage)) {
+    const requestedName = extractContactEngineerName(assistantInputMessage);
     if (!requestedName) {
       return sendAssistantResponse({
         reply: "I can do that. Please include the engineer name, for example: contact Eng. David Mwangi and ask for meeting availability.",
@@ -3407,7 +3557,7 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
       });
     }
 
-    const contactRequestText = extractContactRequestText(trimmedMessage);
+    const contactRequestText = extractContactRequestText(assistantInputMessage);
 
     try {
       const potentialEngineers = await prisma.user.findMany({
@@ -3437,7 +3587,48 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
         }))
         .sort((a, b) => b.score - a.score);
 
-      const selected = ranked[0]?.engineer;
+      let selected = ranked[0]?.engineer;
+
+      if (sendToAnotherProfessional && selected) {
+        const alternativeFromRanked = ranked.find((item) => item.engineer.id !== selected.id && item.score > 0)?.engineer;
+
+        if (alternativeFromRanked) {
+          selected = alternativeFromRanked;
+        } else {
+          const locationHint = extractLocationHint(assistantInputMessage);
+          const fallbackAlternative = await prisma.user.findFirst({
+            where: {
+              role: { in: CONTACTABLE_ROLES as never },
+              id: { not: selected.id },
+              ...(locationHint
+                ? {
+                    location: {
+                      contains: locationHint,
+                      mode: "insensitive",
+                    },
+                  }
+                : {}),
+            } as never,
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              location: true,
+              company: true,
+            },
+            orderBy: { createdAt: "desc" },
+          });
+
+          if (fallbackAlternative) {
+            selected = fallbackAlternative;
+          } else {
+            return sendAssistantResponse({
+              reply: `I couldn't find another matching professional beyond ${selected.name || selected.email}. Ask me to list professionals first and choose one by name.`,
+              source: "task-contact",
+            });
+          }
+        }
+      }
 
       if (!selected) {
         const sampleMatch = SAMPLE_ENGINEERS
@@ -3488,6 +3679,8 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
       const inquiryMessage = [
         `AI assistant task created by ${senderName}.`,
         `User request: ${trimmedMessage}`,
+        ...(assistantInputMessage !== trimmedMessage ? [`Resolved context: ${assistantInputMessage}`] : []),
+        ...(sendToAnotherProfessional ? ["Follow-up mode: route to another matching professional."] : []),
         `Action required: ${contactRequestText}`,
       ].join("\n");
 
@@ -3504,7 +3697,11 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
 
       return sendAssistantResponse({
         reply: [
-          `Done. I sent your contact request to ${selected.name || selected.email}.`,
+          sendToAnotherProfessional
+            ? `Done. I sent this request to another professional: ${selected.name || selected.email}.`
+            : repeatedContactFromHistory
+            ? `Done. I repeated your previous contact request to ${selected.name || selected.email}.`
+            : `Done. I sent your contact request to ${selected.name || selected.email}.`,
           `Inquiry ID: ${inquiry.id}`,
           `Requested action: ${contactRequestText}`,
         ].join("\n"),
@@ -3519,8 +3716,8 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
     }
   }
 
-  if (isEngineerDiscoveryIntent(trimmedMessage)) {
-    const locationHint = extractLocationHint(trimmedMessage);
+  if (isEngineerDiscoveryIntent(assistantInputMessage)) {
+    const locationHint = extractLocationHint(assistantInputMessage);
 
     try {
       const engineers = await prisma.user.findMany({
@@ -3593,7 +3790,7 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
 
   const assistantResult = await generateAssistantReplyWithOllama({
     userName: req.auth?.email || "User",
-    message: trimmedMessage,
+    message: assistantInputMessage,
     history: storedHistory,
   });
 
