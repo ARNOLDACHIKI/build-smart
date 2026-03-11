@@ -24,6 +24,8 @@ type Inquiry = {
   senderEmail: string;
   senderPhone: string | null;
   message: string;
+  replyMessage?: string | null;
+  respondedAt?: string | null;
   status: 'PENDING' | 'READ' | 'REPLIED';
   createdAt: string;
   updatedAt: string;
@@ -153,9 +155,35 @@ const EngineerInbox = () => {
     }
     
     if (selectedInquiry) {
-      // In production, this would send an email via backend
-      toast.success(`Reply sent to ${selectedInquiry.senderEmail}`);
-      markAsReplied(selectedInquiry.id);
+      void sendReply(selectedInquiry.id, replyMessage);
+    }
+  };
+
+  const sendReply = async (id: string, content: string) => {
+    if (!token) return;
+
+    try {
+      const response = await fetch(apiUrl(`/api/inquiries/${id}/reply`), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ replyMessage: content }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send reply');
+      }
+
+      const updatedInquiry = await response.json() as Inquiry;
+      setInquiries(prev => prev.map(inq => inq.id === id ? updatedInquiry : inq));
+      setSelectedInquiry(updatedInquiry);
+      toast.success(`Reply sent to ${updatedInquiry.senderEmail}`);
+      setReplyMessage('');
+    } catch (error) {
+      console.error('Send reply error:', error);
+      toast.error('Failed to send reply');
     }
   };
 
@@ -384,6 +412,18 @@ const EngineerInbox = () => {
                   <p className="text-sm whitespace-pre-wrap">{selectedInquiry.message}</p>
                 </div>
               </div>
+
+              {selectedInquiry.replyMessage && (
+                <div>
+                  <Label className="text-sm font-medium">Saved Reply</Label>
+                  <div className="mt-2 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                    <p className="text-sm whitespace-pre-wrap">{selectedInquiry.replyMessage}</p>
+                    {selectedInquiry.respondedAt && (
+                      <p className="text-xs text-muted-foreground mt-2">Sent {formatDate(selectedInquiry.respondedAt)}</p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <Label htmlFor="reply">Your Reply</Label>

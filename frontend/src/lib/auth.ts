@@ -1,4 +1,5 @@
 import { apiUrl } from "@/lib/api";
+import type { AppRole } from "@/lib/roles";
 
 export type AuthUser = {
   id: string;
@@ -9,7 +10,7 @@ export type AuthUser = {
   bio?: string | null;
   company?: string | null;
   location?: string | null;
-  role: "USER" | "ADMIN" | "ENGINEER";
+  role: AppRole;
   createdAt: string;
   updatedAt: string;
 };
@@ -74,6 +75,7 @@ export const registerUser = async (payload: {
   phone?: string;
   company?: string;
   password: string;
+  role?: AppRole;
 }): Promise<AuthResponse> => {
   return request<AuthResponse>("/api/auth/register", {
     method: "POST",

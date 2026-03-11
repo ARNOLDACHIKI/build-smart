@@ -17,6 +17,32 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const prisma = new PrismaClient();
+const prismaDynamic = prisma as typeof prisma & {
+  assistantConversation: {
+    findMany: (...args: any[]) => Promise<any[]>;
+    count: (...args: any[]) => Promise<number>;
+    findFirst: (...args: any[]) => Promise<any>;
+    create: (...args: any[]) => Promise<any>;
+    update: (...args: any[]) => Promise<any>;
+    delete: (...args: any[]) => Promise<any>;
+  };
+  assistantConversationMessage: {
+    createMany: (...args: any[]) => Promise<any>;
+    count: (...args: any[]) => Promise<number>;
+  };
+  platformSetting: {
+    findMany: (...args: any[]) => Promise<any[]>;
+    upsert: (...args: any[]) => Promise<any>;
+  };
+  assistantTask: {
+    create: (...args: any[]) => Promise<any>;
+    findMany: (...args: any[]) => Promise<any[]>;
+  };
+  assistantMeeting: {
+    create: (...args: any[]) => Promise<any>;
+    findMany: (...args: any[]) => Promise<any[]>;
+  };
+};
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me";
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
@@ -27,6 +53,51 @@ const DEV_AUTH_BYPASS = process.env.DEV_AUTH_BYPASS === "true";
 const DEV_ENGINEER_EMAIL = process.env.DEV_ENGINEER_EMAIL || "engineer@local.test";
 const DEV_ENGINEER_PASSWORD = process.env.DEV_ENGINEER_PASSWORD || "Engineer1234";
 const DEV_ENGINEER_NAME = process.env.DEV_ENGINEER_NAME || "Mock Engineer";
+const ASSISTANT_CHAT_LIMIT = Math.max(1, Number(process.env.ASSISTANT_CHAT_LIMIT || "12"));
+const ASSISTANT_DAILY_MESSAGE_LIMIT = Math.max(1, Number(process.env.ASSISTANT_DAILY_MESSAGE_LIMIT || "50"));
+const ASSISTANT_CHAT_LIMIT_SETTING_KEY = "assistant.chat.limit";
+const ASSISTANT_DAILY_LIMIT_SETTING_KEY = "assistant.daily.limit";
+
+type SentInquiryRecord = {
+  id: string;
+  senderName: string;
+  senderEmail: string;
+  senderPhone: string | null;
+  senderUserId: string | null;
+  message: string;
+  replyMessage: string | null;
+  senderViewedAt: Date | null;
+  recipientId: string;
+  status: "PENDING" | "READ" | "REPLIED";
+  respondedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  recipient: {
+    id: string;
+    name: string | null;
+    email: string;
+    role: AppUserRole;
+    company: string | null;
+    location: string | null;
+  };
+};
+
+type AppUserRole =
+  | "USER"
+  | "ADMIN"
+  | "ENGINEER"
+  | "LABOURER"
+  | "CEMENT_SUPPLIER"
+  | "GENERAL_SUPPLIER"
+  | "DEVELOPER"
+  | "FINANCIER"
+  | "CONTRACTOR"
+  | "REAL_ESTATE"
+  | "CONSULTANT"
+  | "TENANT"
+  | "PROJECT_MANAGER"
+  | "REGULATOR"
+  | "LOCAL_STAKEHOLDER";
 
 type ProjectStatus = "PLANNING" | "IN_PROGRESS" | "REVIEW" | "COMPLETED";
 type ProjectPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -75,6 +146,49 @@ type AssistantMessage = {
 };
 
 type AiGenerationSource = "ollama" | "fallback";
+
+type AssistantIntentName =
+  | "ENGINEER_DISCOVERY"
+  | "CONTACT_ENGINEER"
+  | "PROJECT_COST_ESTIMATE"
+  | "PROJECT_BUDGET_ANALYSIS"
+  | "PROJECT_PLANNING"
+  | "CONSTRUCTION_ADVICE"
+  | "MATERIAL_COST_LOOKUP"
+  | "CONTRACTOR_RECOMMENDATION"
+  | "LOCATION_BASED_SEARCH"
+  | "TASK_CREATION"
+  | "TASK_FOLLOWUP"
+  | "SCHEDULE_MEETING"
+  | "PROJECT_RISK_ANALYSIS"
+  | "PROJECT_STATUS_QUERY"
+  | "CONSTRUCTION_REGULATIONS"
+  | "GREETING"
+  | "GENERAL_CONVERSATION";
+
+type IntentDefinition = {
+  intent_name: AssistantIntentName;
+  example_questions: string[];
+  function_to_call: string;
+  required_parameters: Record<string, string>;
+  expected_response_format: {
+    type: "object" | "list";
+    fields: string[];
+  };
+};
+
+type AssistantRoutingDebug = {
+  intent_name: AssistantIntentName;
+  confidence: number;
+  function_to_call: string;
+  required_parameters: Record<string, string>;
+  extracted_parameters: Record<string, string | number | boolean | null>;
+  missing_parameters: string[];
+  expected_response_format: {
+    type: "object" | "list";
+    fields: string[];
+  };
+};
 
 const getLocationFromMessage = (text: string) => {
   const cities = ["nairobi", "mombasa", "kisumu", "nakuru", "eldoret", "thika", "nyeri", "naivasha"];
@@ -576,8 +690,330 @@ const SAMPLE_ENGINEERS = [
   },
 ];
 
+const INTENT_DEFINITIONS: IntentDefinition[] = [
+  {
+    intent_name: "ENGINEER_DISCOVERY",
+    example_questions: ["Find structural engineers in Nairobi", "Show available civil engineers", "Who are engineers near Mombasa?"],
+    function_to_call: "findEngineers",
+    required_parameters: { specialization: "string (optional)", location: "string (optional)", project_type: "string (optional)" },
+    expected_response_format: { type: "list", fields: ["name", "specialization", "location", "company", "email"] },
+  },
+  {
+    intent_name: "CONTACT_ENGINEER",
+    example_questions: ["Contact Eng. David", "Send a request to QS Mary", "Message this engineer"],
+    function_to_call: "createEngineerContactRequest",
+    required_parameters: { engineer_id_or_name: "string", message: "string" },
+    expected_response_format: { type: "object", fields: ["status", "inquiry_id", "recipient", "message_summary"] },
+  },
+  {
+    intent_name: "PROJECT_COST_ESTIMATE",
+    example_questions: ["Estimate cost for 5-floor apartment", "How much to build in Kisumu?", "Rough construction cost"],
+    function_to_call: "estimateProjectCost",
+    required_parameters: { project_type: "string", location: "string", size_or_scope: "string" },
+    expected_response_format: { type: "object", fields: ["estimated_range_min", "estimated_range_max", "currency", "assumptions"] },
+  },
+  {
+    intent_name: "PROJECT_BUDGET_ANALYSIS",
+    example_questions: ["Analyze this budget", "Is my budget enough?", "Where can I reduce cost?"],
+    function_to_call: "analyzeBudget",
+    required_parameters: { budget_total: "number", project_type: "string (optional)", location: "string (optional)" },
+    expected_response_format: { type: "object", fields: ["budget_health", "gap_or_surplus", "high_risk_items", "recommendations"] },
+  },
+  {
+    intent_name: "PROJECT_PLANNING",
+    example_questions: ["Help me plan my project", "Create construction phases", "Generate a project plan"],
+    function_to_call: "generateProjectPlan",
+    required_parameters: { project_type: "string", location: "string (optional)", timeline_target: "string (optional)" },
+    expected_response_format: { type: "object", fields: ["phases", "deliverables", "timeline_estimate", "dependencies"] },
+  },
+  {
+    intent_name: "CONSTRUCTION_ADVICE",
+    example_questions: ["Advice for reducing delays", "Best foundation for weak soil", "How to avoid cost overruns"],
+    function_to_call: "getConstructionAdvice",
+    required_parameters: { question: "string", context: "string (optional)" },
+    expected_response_format: { type: "object", fields: ["advice", "tradeoffs", "next_actions"] },
+  },
+  {
+    intent_name: "MATERIAL_COST_LOOKUP",
+    example_questions: ["Cement price in Nairobi", "Steel price per ton", "Current cost of sand"],
+    function_to_call: "lookupMaterialCosts",
+    required_parameters: { material_name: "string", location: "string (optional)" },
+    expected_response_format: { type: "object", fields: ["material", "location", "unit_price_range", "currency", "notes"] },
+  },
+  {
+    intent_name: "CONTRACTOR_RECOMMENDATION",
+    example_questions: ["Recommend contractors", "Best contractor in Mombasa", "Contractors for apartment projects"],
+    function_to_call: "recommendContractors",
+    required_parameters: { project_type: "string (optional)", location: "string (optional)", budget_band: "string (optional)" },
+    expected_response_format: { type: "list", fields: ["contractor_name", "location", "specialty", "email"] },
+  },
+  {
+    intent_name: "LOCATION_BASED_SEARCH",
+    example_questions: ["Find professionals in Kisumu", "Suppliers near Nairobi", "Who is available around Nakuru"],
+    function_to_call: "searchByLocation",
+    required_parameters: { location: "string", entity_type: "string (optional)" },
+    expected_response_format: { type: "list", fields: ["name", "role", "location", "email"] },
+  },
+  {
+    intent_name: "TASK_CREATION",
+    example_questions: ["Create a task to review BOQ tomorrow", "Add task for site inspection", "Remind me to call supplier"],
+    function_to_call: "createTask",
+    required_parameters: { title: "string", due_date: "string (optional)", priority: "string (optional)" },
+    expected_response_format: { type: "object", fields: ["task_id", "title", "status", "due_date", "priority"] },
+  },
+  {
+    intent_name: "TASK_FOLLOWUP",
+    example_questions: ["Show my pending tasks", "Any overdue tasks?", "Task followup"],
+    function_to_call: "getTaskUpdates",
+    required_parameters: { filter: "string (optional)" },
+    expected_response_format: { type: "list", fields: ["task_id", "title", "status", "due_date", "priority"] },
+  },
+  {
+    intent_name: "SCHEDULE_MEETING",
+    example_questions: ["Schedule meeting with Eng. David tomorrow 10am", "Book consultation Friday", "Set meeting for project kickoff"],
+    function_to_call: "scheduleMeeting",
+    required_parameters: { participant_id_or_name: "string", date_time: "string", purpose: "string" },
+    expected_response_format: { type: "object", fields: ["meeting_id", "participants", "date_time", "status"] },
+  },
+  {
+    intent_name: "PROJECT_RISK_ANALYSIS",
+    example_questions: ["Analyze project risks", "What are major risks?", "Risk assessment for this build"],
+    function_to_call: "analyzeProjectRisk",
+    required_parameters: { project_type: "string", location: "string (optional)", budget: "number (optional)" },
+    expected_response_format: { type: "object", fields: ["risk_score", "top_risks", "impact_level", "mitigation_actions"] },
+  },
+  {
+    intent_name: "PROJECT_STATUS_QUERY",
+    example_questions: ["What is project status?", "Show latest progress", "How far are we?"],
+    function_to_call: "getProjectStatus",
+    required_parameters: { project_id_or_name: "string (optional)" },
+    expected_response_format: { type: "object", fields: ["current_phase", "progress_percent", "milestones", "blockers"] },
+  },
+  {
+    intent_name: "CONSTRUCTION_REGULATIONS",
+    example_questions: ["Permits needed in Nairobi", "Building regulations for apartments", "Do I need NEMA approval?"],
+    function_to_call: "getConstructionRegulations",
+    required_parameters: { location: "string", project_type: "string" },
+    expected_response_format: { type: "object", fields: ["required_permits", "regulatory_bodies", "compliance_checklist", "disclaimer"] },
+  },
+  {
+    intent_name: "GREETING",
+    example_questions: ["Hi", "Hello", "Good morning"],
+    function_to_call: "handleGreeting",
+    required_parameters: {},
+    expected_response_format: { type: "object", fields: ["message", "suggested_actions"] },
+  },
+  {
+    intent_name: "GENERAL_CONVERSATION",
+    example_questions: ["What can you do?", "Help me", "How does this platform work?"],
+    function_to_call: "handleGeneralConversation",
+    required_parameters: { message: "string" },
+    expected_response_format: { type: "object", fields: ["message", "capabilities", "suggested_next_prompts"] },
+  },
+];
+
+const MATERIAL_COST_REFERENCES: Record<string, { unit: string; min: number; max: number }> = {
+  cement: { unit: "50kg bag", min: 760, max: 1050 },
+  steel: { unit: "ton", min: 98000, max: 145000 },
+  sand: { unit: "ton", min: 2200, max: 6000 },
+  ballast: { unit: "ton", min: 2500, max: 7000 },
+  blocks: { unit: "piece", min: 65, max: 140 },
+};
+
+const detectAssistantIntent = (message: string): { intent: AssistantIntentName; confidence: number } => {
+  const text = message.toLowerCase();
+
+  if (/\b(hello|hi|hey|good morning|good afternoon|good evening)\b/.test(text)) {
+    return { intent: "GREETING", confidence: 0.96 };
+  }
+  if (isContactEngineerIntent(message)) return { intent: "CONTACT_ENGINEER", confidence: 0.94 };
+  if (/\b(create|add|set|make)\b.*\btask\b|\bremind me\b/.test(text)) return { intent: "TASK_CREATION", confidence: 0.92 };
+  if (/\b(task|tasks?)\b.*\b(status|follow ?up|pending|overdue|complete|completed)\b|\b(pending|overdue|completed?)\b.*\btasks?\b|\boverdue tasks?\b/.test(text)) {
+    return { intent: "TASK_FOLLOWUP", confidence: 0.9 };
+  }
+  if (/\b(schedule|book|arrange|set up)\b.*\b(meeting|call|consultation)\b/.test(text)) {
+    return { intent: "SCHEDULE_MEETING", confidence: 0.92 };
+  }
+  if (isEngineerDiscoveryIntent(message)) return { intent: "ENGINEER_DISCOVERY", confidence: 0.9 };
+  if (/\b(estimate|cost estimate|how much|rough cost)\b/.test(text)) return { intent: "PROJECT_COST_ESTIMATE", confidence: 0.9 };
+  if (/\b(budget analysis|analy[sz]e budget|budget enough|reduce cost|optimi[sz]e budget)\b/.test(text)) {
+    return { intent: "PROJECT_BUDGET_ANALYSIS", confidence: 0.9 };
+  }
+  if (/\b(plan|planning|project plan|phases|roadmap)\b/.test(text)) return { intent: "PROJECT_PLANNING", confidence: 0.88 };
+  if (/\b(risk|risks|risk analysis|risk assessment)\b/.test(text)) return { intent: "PROJECT_RISK_ANALYSIS", confidence: 0.9 };
+  if (/\b(project status|progress update|current phase|status of project)\b/.test(text)) return { intent: "PROJECT_STATUS_QUERY", confidence: 0.88 };
+  if (/\b(regulation|permit|approval|code|nema|compliance)\b/.test(text)) return { intent: "CONSTRUCTION_REGULATIONS", confidence: 0.9 };
+  if (/\b(material|cement|steel|sand|ballast|blocks?)\b.*\b(price|cost|rate)\b|\b(price|cost)\b.*\b(cement|steel|sand|ballast|blocks?)\b/.test(text)) {
+    return { intent: "MATERIAL_COST_LOOKUP", confidence: 0.9 };
+  }
+  if (/\b(recommend|best|top)\b.*\b(contractor|contractors)\b/.test(text)) return { intent: "CONTRACTOR_RECOMMENDATION", confidence: 0.9 };
+  if (/\b(in|near|around)\s+(nairobi|mombasa|kisumu|nakuru|eldoret|thika|nyeri|naivasha)\b.*\b(engineer|contractor|consultant|supplier|professional)s?\b|\bfind\b.*\b(in|near|around)\b/.test(text)) {
+    return { intent: "LOCATION_BASED_SEARCH", confidence: 0.88 };
+  }
+  if (/\b(advice|recommendation|best practice|how should i)\b/.test(text)) return { intent: "CONSTRUCTION_ADVICE", confidence: 0.82 };
+
+  return { intent: "GENERAL_CONVERSATION", confidence: 0.6 };
+};
+
+const extractBudgetValueFromText = (message: string): number | null => {
+  const match = message.match(/(?:kes|ksh|usd|\$)?\s*([\d,]{4,})/i);
+  if (!match?.[1]) return null;
+  const num = Number(match[1].replace(/,/g, ""));
+  return Number.isFinite(num) ? num : null;
+};
+
+const extractMaterialName = (message: string): string | null => {
+  const lower = message.toLowerCase();
+  return Object.keys(MATERIAL_COST_REFERENCES).find((name) => lower.includes(name)) || null;
+};
+
+const extractTaskTitle = (message: string): string => {
+  const match = message.match(/(?:task\s+(?:to|for)\s+|remind me to\s+|create\s+task\s+)(.+)$/i);
+  return (match?.[1] || message).trim().replace(/[.?!]+$/, "");
+};
+
+const extractDateFromMessage = (message: string): Date | null => {
+  const lower = message.toLowerCase();
+  const now = new Date();
+  if (lower.includes("tomorrow")) {
+    const date = new Date(now);
+    date.setDate(date.getDate() + 1);
+    return date;
+  }
+
+  const explicitDate = message.match(/(\d{4}-\d{2}-\d{2})/);
+  if (explicitDate?.[1]) {
+    const parsed = new Date(explicitDate[1]);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  return null;
+};
+
+const extractMeetingParticipant = (message: string): string => {
+  const match = message.match(/(?:with|for)\s+([a-zA-Z][a-zA-Z\s.'-]{2,80})/i);
+  return (match?.[1] || "Project contact").trim();
+};
+
+const getIntentDefinition = (intent: AssistantIntentName): IntentDefinition => {
+  return INTENT_DEFINITIONS.find((item) => item.intent_name === intent)
+    || INTENT_DEFINITIONS.find((item) => item.intent_name === "GENERAL_CONVERSATION")
+    || {
+      intent_name: "GENERAL_CONVERSATION",
+      example_questions: [],
+      function_to_call: "handleGeneralConversation",
+      required_parameters: { message: "string" },
+      expected_response_format: { type: "object", fields: ["message"] },
+    };
+};
+
+const buildIntentExtraction = (intent: AssistantIntentName, message: string): Record<string, string | number | boolean | null> => {
+  const location = extractLocationHint(message);
+  const budget = extractBudgetValueFromText(message);
+  const engineerName = extractContactEngineerName(message);
+  const material = extractMaterialName(message);
+  const dueDate = extractDateFromMessage(message);
+
+  switch (intent) {
+    case "ENGINEER_DISCOVERY":
+      return {
+        location,
+        project_type: getProjectType(message),
+        specialization: null,
+      };
+    case "CONTACT_ENGINEER":
+      return {
+        engineer_id_or_name: engineerName,
+        message: extractContactRequestText(message),
+      };
+    case "PROJECT_COST_ESTIMATE":
+      return {
+        project_type: getProjectType(message),
+        location,
+        size_or_scope: message,
+      };
+    case "PROJECT_BUDGET_ANALYSIS":
+      return {
+        budget_total: budget,
+        project_type: getProjectType(message),
+        location,
+      };
+    case "PROJECT_PLANNING":
+      return {
+        project_type: getProjectType(message),
+        location,
+      };
+    case "CONSTRUCTION_ADVICE":
+      return { question: message };
+    case "MATERIAL_COST_LOOKUP":
+      return { material_name: material, location };
+    case "CONTRACTOR_RECOMMENDATION":
+      return { project_type: getProjectType(message), location, budget_band: null };
+    case "LOCATION_BASED_SEARCH":
+      return { location, entity_type: null };
+    case "TASK_CREATION":
+      return {
+        title: extractTaskTitle(message),
+        due_date: dueDate ? dueDate.toISOString() : null,
+        priority: /\burgent|high priority\b/i.test(message) ? "HIGH" : /\blow priority\b/i.test(message) ? "LOW" : "MEDIUM",
+      };
+    case "TASK_FOLLOWUP":
+      return { filter: /\boverdue\b/i.test(message) ? "OVERDUE" : /\bcompleted|done\b/i.test(message) ? "COMPLETED" : "PENDING" };
+    case "SCHEDULE_MEETING":
+      return {
+        participant_id_or_name: extractMeetingParticipant(message),
+        date_time: dueDate ? dueDate.toISOString() : null,
+        purpose: extractContactRequestText(message),
+      };
+    case "PROJECT_RISK_ANALYSIS":
+      return { project_type: getProjectType(message), location, budget };
+    case "PROJECT_STATUS_QUERY":
+      return { project_id_or_name: null };
+    case "CONSTRUCTION_REGULATIONS":
+      return { location, project_type: getProjectType(message) };
+    case "GREETING":
+      return {};
+    case "GENERAL_CONVERSATION":
+    default:
+      return { message };
+  }
+};
+
+const buildRoutingDebugInfo = (input: { intent: AssistantIntentName; confidence: number; message: string }): AssistantRoutingDebug => {
+  const definition = getIntentDefinition(input.intent);
+  const extracted = buildIntentExtraction(input.intent, input.message);
+  const missing = Object.keys(definition.required_parameters).filter((param) => {
+    const value = extracted[param as keyof typeof extracted];
+    return value === null || value === undefined || value === "";
+  });
+
+  return {
+    intent_name: input.intent,
+    confidence: input.confidence,
+    function_to_call: definition.function_to_call,
+    required_parameters: definition.required_parameters,
+    extracted_parameters: extracted,
+    missing_parameters: missing,
+    expected_response_format: definition.expected_response_format,
+  };
+};
+
 const isPricingIntent = (message: string) => {
   return /\b(pricing|price|package|subscription|trial|cost|usd)\b/i.test(message);
+};
+
+const isInboxListIntent = (message: string) => {
+  return /\b(list|show|view|see|open|check)\b.*\b(messages?|inquiries|inbox|requests?)\b/i.test(message)
+    || /\b(messages?|inquiries|inbox|requests?)\b.*\b(list|show|all|latest|recent)\b/i.test(message);
+};
+
+const isInboxSummaryIntent = (message: string) => {
+  return /\b(how many|count|summary|summarize)\b.*\b(messages?|inquiries|inbox|requests?)\b/i.test(message);
+};
+
+const isSentInquiryIntent = (message: string) => {
+  return /\b(my|sent|outgoing|requested|requester)\b.*\b(messages?|replies|responses?|requests?)\b/i.test(message)
+    || /\b(replies|responses?)\b.*\b(from|to|for)\b/i.test(message);
 };
 
 const isTargetMarketIntent = (message: string) => {
@@ -587,6 +1023,114 @@ const isTargetMarketIntent = (message: string) => {
 const isEngineerDiscoveryIntent = (message: string) => {
   return /\b(list|find|show|recommend|search)\b.*\b(engineer|architect|consultant|contractor|professionals?)\b/i.test(message)
     || /\b(engineers?|architects?|consultants?)\b.*\b(in|near|around)\b/i.test(message);
+};
+
+const isContactEngineerIntent = (message: string) => {
+  const lower = message.toLowerCase();
+  return /\b(contact|message|reach out|email|notify|ask)\b/.test(lower)
+    && /\b(eng\.?|engineer|architect|consultant|contractor|qs|quantity\s+surveyor)\b/.test(lower);
+};
+
+const CONTACTABLE_ROLES: AppUserRole[] = [
+  "ENGINEER",
+  "CONSULTANT",
+  "CONTRACTOR",
+  "PROJECT_MANAGER",
+  "REAL_ESTATE",
+  "DEVELOPER",
+  "FINANCIER",
+  "LABOURER",
+  "CEMENT_SUPPLIER",
+  "GENERAL_SUPPLIER",
+  "REGULATOR",
+  "LOCAL_STAKEHOLDER",
+  "TENANT",
+];
+
+const cleanPersonName = (value: string) => {
+  return value
+    .replace(/^(eng\.?|engineer|arch\.?|architect|qs|quantity\s+surveyor|consultant|contractor)\s+/i, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+};
+
+const extractContactEngineerName = (message: string): string | null => {
+  const patterns = [
+    /(?:contact|message|reach out to|email|notify|ask)\s+(.+?)(?:\s+(?:and|to)\s+ask\b|\s+about\b|[,.!?]|$)/i,
+    /(?:eng\.?|engineer|arch\.?|architect|qs|quantity\s+surveyor|consultant|contractor)\s+([a-zA-Z][a-zA-Z\s.'-]{1,80})/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match?.[1]) {
+      const cleaned = cleanPersonName(match[1]);
+      if (cleaned) return cleaned;
+    }
+  }
+
+  return null;
+};
+
+const extractContactRequestText = (message: string): string => {
+  const normalizedMessage = message.trim().replace(/[.\s]+$/, "");
+  const askMatch = message.match(/(?:and|to)\s+ask(?:\s+them)?\s+(.+)$/i);
+  const aboutMatch = message.match(/\babout\s+(.+)$/i);
+
+  const aboutText = aboutMatch?.[1]?.trim().replace(/[.\s]+$/, "") || "";
+  const askText = askMatch?.[1]?.trim().replace(/[.\s]+$/, "") || "";
+
+  if (aboutText && askText) {
+    const cleanedAbout = aboutText.replace(/\s+(?:and|to)\s+ask(?:\s+them)?\s+.+$/i, "").trim();
+    if (cleanedAbout && !cleanedAbout.toLowerCase().includes(askText.toLowerCase())) {
+      return `${cleanedAbout}; also share ${askText}`;
+    }
+    return aboutText;
+  }
+
+  if (aboutText) {
+    return aboutText;
+  }
+
+  if (askText) {
+    return askText;
+  }
+
+  const genericContextMatch = normalizedMessage.match(/(?:contact|message|reach out to|email|notify)\s+.+?\s+(?:about|for)\s+(.+)$/i);
+  if (genericContextMatch?.[1]) {
+    return genericContextMatch[1].trim();
+  }
+
+  return "Please share your next available meeting slots and how you can support this construction request.";
+};
+
+const toNameSearchTokens = (value: string): string[] => {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z\s'-]/g, " ")
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 2);
+};
+
+const scoreEngineerNameMatch = (candidateName: string | null, requestedName: string): number => {
+  const candidateTokens = toNameSearchTokens(candidateName || "");
+  const requestedTokens = toNameSearchTokens(requestedName);
+  if (candidateTokens.length === 0 || requestedTokens.length === 0) return 0;
+
+  const candidateTokenSet = new Set(candidateTokens);
+  let score = 0;
+
+  for (const token of requestedTokens) {
+    if (candidateTokenSet.has(token)) score += 2;
+  }
+
+  const candidateJoined = candidateTokens.join(" ");
+  const requestedJoined = requestedTokens.join(" ");
+  if (candidateJoined.includes(requestedJoined) || requestedJoined.includes(candidateJoined)) {
+    score += 4;
+  }
+
+  return score;
 };
 
 const extractLocationHint = (message: string): string | null => {
@@ -637,6 +1181,112 @@ const buildAssistantFallbackReply = (message: string) => {
     "• What stakeholders are targeted by ICDBO?",
     "• Help me plan a construction project brief",
   ].join("\n");
+};
+
+const formatInquiryPreview = (inquiry: {
+  senderName: string;
+  senderEmail: string;
+  message: string;
+  status: string;
+  createdAt: Date;
+}) => {
+  const preview = inquiry.message.replace(/\s+/g, " ").trim().slice(0, 140);
+  return `• ${inquiry.senderName} (${inquiry.senderEmail}) — ${inquiry.status} — ${preview}${inquiry.message.length > 140 ? "..." : ""}`;
+};
+
+const formatSentInquiryPreview = (inquiry: {
+  message: string;
+  replyMessage: string | null;
+  status: string;
+  createdAt: Date;
+  recipient: {
+    name: string | null;
+    email: string;
+    role: AppUserRole;
+  };
+}) => {
+  const recipientLabel = inquiry.recipient.name?.trim() || inquiry.recipient.email;
+  const requestPreview = inquiry.message.replace(/\s+/g, " ").trim().slice(0, 90);
+  const replyPreview = inquiry.replyMessage?.replace(/\s+/g, " ").trim().slice(0, 90);
+
+  if (replyPreview) {
+    return `• To ${recipientLabel} (${inquiry.recipient.role}) — ${inquiry.status} — Reply: ${replyPreview}${inquiry.replyMessage && inquiry.replyMessage.length > 90 ? "..." : ""}`;
+  }
+
+  return `• To ${recipientLabel} (${inquiry.recipient.role}) — ${inquiry.status} — Request: ${requestPreview}${inquiry.message.length > 90 ? "..." : ""}`;
+};
+
+const buildAssistantConversationTitle = (message: string) => {
+  const normalized = message.replace(/\s+/g, " ").trim();
+  if (!normalized) return "New chat";
+
+  const firstSentence = normalized.split(/[.!?]/)[0]?.trim() || normalized;
+  return firstSentence.length > 48 ? `${firstSentence.slice(0, 45).trim()}...` : firstSentence;
+};
+
+const mapStoredAssistantRole = (role: "USER" | "ASSISTANT"): AssistantMessage["role"] => {
+  return role === "USER" ? "user" : "assistant";
+};
+
+const buildAssistantHistoryFromStoredMessages = (
+  messages: Array<{ role: "USER" | "ASSISTANT"; content: string }>
+): AssistantMessage[] => {
+  return messages.map((message) => ({
+    role: mapStoredAssistantRole(message.role),
+    content: message.content,
+  }));
+};
+
+const getStartOfCurrentDay = () => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+};
+
+const toPositiveInt = (value: string | null | undefined, fallback: number) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(1, Math.floor(parsed));
+};
+
+const getAssistantLimits = async () => {
+  const settings = await prismaDynamic.platformSetting.findMany({
+    where: {
+      key: {
+        in: [ASSISTANT_CHAT_LIMIT_SETTING_KEY, ASSISTANT_DAILY_LIMIT_SETTING_KEY],
+      },
+    },
+  });
+
+  const map = new Map<string, string>((settings as Array<{ key: string; value: string }>).map((item) => [item.key, item.value]));
+  const chatLimit = toPositiveInt(map.get(ASSISTANT_CHAT_LIMIT_SETTING_KEY), ASSISTANT_CHAT_LIMIT);
+  const dailyMessageLimit = toPositiveInt(map.get(ASSISTANT_DAILY_LIMIT_SETTING_KEY), ASSISTANT_DAILY_MESSAGE_LIMIT);
+
+  return {
+    chatLimit,
+    dailyMessageLimit,
+  };
+};
+
+const setAssistantLimits = async (input: { chatLimit: number; dailyMessageLimit: number }) => {
+  await prismaDynamic.platformSetting.upsert({
+    where: { key: ASSISTANT_CHAT_LIMIT_SETTING_KEY },
+    update: { value: String(input.chatLimit) },
+    create: { key: ASSISTANT_CHAT_LIMIT_SETTING_KEY, value: String(input.chatLimit) },
+  });
+
+  await prismaDynamic.platformSetting.upsert({
+    where: { key: ASSISTANT_DAILY_LIMIT_SETTING_KEY },
+    update: { value: String(input.dailyMessageLimit) },
+    create: { key: ASSISTANT_DAILY_LIMIT_SETTING_KEY, value: String(input.dailyMessageLimit) },
+  });
+};
+
+const getRemainingAssistantChatsByLimit = (limit: number, conversationCount: number) => {
+  return Math.max(limit - conversationCount, 0);
+};
+
+const getRemainingDailyMessagesByLimit = (limit: number, dailyCount: number) => {
+  return Math.max(limit - dailyCount, 0);
 };
 
 const generateAssistantReplyWithOllama = async (input: {
@@ -755,7 +1405,7 @@ type SafeUser = {
   bio: string | null;
   company: string | null;
   location: string | null;
-  role: "USER" | "ADMIN" | "ENGINEER";
+  role: AppUserRole;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -763,7 +1413,7 @@ type SafeUser = {
 type JwtPayload = {
   userId: string;
   email: string;
-  role: "USER" | "ADMIN" | "ENGINEER";
+  role: AppUserRole;
 };
 
 type AuthenticatedRequest = express.Request & {
@@ -779,7 +1429,7 @@ const toSafeUser = (user: {
   bio: string | null;
   company: string | null;
   location: string | null;
-  role: "USER" | "ADMIN" | "ENGINEER";
+  role: AppUserRole;
   createdAt: Date;
   updatedAt: Date;
 }): SafeUser => ({
@@ -813,10 +1463,234 @@ const buildDevEngineerSafeUser = (): SafeUser => {
   };
 };
 
+const REGISTERABLE_ROLES: AppUserRole[] = [
+  "USER",
+  "ENGINEER",
+  "LABOURER",
+  "CEMENT_SUPPLIER",
+  "GENERAL_SUPPLIER",
+  "DEVELOPER",
+  "FINANCIER",
+  "CONTRACTOR",
+  "REAL_ESTATE",
+  "CONSULTANT",
+  "TENANT",
+  "PROJECT_MANAGER",
+  "REGULATOR",
+  "LOCAL_STAKEHOLDER",
+];
+
+const SEEDED_DEFAULT_PASSWORD = "123456";
+
+const DEFAULT_ROLE_PROFILES: Array<{
+  email: string;
+  name: string;
+  role: AppUserRole;
+  phone: string;
+  company: string;
+  location: string;
+  bio: string;
+}> = [
+  {
+    email: "david@gmail.com",
+    name: "David Mwangi",
+    role: "ENGINEER",
+    phone: "+254712345601",
+    company: "Mwangi Structural Studio",
+    location: "Nairobi",
+    bio: "Structural engineer focused on apartment and commercial building delivery in Nairobi.",
+  },
+  {
+    email: "grace@gmail.com",
+    name: "Grace Njeri",
+    role: "ENGINEER",
+    phone: "+254712345602",
+    company: "Njeri Design Collaborative",
+    location: "Nairobi",
+    bio: "Architect and engineering consultant for mixed-use and sustainable developments.",
+  },
+  {
+    email: "joseph@gmail.com",
+    name: "Joseph Otieno",
+    role: "ENGINEER",
+    phone: "+254712345603",
+    company: "Lake Infrastructure Partners",
+    location: "Kisumu",
+    bio: "Civil engineer specializing in roads, drainage and public infrastructure delivery.",
+  },
+  {
+    email: "kevin@gmail.com",
+    name: "Kevin Kamau",
+    role: "LABOURER",
+    phone: "+254712345604",
+    company: "SiteWorks Crew",
+    location: "Nairobi",
+    bio: "Experienced site labourer supporting formwork, finishing and daily site operations.",
+  },
+  {
+    email: "brenda@gmail.com",
+    name: "Brenda Achieng",
+    role: "CEMENT_SUPPLIER",
+    phone: "+254712345605",
+    company: "Achieng Cement Distributors",
+    location: "Mombasa",
+    bio: "Cement supplier coordinating bulk dispatch, stock planning and sample approvals.",
+  },
+  {
+    email: "brian@gmail.com",
+    name: "Brian Kiptoo",
+    role: "GENERAL_SUPPLIER",
+    phone: "+254712345606",
+    company: "Kiptoo Build Supplies",
+    location: "Eldoret",
+    bio: "General supplier for fittings, finishes, hardware and rapid procurement support.",
+  },
+  {
+    email: "faith@gmail.com",
+    name: "Faith Wanjiku",
+    role: "DEVELOPER",
+    phone: "+254712345607",
+    company: "Wanjiku Urban Developments",
+    location: "Nairobi",
+    bio: "Property developer managing residential and mixed-use investment projects.",
+  },
+  {
+    email: "samuel@gmail.com",
+    name: "Samuel Mutiso",
+    role: "FINANCIER",
+    phone: "+254712345608",
+    company: "Mutiso Capital Advisory",
+    location: "Nairobi",
+    bio: "Project financier reviewing construction viability, risk and return performance.",
+  },
+  {
+    email: "hassan@gmail.com",
+    name: "Hassan Ali",
+    role: "CONTRACTOR",
+    phone: "+254712345609",
+    company: "Ali Construction Kenya",
+    location: "Mombasa",
+    bio: "General contractor handling residential, commercial and industrial site execution.",
+  },
+  {
+    email: "lillian@gmail.com",
+    name: "Lillian Atieno",
+    role: "REAL_ESTATE",
+    phone: "+254712345610",
+    company: "Atieno Realty Advisory",
+    location: "Nairobi",
+    bio: "Real estate analyst tracking buyer demand, tenant behavior and location potential.",
+  },
+  {
+    email: "mary@gmail.com",
+    name: "Mary Akinyi",
+    role: "CONSULTANT",
+    phone: "+254712345611",
+    company: "Akinyi Cost and Advisory",
+    location: "Kisumu",
+    bio: "Construction consultant supporting value engineering, advisory reviews and cost control.",
+  },
+  {
+    email: "esther@gmail.com",
+    name: "Esther Wambui",
+    role: "TENANT",
+    phone: "+254712345612",
+    company: "Tenant Voice Network",
+    location: "Nairobi",
+    bio: "Tenant representative sharing occupancy needs and end-user experience insights.",
+  },
+  {
+    email: "patrick@gmail.com",
+    name: "Patrick Odhiambo",
+    role: "PROJECT_MANAGER",
+    phone: "+254712345613",
+    company: "Odhiambo PMO",
+    location: "Nakuru",
+    bio: "Project manager coordinating scope, cost, approvals and stakeholder timelines.",
+  },
+  {
+    email: "dorcas@gmail.com",
+    name: "Dorcas Chebet",
+    role: "REGULATOR",
+    phone: "+254712345614",
+    company: "County Built Environment Office",
+    location: "Uasin Gishu",
+    bio: "Regulatory officer overseeing compliance, approvals and built environment standards.",
+  },
+  {
+    email: "moses@gmail.com",
+    name: "Moses Kariuki",
+    role: "LOCAL_STAKEHOLDER",
+    phone: "+254712345615",
+    company: "Kilimani Residents Forum",
+    location: "Nairobi",
+    bio: "Local stakeholder documenting community concerns, utilities and neighborhood impact.",
+  },
+  {
+    email: "admin@gmail.com",
+    name: "Platform Admin",
+    role: "ADMIN",
+    phone: "+254712345617",
+    company: "ICDBO Admin Office",
+    location: "Nairobi",
+    bio: "System administrator managing governance, users and platform controls.",
+  },
+  {
+    email: "ivy@gmail.com",
+    name: "Ivy Naliaka",
+    role: "USER",
+    phone: "+254712345616",
+    company: "ICDBO Client Workspace",
+    location: "Nairobi",
+    bio: "General platform user tracking project performance and collaboration workflows.",
+  },
+];
+
+const seedDefaultProfiles = async () => {
+  const hashedPassword = await bcrypt.hash(SEEDED_DEFAULT_PASSWORD, 10);
+
+  for (const profile of DEFAULT_ROLE_PROFILES) {
+    await prisma.user.upsert({
+      where: { email: profile.email },
+      update: {
+        name: profile.name,
+        phone: profile.phone,
+        company: profile.company,
+        location: profile.location,
+        bio: profile.bio,
+        role: profile.role as never,
+      },
+      create: {
+        email: profile.email,
+        password: hashedPassword,
+        name: profile.name,
+        phone: profile.phone,
+        company: profile.company,
+        location: profile.location,
+        bio: profile.bio,
+        role: profile.role as never,
+      },
+    });
+  }
+};
+
 const generateToken = (payload: JwtPayload): string => {
   return jwt.sign(payload, JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN as jwt.SignOptions["expiresIn"],
   });
+};
+
+const resolveOptionalAuth = (req: express.Request): JwtPayload | null => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return null;
+  }
+
+  try {
+    return jwt.verify(authHeader.split(" ")[1], JWT_SECRET) as JwtPayload;
+  } catch (_error) {
+    return null;
+  }
 };
 
 const authMiddleware = (
@@ -839,6 +1713,18 @@ const authMiddleware = (
   } catch (_error) {
     return res.status(401).json({ error: "Invalid or expired token" });
   }
+};
+
+const adminOnlyMiddleware = (
+  req: AuthenticatedRequest,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  if (req.auth?.role !== "ADMIN") {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+
+  next();
 };
 
 // Middleware
@@ -873,12 +1759,13 @@ app.get("/api/health/db", async (_req, res) => {
 
 // Auth - register
 app.post("/api/auth/register", async (req, res) => {
-  const { email, password, name, phone, company } = req.body as {
+  const { email, password, name, phone, company, role } = req.body as {
     email?: string;
     password?: string;
     name?: string;
     phone?: string;
     company?: string;
+    role?: AppUserRole;
   };
 
   if (!email || !password) {
@@ -888,6 +1775,10 @@ app.post("/api/auth/register", async (req, res) => {
   if (password.length < 6) {
     return res.status(400).json({ error: "Password must be at least 6 characters" });
   }
+
+  const selectedRole = REGISTERABLE_ROLES.includes(role as AppUserRole)
+    ? (role as AppUserRole)
+    : "USER";
 
   try {
     const existingUser = await prisma.user.findUnique({ where: { email } });
@@ -903,6 +1794,7 @@ app.post("/api/auth/register", async (req, res) => {
         name: name || null,
         phone: phone || null,
         company: company || null,
+        role: selectedRole as never,
       },
     });
 
@@ -1135,6 +2027,8 @@ app.post("/api/inquiries", async (req, res) => {
   }
 
   try {
+    const optionalAuth = resolveOptionalAuth(req);
+
     // Check if this is a demo/mock inquiry (recipientId starts with 'mock-')
     if (recipientId.startsWith('mock-')) {
       // For demo purposes, return success without storing in database
@@ -1168,8 +2062,9 @@ app.post("/api/inquiries", async (req, res) => {
         senderName,
         senderEmail,
         senderPhone: senderPhone || null,
+        senderUserId: optionalAuth?.userId && optionalAuth.userId !== "dev-engineer" ? optionalAuth.userId : null,
         message,
-      },
+      } as never,
     });
 
     return res.status(201).json(inquiry);
@@ -1190,12 +2085,163 @@ app.get("/api/inquiries", authMiddleware, async (req: AuthenticatedRequest, res)
     const inquiries = await prisma.inquiry.findMany({
       where: { recipientId: userId },
       orderBy: { createdAt: "desc" },
-    });
+    }) as SentInquiryRecord[];
 
     return res.json(inquiries);
   } catch (error) {
     console.error("Get inquiries error:", error);
     return res.status(500).json({ error: "Failed to fetch inquiries" });
+  }
+});
+
+app.get("/api/inquiries/sent", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.auth?.userId;
+    const email = req.auth?.email;
+
+    if (!userId || !email) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const inquiries = await (prisma.inquiry.findMany as any)({
+      where: {
+        OR: [
+          { senderUserId: userId },
+          { senderEmail: email },
+        ],
+      } as never,
+      include: {
+        recipient: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            company: true,
+            location: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return res.json(
+      inquiries.map((inquiry: SentInquiryRecord) => ({
+        ...inquiry,
+        senderHasUnreadReply: Boolean(inquiry.replyMessage && !inquiry.senderViewedAt),
+      })),
+    );
+  } catch (error) {
+    console.error("Get sent inquiries error:", error);
+    return res.status(500).json({ error: "Failed to fetch sent inquiries" });
+  }
+});
+
+app.patch("/api/inquiries/sent/:id/read", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
+
+  try {
+    const userId = req.auth?.userId;
+    const email = req.auth?.email;
+
+    if (!userId || !email) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const inquiry = await (prisma.inquiry.findUnique as any)({
+      where: { id },
+      include: {
+        recipient: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            company: true,
+            location: true,
+          },
+        },
+      },
+    }) as SentInquiryRecord | null;
+
+    if (!inquiry) {
+      return res.status(404).json({ error: "Inquiry not found" });
+    }
+
+    const isSender = inquiry.senderUserId === userId || inquiry.senderEmail === email;
+    if (!isSender) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const updatedInquiry = await (prisma.inquiry.update as any)({
+      where: { id },
+      data: {
+        senderViewedAt: new Date(),
+      } as never,
+      include: {
+        recipient: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            company: true,
+            location: true,
+          },
+        },
+      },
+    }) as SentInquiryRecord;
+
+    return res.json({
+      ...updatedInquiry,
+      senderHasUnreadReply: Boolean(updatedInquiry.replyMessage && !updatedInquiry.senderViewedAt),
+    });
+  } catch (error) {
+    console.error("Mark sent inquiry read error:", error);
+    return res.status(500).json({ error: "Failed to update sent inquiry read status" });
+  }
+});
+
+app.post("/api/inquiries/:id/reply", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
+  const { replyMessage } = req.body as { replyMessage?: string };
+
+  if (!replyMessage || !replyMessage.trim()) {
+    return res.status(400).json({ error: "replyMessage is required" });
+  }
+
+  try {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const inquiry = await prisma.inquiry.findUnique({
+      where: { id },
+    });
+
+    if (!inquiry) {
+      return res.status(404).json({ error: "Inquiry not found" });
+    }
+
+    if (inquiry.recipientId !== userId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const updatedInquiry = await prisma.inquiry.update({
+      where: { id },
+      data: {
+        replyMessage: replyMessage.trim(),
+        senderViewedAt: null,
+        respondedAt: new Date(),
+        status: "REPLIED",
+      } as never,
+    });
+
+    return res.json(updatedInquiry);
+  } catch (error) {
+    console.error("Reply inquiry error:", error);
+    return res.status(500).json({ error: "Failed to send reply" });
   }
 });
 
@@ -1425,11 +2471,220 @@ app.post("/api/ai/process-project-update", authMiddleware, async (req: Authentic
   }
 });
 
+app.get("/api/admin/assistant-limits", authMiddleware, adminOnlyMiddleware, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const limits = await getAssistantLimits();
+    return res.json({
+      chatLimit: limits.chatLimit,
+      dailyMessageLimit: limits.dailyMessageLimit,
+      defaults: {
+        chatLimit: ASSISTANT_CHAT_LIMIT,
+        dailyMessageLimit: ASSISTANT_DAILY_MESSAGE_LIMIT,
+      },
+    });
+  } catch (error) {
+    console.error("Get assistant limits error:", error);
+    return res.status(500).json({ error: "Failed to load assistant limits" });
+  }
+});
+
+app.put("/api/admin/assistant-limits", authMiddleware, adminOnlyMiddleware, async (req: AuthenticatedRequest, res) => {
+  const { chatLimit, dailyMessageLimit } = req.body as {
+    chatLimit?: number;
+    dailyMessageLimit?: number;
+  };
+
+  const nextChatLimit = Math.max(1, Math.floor(Number(chatLimit || 0)));
+  const nextDailyLimit = Math.max(1, Math.floor(Number(dailyMessageLimit || 0)));
+
+  if (!Number.isFinite(nextChatLimit) || !Number.isFinite(nextDailyLimit)) {
+    return res.status(400).json({ error: "chatLimit and dailyMessageLimit must be valid positive numbers" });
+  }
+
+  try {
+    await setAssistantLimits({
+      chatLimit: nextChatLimit,
+      dailyMessageLimit: nextDailyLimit,
+    });
+
+    return res.json({
+      chatLimit: nextChatLimit,
+      dailyMessageLimit: nextDailyLimit,
+    });
+  } catch (error) {
+    console.error("Update assistant limits error:", error);
+    return res.status(500).json({ error: "Failed to update assistant limits" });
+  }
+});
+
+app.get("/api/ai/intents", authMiddleware, (_req: AuthenticatedRequest, res) => {
+  return res.json({
+    intents: INTENT_DEFINITIONS,
+    count: INTENT_DEFINITIONS.length,
+  });
+});
+
+app.get("/api/ai/conversations", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  try {
+    const limits = await getAssistantLimits();
+    const userId = req.auth?.userId;
+    if (!userId || userId === "dev-engineer") {
+      return res.json({
+        conversations: [],
+        limit: limits.chatLimit,
+        remainingChats: limits.chatLimit,
+        dailyLimit: limits.dailyMessageLimit,
+        remainingDailyMessages: limits.dailyMessageLimit,
+      });
+    }
+
+    const conversations = await prismaDynamic.assistantConversation.findMany({
+      where: { userId },
+      orderBy: { lastMessageAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        updatedAt: true,
+        lastMessageAt: true,
+        _count: {
+          select: {
+            messages: true,
+          },
+        },
+        messages: {
+          select: {
+            content: true,
+            role: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+      take: limits.chatLimit,
+    });
+
+    const conversationCount = await prismaDynamic.assistantConversation.count({ where: { userId } });
+    const dailyMessageCount = await prismaDynamic.assistantConversationMessage.count({
+      where: {
+        role: "USER",
+        conversation: {
+          userId,
+        },
+        createdAt: {
+          gte: getStartOfCurrentDay(),
+        },
+      },
+    });
+
+    return res.json({
+      conversations: conversations.map((conversation: any) => ({
+        id: conversation.id,
+        title: conversation.title,
+        createdAt: conversation.createdAt,
+        updatedAt: conversation.updatedAt,
+        lastMessageAt: conversation.lastMessageAt,
+        messageCount: conversation._count.messages,
+        preview: conversation.messages[0]?.content || "",
+        previewRole: conversation.messages[0] ? mapStoredAssistantRole(conversation.messages[0].role) : null,
+      })),
+      limit: limits.chatLimit,
+      remainingChats: getRemainingAssistantChatsByLimit(limits.chatLimit, conversationCount),
+      dailyLimit: limits.dailyMessageLimit,
+      remainingDailyMessages: getRemainingDailyMessagesByLimit(limits.dailyMessageLimit, dailyMessageCount),
+    });
+  } catch (error) {
+    console.error("List assistant conversations error:", error);
+    return res.status(500).json({ error: "Failed to fetch assistant conversations" });
+  }
+});
+
+app.get("/api/ai/conversations/:id", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.auth?.userId;
+    if (!userId || userId === "dev-engineer") {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    const conversation = await prismaDynamic.assistantConversation.findFirst({
+      where: {
+        id: req.params.id,
+        userId,
+      },
+      include: {
+        messages: {
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    return res.json({
+      id: conversation.id,
+      title: conversation.title,
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+      lastMessageAt: conversation.lastMessageAt,
+      messages: conversation.messages.map((message: any) => ({
+        id: message.id,
+        role: mapStoredAssistantRole(message.role),
+        content: message.content,
+        createdAt: message.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error("Get assistant conversation error:", error);
+    return res.status(500).json({ error: "Failed to fetch assistant conversation" });
+  }
+});
+
+app.delete("/api/ai/conversations/:id", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  try {
+    const limits = await getAssistantLimits();
+    const userId = req.auth?.userId;
+    if (!userId || userId === "dev-engineer") {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    const conversation = await prismaDynamic.assistantConversation.findFirst({
+      where: {
+        id: req.params.id,
+        userId,
+      },
+      select: { id: true },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    await prismaDynamic.assistantConversation.delete({
+      where: { id: conversation.id },
+    });
+
+    const conversationCount = await prismaDynamic.assistantConversation.count({ where: { userId } });
+    return res.json({
+      ok: true,
+      remainingChats: getRemainingAssistantChatsByLimit(limits.chatLimit, conversationCount),
+      limit: limits.chatLimit,
+      dailyLimit: limits.dailyMessageLimit,
+    });
+  } catch (error) {
+    console.error("Delete assistant conversation error:", error);
+    return res.status(500).json({ error: "Failed to delete assistant conversation" });
+  }
+});
+
 app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, res) => {
   const { message, history } = req.body as {
     message?: string;
     history?: AssistantMessage[];
   };
+  const requestedConversationId = typeof req.body?.conversationId === "string" ? req.body.conversationId.trim() : "";
 
   if (!message || !message.trim()) {
     return res.status(400).json({ error: "message is required" });
@@ -1443,18 +2698,825 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
         .filter((item) => item.content.length > 0)
     : [];
 
-  if (isPricingIntent(trimmedMessage)) {
+  const limits = await getAssistantLimits();
+  const canPersistConversation = Boolean(req.auth?.userId && req.auth.userId !== "dev-engineer");
+  let assistantConversation:
+    | {
+        id: string;
+        title: string;
+        messages: Array<{ role: "USER" | "ASSISTANT"; content: string }>;
+      }
+    | null = null;
+  let conversationCount = 0;
+  let dailyMessageCount = 0;
+
+  const resolveDailyMessageCount = async () => {
+    if (!canPersistConversation || !req.auth?.userId) {
+      return 0;
+    }
+
+    if (dailyMessageCount > 0) {
+      return dailyMessageCount;
+    }
+
+    dailyMessageCount = await prismaDynamic.assistantConversationMessage.count({
+      where: {
+        role: "USER",
+        conversation: {
+          userId: req.auth.userId,
+        },
+        createdAt: {
+          gte: getStartOfCurrentDay(),
+        },
+      },
+    });
+
+    return dailyMessageCount;
+  };
+
+  if (canPersistConversation && req.auth?.userId) {
+    const todayCount = await resolveDailyMessageCount();
+    if (todayCount >= limits.dailyMessageLimit) {
+      return res.status(429).json({
+        error: `You have reached your daily assistant message limit of ${limits.dailyMessageLimit}. Please try again tomorrow.`,
+        code: "DAILY_CHAT_LIMIT_REACHED",
+        dailyLimit: limits.dailyMessageLimit,
+        remainingDailyMessages: 0,
+      });
+    }
+  }
+
+  const resolveAssistantConversation = async () => {
+    if (!canPersistConversation || !req.auth?.userId) {
+      return null;
+    }
+
+    if (assistantConversation) {
+      return assistantConversation;
+    }
+
+    if (requestedConversationId) {
+      const existingConversation = await prismaDynamic.assistantConversation.findFirst({
+        where: {
+          id: requestedConversationId,
+          userId: req.auth.userId,
+        },
+        include: {
+          messages: {
+            select: {
+              role: true,
+              content: true,
+            },
+            orderBy: { createdAt: "asc" },
+          },
+        },
+      });
+
+      if (!existingConversation) {
+        throw new Error("conversation_not_found");
+      }
+
+      conversationCount = await prismaDynamic.assistantConversation.count({ where: { userId: req.auth.userId } });
+      assistantConversation = existingConversation;
+      return assistantConversation;
+    }
+
+    conversationCount = await prismaDynamic.assistantConversation.count({ where: { userId: req.auth.userId } });
+    if (conversationCount >= limits.chatLimit) {
+      throw new Error("chat_limit_reached");
+    }
+
+    const createdConversation = await prismaDynamic.assistantConversation.create({
+      data: {
+        userId: req.auth.userId,
+        title: buildAssistantConversationTitle(trimmedMessage),
+      },
+      include: {
+        messages: {
+          select: {
+            role: true,
+            content: true,
+          },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    conversationCount += 1;
+    assistantConversation = createdConversation;
+    return assistantConversation;
+  };
+
+  const sendAssistantResponse = async (payload: {
+    reply: string;
+    source: string;
+    fallbackReason?: string | null;
+    model?: string;
+    routing?: AssistantRoutingDebug;
+  }) => {
+    if (canPersistConversation && req.auth?.userId) {
+      try {
+        const conversation = await resolveAssistantConversation();
+        if (conversation) {
+          const now = new Date();
+          await prismaDynamic.assistantConversationMessage.createMany({
+            data: [
+              {
+                conversationId: conversation.id,
+                role: "USER",
+                content: trimmedMessage,
+                createdAt: now,
+              },
+              {
+                conversationId: conversation.id,
+                role: "ASSISTANT",
+                content: payload.reply,
+                createdAt: now,
+              },
+            ],
+          });
+
+          await prismaDynamic.assistantConversation.update({
+            where: { id: conversation.id },
+            data: {
+              title: conversation.title === "New chat" ? buildAssistantConversationTitle(trimmedMessage) : conversation.title,
+              lastMessageAt: now,
+            },
+          });
+
+          assistantConversation = {
+            ...conversation,
+            title: conversation.title === "New chat" ? buildAssistantConversationTitle(trimmedMessage) : conversation.title,
+            messages: [
+              ...conversation.messages,
+              { role: "USER", content: trimmedMessage },
+              { role: "ASSISTANT", content: payload.reply },
+            ],
+          };
+          dailyMessageCount += 1;
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message === "chat_limit_reached") {
+          return res.status(409).json({
+            error: `You have reached the saved chat limit of ${limits.chatLimit}. Delete an old chat to start a new one.`,
+            code: "CHAT_LIMIT_REACHED",
+            limit: limits.chatLimit,
+            remainingChats: 0,
+            dailyLimit: limits.dailyMessageLimit,
+            remainingDailyMessages: getRemainingDailyMessagesByLimit(limits.dailyMessageLimit, dailyMessageCount),
+          });
+        }
+
+        if (error instanceof Error && error.message === "conversation_not_found") {
+          return res.status(404).json({
+            error: "The selected chat could not be found. Refresh and try again.",
+            code: "CONVERSATION_NOT_FOUND",
+          });
+        }
+
+        console.error("Persist assistant conversation error:", error);
+      }
+    }
+
     return res.status(200).json({
+      ...payload,
+      fallbackReason: payload.fallbackReason || null,
+      routing: payload.routing || routingDebug,
+      conversationId: assistantConversation?.id || null,
+      limit: limits.chatLimit,
+      remainingChats: canPersistConversation
+        ? getRemainingAssistantChatsByLimit(limits.chatLimit, conversationCount)
+        : limits.chatLimit,
+      dailyLimit: limits.dailyMessageLimit,
+      remainingDailyMessages: canPersistConversation
+        ? getRemainingDailyMessagesByLimit(limits.dailyMessageLimit, dailyMessageCount)
+        : limits.dailyMessageLimit,
+    });
+  };
+
+  let storedHistory = normalizedHistory;
+  if (canPersistConversation && requestedConversationId) {
+    try {
+      const conversation = await resolveAssistantConversation();
+      if (conversation) {
+        storedHistory = buildAssistantHistoryFromStoredMessages(conversation.messages);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === "conversation_not_found") {
+        return res.status(404).json({
+          error: "The selected chat could not be found. Refresh and try again.",
+          code: "CONVERSATION_NOT_FOUND",
+        });
+      }
+
+      console.error("Load assistant conversation error:", error);
+    }
+  }
+
+  const detectedIntent = detectAssistantIntent(trimmedMessage);
+  const routingDebug = buildRoutingDebugInfo({
+    intent: detectedIntent.intent,
+    confidence: detectedIntent.confidence,
+    message: trimmedMessage,
+  });
+
+  if (detectedIntent.intent === "GREETING") {
+    return sendAssistantResponse({
+      reply: [
+        "Hi. I can help with engineer discovery, contractor recommendations, cost estimates, planning, tasks and meeting scheduling.",
+        "Try:",
+        "• Find engineers in Nairobi",
+        "• Estimate cost for a 5-floor apartment in Mombasa",
+        "• Create task to review BOQ tomorrow",
+      ].join("\n"),
+      source: "intent-greeting",
+    });
+  }
+
+  if (detectedIntent.intent === "PROJECT_COST_ESTIMATE") {
+    const location = extractLocationHint(trimmedMessage) || "Nairobi";
+    const projectType = getProjectType(trimmedMessage);
+    const budgetMention = extractBudgetValueFromText(trimmedMessage);
+    const floorsMatch = trimmedMessage.match(/(\d+)\s*(?:floor|storey|story)/i);
+    const floors = floorsMatch?.[1] ? Math.max(1, Number(floorsMatch[1])) : 1;
+    const sizeHint = floors * 150;
+    const basePerSqm = projectType === "Residential" ? 450 : projectType === "Commercial Building" ? 600 : 520;
+    const min = Math.round(sizeHint * basePerSqm * 0.85);
+    const max = Math.round(sizeHint * basePerSqm * 1.25);
+
+    return sendAssistantResponse({
+      reply: [
+        `Intent: PROJECT_COST_ESTIMATE (confidence ${detectedIntent.confidence.toFixed(2)})`,
+        `Estimated range for ${projectType} in ${location}: KES ${min.toLocaleString()} - KES ${max.toLocaleString()}.`,
+        budgetMention ? `Provided budget reference: KES ${budgetMention.toLocaleString()}.` : "No explicit budget provided.",
+        "Assumptions: preliminary estimate, excludes permit and financing variance.",
+      ].join("\n"),
+      source: "intent-project-cost-estimate",
+    });
+  }
+
+  if (detectedIntent.intent === "PROJECT_BUDGET_ANALYSIS") {
+    const budget = extractBudgetValueFromText(trimmedMessage);
+    if (!budget) {
+      return sendAssistantResponse({
+        reply: "I can analyze that budget. Please include a numeric budget value, for example: analyze budget KES 12,000,000 for 4-floor apartment in Nairobi.",
+        source: "intent-project-budget-analysis",
+      });
+    }
+
+    const location = extractLocationHint(trimmedMessage) || "Nairobi";
+    const projectType = getProjectType(trimmedMessage);
+    const baseline = projectType === "Residential" ? 9000000 : 13000000;
+    const gap = budget - baseline;
+    const health = gap >= 0 ? "Within expected range" : "Potential shortfall";
+
+    return sendAssistantResponse({
+      reply: [
+        `Intent: PROJECT_BUDGET_ANALYSIS (confidence ${detectedIntent.confidence.toFixed(2)})`,
+        `Budget health: ${health}`,
+        `Project type: ${projectType} (${location})`,
+        `Estimated variance: KES ${gap.toLocaleString()}`,
+        "Recommendations:",
+        "• Validate structural, MEP and finishes line items",
+        "• Keep 8-12% contingency",
+        "• Lock supplier rates early for cement/steel",
+      ].join("\n"),
+      source: "intent-project-budget-analysis",
+    });
+  }
+
+  if (detectedIntent.intent === "PROJECT_PLANNING") {
+    const projectType = getProjectType(trimmedMessage);
+    const location = extractLocationHint(trimmedMessage) || "Kenya";
+    return sendAssistantResponse({
+      reply: [
+        `Intent: PROJECT_PLANNING (confidence ${detectedIntent.confidence.toFixed(2)})`,
+        `Project plan for ${projectType} (${location}):`,
+        "1) Feasibility & requirements",
+        "2) Concept design and approvals",
+        "3) Detailed design + BOQ",
+        "4) Procurement & mobilization",
+        "5) Construction execution",
+        "6) QA/QC, commissioning and handover",
+        "Key dependency: permits + utility clearances before mobilization.",
+      ].join("\n"),
+      source: "intent-project-planning",
+    });
+  }
+
+  if (detectedIntent.intent === "CONSTRUCTION_ADVICE") {
+    return sendAssistantResponse({
+      reply: [
+        `Intent: CONSTRUCTION_ADVICE (confidence ${detectedIntent.confidence.toFixed(2)})`,
+        "Practical guidance:",
+        "• Start with a clear BOQ and phased procurement plan",
+        "• Run weekly look-ahead planning and daily site logs",
+        "• Track top-3 risks weekly: cashflow, materials, weather",
+        "• Freeze design changes before critical path activities",
+      ].join("\n"),
+      source: "intent-construction-advice",
+    });
+  }
+
+  if (detectedIntent.intent === "MATERIAL_COST_LOOKUP") {
+    const material = extractMaterialName(trimmedMessage);
+    const location = extractLocationHint(trimmedMessage) || "Nairobi";
+    if (!material) {
+      return sendAssistantResponse({
+        reply: "Please specify a material name (cement, steel, sand, ballast, blocks) so I can return a market range.",
+        source: "intent-material-cost-lookup",
+      });
+    }
+
+    const ref = MATERIAL_COST_REFERENCES[material];
+    return sendAssistantResponse({
+      reply: [
+        `Intent: MATERIAL_COST_LOOKUP (confidence ${detectedIntent.confidence.toFixed(2)})`,
+        `${material.toUpperCase()} in ${location}: KES ${ref.min.toLocaleString()} - KES ${ref.max.toLocaleString()} per ${ref.unit}.`,
+        "Note: prices vary by transport distance, supplier terms and seasonality.",
+      ].join("\n"),
+      source: "intent-material-cost-lookup",
+    });
+  }
+
+  if (detectedIntent.intent === "CONTRACTOR_RECOMMENDATION") {
+    const location = extractLocationHint(trimmedMessage);
+    const contractors = await prisma.user.findMany({
+      where: {
+        role: "CONTRACTOR" as never,
+        ...(location ? { location: { contains: location, mode: "insensitive" } } : {}),
+      },
+      select: { name: true, email: true, location: true, company: true, bio: true },
+      take: 6,
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (contractors.length === 0) {
+      return sendAssistantResponse({
+        reply: "I could not find contractor profiles matching that request yet. Try another location or onboard contractor accounts first.",
+        source: "intent-contractor-recommendation",
+      });
+    }
+
+    return sendAssistantResponse({
+      reply: [
+        `Intent: CONTRACTOR_RECOMMENDATION (confidence ${detectedIntent.confidence.toFixed(2)})`,
+        "Recommended contractors:",
+        ...contractors.map((c) => `• ${c.name || c.email} — ${c.company || "Independent"} (${c.location || "Location not set"}) | ${c.email}`),
+      ].join("\n"),
+      source: "intent-contractor-recommendation",
+    });
+  }
+
+  if (detectedIntent.intent === "LOCATION_BASED_SEARCH") {
+    const location = extractLocationHint(trimmedMessage);
+    if (!location) {
+      return sendAssistantResponse({
+        reply: "Please provide a location, for example: find contractors and engineers in Mombasa.",
+        source: "intent-location-based-search",
+      });
+    }
+
+    const professionals = await prisma.user.findMany({
+      where: {
+        role: { in: CONTACTABLE_ROLES as never },
+        location: { contains: location, mode: "insensitive" },
+      },
+      select: { name: true, email: true, role: true, location: true, company: true },
+      take: 12,
+      orderBy: { createdAt: "desc" },
+    });
+
+    return sendAssistantResponse({
+      reply: professionals.length === 0
+        ? `No professionals found in ${location} yet.`
+        : [
+            `Intent: LOCATION_BASED_SEARCH (confidence ${detectedIntent.confidence.toFixed(2)})`,
+            `Professionals in ${location}:`,
+            ...professionals.map((p) => `• ${p.name || p.email} — ${p.role} | ${p.company || "Independent"} | ${p.email}`),
+          ].join("\n"),
+      source: "intent-location-based-search",
+    });
+  }
+
+  if (detectedIntent.intent === "TASK_CREATION") {
+    if (!req.auth?.userId || req.auth.userId === "dev-engineer") {
+      return sendAssistantResponse({
+        reply: "Task creation requires a logged-in account.",
+        source: "intent-task-creation",
+      });
+    }
+
+    const title = extractTaskTitle(trimmedMessage);
+    const dueDate = extractDateFromMessage(trimmedMessage);
+    const priority = /\burgent|high priority\b/i.test(trimmedMessage) ? "HIGH" : /\blow priority\b/i.test(trimmedMessage) ? "LOW" : "MEDIUM";
+    const task = await prismaDynamic.assistantTask.create({
+      data: {
+        userId: req.auth.userId,
+        title,
+        context: trimmedMessage,
+        dueDate,
+        priority,
+        status: "PENDING",
+      },
+    });
+
+    return sendAssistantResponse({
+      reply: [
+        `Intent: TASK_CREATION (confidence ${detectedIntent.confidence.toFixed(2)})`,
+        `Task created: ${task.title}`,
+        `Task ID: ${task.id}`,
+        `Priority: ${task.priority}`,
+        `Due: ${task.dueDate ? new Date(task.dueDate).toLocaleString() : "Not set"}`,
+      ].join("\n"),
+      source: "intent-task-creation",
+    });
+  }
+
+  if (detectedIntent.intent === "TASK_FOLLOWUP") {
+    if (!req.auth?.userId || req.auth.userId === "dev-engineer") {
+      return sendAssistantResponse({
+        reply: "Task follow-up requires a logged-in account.",
+        source: "intent-task-followup",
+      });
+    }
+
+    const filter = /\boverdue\b/i.test(trimmedMessage)
+      ? "OVERDUE"
+      : /\bcompleted|done\b/i.test(trimmedMessage)
+        ? "COMPLETED"
+        : "PENDING";
+    const now = new Date();
+
+    const tasks = await prismaDynamic.assistantTask.findMany({
+      where: {
+        userId: req.auth.userId,
+        ...(filter === "COMPLETED"
+          ? { status: "COMPLETED" }
+          : filter === "OVERDUE"
+            ? { status: { not: "COMPLETED" }, dueDate: { lt: now } }
+            : { status: { not: "COMPLETED" } }),
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    });
+
+    return sendAssistantResponse({
+      reply: tasks.length === 0
+        ? `No ${filter.toLowerCase()} tasks found.`
+        : [
+            `Intent: TASK_FOLLOWUP (confidence ${detectedIntent.confidence.toFixed(2)})`,
+            `Here are your ${filter.toLowerCase()} tasks:`,
+            ...tasks.map((task) => `• ${task.title} | ${task.status} | due ${task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "not set"}`),
+          ].join("\n"),
+      source: "intent-task-followup",
+    });
+  }
+
+  if (detectedIntent.intent === "SCHEDULE_MEETING") {
+    if (!req.auth?.userId || req.auth.userId === "dev-engineer") {
+      return sendAssistantResponse({
+        reply: "Meeting scheduling requires a logged-in account.",
+        source: "intent-schedule-meeting",
+      });
+    }
+
+    const scheduledFor = extractDateFromMessage(trimmedMessage);
+    if (!scheduledFor) {
+      return sendAssistantResponse({
+        reply: "Please include a meeting date (e.g., tomorrow or YYYY-MM-DD) so I can schedule it.",
+        source: "intent-schedule-meeting",
+      });
+    }
+
+    const participant = extractMeetingParticipant(trimmedMessage);
+    const purpose = extractContactRequestText(trimmedMessage);
+    const meeting = await prismaDynamic.assistantMeeting.create({
+      data: {
+        userId: req.auth.userId,
+        participant,
+        purpose,
+        scheduledFor,
+        status: "SCHEDULED",
+      },
+    });
+
+    return sendAssistantResponse({
+      reply: [
+        `Intent: SCHEDULE_MEETING (confidence ${detectedIntent.confidence.toFixed(2)})`,
+        `Meeting scheduled with ${meeting.participant}.`,
+        `Meeting ID: ${meeting.id}`,
+        `When: ${new Date(meeting.scheduledFor).toLocaleString()}`,
+      ].join("\n"),
+      source: "intent-schedule-meeting",
+    });
+  }
+
+  if (detectedIntent.intent === "PROJECT_RISK_ANALYSIS") {
+    const budget = extractBudgetValueFromText(trimmedMessage) || 0;
+    const location = extractLocationHint(trimmedMessage) || "Nairobi";
+    const projectType = getProjectType(trimmedMessage);
+    let riskScore = 55;
+    if (/\burgent|asap\b/i.test(trimmedMessage)) riskScore += 15;
+    if (budget > 0 && budget < 7000000) riskScore += 10;
+    if (/\brainy|flood|coast|slope\b/i.test(trimmedMessage)) riskScore += 8;
+    riskScore = Math.min(95, riskScore);
+
+    return sendAssistantResponse({
+      reply: [
+        `Intent: PROJECT_RISK_ANALYSIS (confidence ${detectedIntent.confidence.toFixed(2)})`,
+        `Risk score: ${riskScore}/100 for ${projectType} (${location})`,
+        "Top risks:",
+        "• Procurement lead-time variability",
+        "• Scope changes after design freeze",
+        "• Cashflow-pressure and contractor productivity",
+        "Mitigation: lock critical materials early, maintain contingency, enforce weekly risk review.",
+      ].join("\n"),
+      source: "intent-project-risk-analysis",
+    });
+  }
+
+  if (detectedIntent.intent === "PROJECT_STATUS_QUERY") {
+    if (!req.auth?.userId || req.auth.userId === "dev-engineer") {
+      return sendAssistantResponse({
+        reply: "Project status query requires a logged-in account.",
+        source: "intent-project-status-query",
+      });
+    }
+
+    const pendingTasks = await prismaDynamic.assistantTask.findMany({
+      where: { userId: req.auth.userId, status: { not: "COMPLETED" } },
+      take: 5,
+      orderBy: { createdAt: "desc" },
+    });
+    const upcomingMeetings = await prismaDynamic.assistantMeeting.findMany({
+      where: { userId: req.auth.userId, status: "SCHEDULED", scheduledFor: { gte: new Date() } },
+      take: 3,
+      orderBy: { scheduledFor: "asc" },
+    });
+
+    return sendAssistantResponse({
+      reply: [
+        `Intent: PROJECT_STATUS_QUERY (confidence ${detectedIntent.confidence.toFixed(2)})`,
+        `Open tasks: ${pendingTasks.length}`,
+        `Upcoming meetings: ${upcomingMeetings.length}`,
+        `Current phase: ${pendingTasks.length > 4 ? "Execution" : "Planning / Coordination"}`,
+        "Blockers: check pending approvals, supplier confirmations and budget sign-off.",
+      ].join("\n"),
+      source: "intent-project-status-query",
+    });
+  }
+
+  if (detectedIntent.intent === "CONSTRUCTION_REGULATIONS") {
+    const location = extractLocationHint(trimmedMessage) || "Nairobi";
+    const projectType = getProjectType(trimmedMessage);
+    return sendAssistantResponse({
+      reply: [
+        `Intent: CONSTRUCTION_REGULATIONS (confidence ${detectedIntent.confidence.toFixed(2)})`,
+        `Regulatory checklist for ${projectType} in ${location}:`,
+        "• County development approval / building permit",
+        "• NEMA compliance (where applicable)",
+        "• Occupational safety compliance for site operations",
+        "• Utility and wayleave clearances if required",
+        "Disclaimer: confirm final requirements with local county and licensed professionals.",
+      ].join("\n"),
+      source: "intent-construction-regulations",
+    });
+  }
+
+  if (detectedIntent.intent === "GENERAL_CONVERSATION" && /\b(what can you do|help me|capabilities|how does this work)\b/i.test(trimmedMessage)) {
+    return sendAssistantResponse({
+      reply: [
+        "I can route your request to platform functions for:",
+        "• engineer and contractor discovery",
+        "• contact requests and inbox tracking",
+        "• project planning, cost and risk analysis",
+        "• material cost lookup",
+        "• task creation/follow-up and meeting scheduling",
+      ].join("\n"),
+      source: "intent-general-conversation",
+    });
+  }
+
+  if (isPricingIntent(trimmedMessage)) {
+    return sendAssistantResponse({
       reply: buildPricingReply(),
       source: "policy",
     });
   }
 
   if (isTargetMarketIntent(trimmedMessage)) {
-    return res.status(200).json({
+    return sendAssistantResponse({
       reply: buildTargetMarketReply(),
       source: "policy",
     });
+  }
+
+  if (isInboxListIntent(trimmedMessage) || isInboxSummaryIntent(trimmedMessage) || isSentInquiryIntent(trimmedMessage)) {
+    if (!req.auth?.userId || req.auth.userId === "dev-engineer") {
+      return sendAssistantResponse({
+        reply: "Inbox access is unavailable for the current session. Please log in with a saved account to view real messages.",
+        source: "inbox",
+      });
+    }
+
+    try {
+      const useSentRequests = req.auth.role === "USER" || isSentInquiryIntent(trimmedMessage);
+      const inquiries = useSentRequests
+        ? await prisma.inquiry.findMany({
+            where: {
+              OR: [{ senderUserId: req.auth.userId }, { senderEmail: req.auth.email }],
+            } as never,
+            include: {
+              recipient: {
+                select: {
+                  name: true,
+                  email: true,
+                  role: true,
+                },
+              },
+            },
+            orderBy: { createdAt: "desc" },
+            take: 10,
+          })
+        : await prisma.inquiry.findMany({
+            where: { recipientId: req.auth.userId },
+            orderBy: { createdAt: "desc" },
+            take: 10,
+          });
+
+      if (inquiries.length === 0) {
+        return sendAssistantResponse({
+          reply: useSentRequests ? "You have not sent any requests yet." : "You have no messages in your inbox yet.",
+          source: useSentRequests ? "sent-requests" : "inbox",
+        });
+      }
+
+      if (isInboxSummaryIntent(trimmedMessage)) {
+        const pending = inquiries.filter((item) => item.status === "PENDING").length;
+        const read = inquiries.filter((item) => item.status === "READ").length;
+        const replied = inquiries.filter((item) => item.status === "REPLIED").length;
+
+        return sendAssistantResponse({
+          reply: [
+            useSentRequests
+              ? `You have ${inquiries.length} sent requests tracked in the platform.`
+              : `You have ${inquiries.length} messages in your inbox.`,
+            `• Pending: ${pending}`,
+            `• Read: ${read}`,
+            `• Replied: ${replied}`,
+          ].join("\n"),
+          source: useSentRequests ? "sent-requests" : "inbox",
+        });
+      }
+
+      const inquiryLines = useSentRequests
+        ? inquiries.map((inquiry) =>
+            formatSentInquiryPreview(inquiry as never)
+          )
+        : inquiries.map((inquiry) =>
+            formatInquiryPreview(inquiry as never)
+          );
+
+      return sendAssistantResponse({
+        reply: [
+          useSentRequests
+            ? `Here are your latest ${inquiries.length} sent requests and replies:`
+            : `Here are your latest ${inquiries.length} messages:`,
+          ...inquiryLines,
+        ].join("\n"),
+        source: useSentRequests ? "sent-requests" : "inbox",
+      });
+    } catch (error) {
+      console.error("Assistant inbox lookup error:", error);
+      return sendAssistantResponse({
+        reply: req.auth.role === "USER"
+          ? "I could not load your sent requests right now. Please open the Messages page or try again shortly."
+          : "I could not load your inbox right now. Please open the Inbox page or try again shortly.",
+        source: req.auth.role === "USER" ? "sent-requests" : "inbox",
+      });
+    }
+  }
+
+  if (isContactEngineerIntent(trimmedMessage)) {
+    const requestedName = extractContactEngineerName(trimmedMessage);
+    if (!requestedName) {
+      return sendAssistantResponse({
+        reply: "I can do that. Please include the engineer name, for example: contact Eng. David Mwangi and ask for meeting availability.",
+        source: "task-contact",
+      });
+    }
+
+    const contactRequestText = extractContactRequestText(trimmedMessage);
+
+    try {
+      const potentialEngineers = await prisma.user.findMany({
+        where: {
+          role: {
+            in: CONTACTABLE_ROLES as never,
+          },
+          OR: [
+            { name: { contains: requestedName, mode: "insensitive" } },
+            { email: { contains: requestedName, mode: "insensitive" } },
+          ],
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          location: true,
+          company: true,
+        },
+        take: 20,
+      });
+
+      const ranked = potentialEngineers
+        .map((engineer) => ({
+          engineer,
+          score: scoreEngineerNameMatch(engineer.name, requestedName),
+        }))
+        .sort((a, b) => b.score - a.score);
+
+      const selected = ranked[0]?.engineer;
+
+      if (!selected) {
+        const sampleMatch = SAMPLE_ENGINEERS
+          .map((engineer) => ({
+            engineer,
+            score: scoreEngineerNameMatch(engineer.name, requestedName),
+          }))
+          .sort((a, b) => b.score - a.score)[0];
+
+        if (sampleMatch && sampleMatch.score >= 2) {
+          return sendAssistantResponse({
+            reply: [
+              `I could not find a live profile for ${requestedName}, but I prepared an outreach task for ${sampleMatch.engineer.name}.`,
+              "Action draft:",
+              `• Contact: ${sampleMatch.engineer.name} (${sampleMatch.engineer.email})`,
+              `• Request: ${contactRequestText}`,
+              "To execute this automatically, add this engineer as a registered ENGINEER user in the platform.",
+            ].join("\n"),
+            source: "task-contact-sample",
+          });
+        }
+
+        return sendAssistantResponse({
+          reply: `I could not find ${requestedName} in the current engineer directory. Ask me to list engineers in a location first, then I can contact one directly.`,
+          source: "task-contact",
+        });
+      }
+
+      let senderName = "Platform user";
+      let senderEmail = req.auth?.email || "user@icdbo.local";
+      let senderPhone: string | null = null;
+
+      if (req.auth?.userId && req.auth.userId !== "dev-engineer") {
+        const sender = await prisma.user.findUnique({
+          where: { id: req.auth.userId },
+          select: {
+            name: true,
+            email: true,
+            phone: true,
+          },
+        });
+
+        if (sender?.name?.trim()) senderName = sender.name.trim();
+        if (sender?.email?.trim()) senderEmail = sender.email.trim();
+        if (sender?.phone?.trim()) senderPhone = sender.phone.trim();
+      }
+
+      const inquiryMessage = [
+        `AI assistant task created by ${senderName}.`,
+        `User request: ${trimmedMessage}`,
+        `Action required: ${contactRequestText}`,
+      ].join("\n");
+
+      const inquiry = await prisma.inquiry.create({
+        data: {
+          recipientId: selected.id,
+          senderName,
+          senderEmail,
+          senderPhone,
+          senderUserId: req.auth?.userId && req.auth.userId !== "dev-engineer" ? req.auth.userId : null,
+          message: inquiryMessage,
+        } as never,
+      });
+
+      return sendAssistantResponse({
+        reply: [
+          `Done. I sent your contact request to ${selected.name || selected.email}.`,
+          `Inquiry ID: ${inquiry.id}`,
+          `Requested action: ${contactRequestText}`,
+        ].join("\n"),
+        source: "task-contact",
+      });
+    } catch (error) {
+      console.error("Assistant contact-engineer task error:", error);
+      return sendAssistantResponse({
+        reply: "I could not complete that contact task right now due to a server issue. Please try again in a moment.",
+        source: "task-contact",
+      });
+    }
   }
 
   if (isEngineerDiscoveryIntent(trimmedMessage)) {
@@ -1497,7 +3559,7 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
 
       const result = engineers.length > 0 ? engineers : fallbackEngineers;
       if (result.length === 0) {
-        return res.status(200).json({
+        return sendAssistantResponse({
           reply: "I could not find engineers for that location yet. Try another city or update engineer profiles first.",
           source: "engineers",
         });
@@ -1507,7 +3569,7 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
         ? `Here are engineers I found in ${locationHint}:`
         : "Here are engineers I found:";
 
-      return res.status(200).json({
+      return sendAssistantResponse({
         reply: [heading, ...result.map((engineer) => formatEngineerLine(engineer))].join("\n"),
         source: "engineers",
       });
@@ -1518,7 +3580,7 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
         .slice(0, 8);
 
       if (fallbackEngineers.length > 0) {
-        return res.status(200).json({
+        return sendAssistantResponse({
           reply: [
             "I used sample directory data because live lookup is unavailable right now:",
             ...fallbackEngineers.map((engineer) => formatEngineerLine(engineer)),
@@ -1532,10 +3594,10 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
   const assistantResult = await generateAssistantReplyWithOllama({
     userName: req.auth?.email || "User",
     message: trimmedMessage,
-    history: normalizedHistory,
+    history: storedHistory,
   });
 
-  return res.status(200).json({
+  return sendAssistantResponse({
     reply: assistantResult.reply,
     source: assistantResult.source,
     fallbackReason: assistantResult.fallbackReason || null,
@@ -1558,6 +3620,7 @@ const start = async () => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     dbConnected = true;
+    await seedDefaultProfiles();
   } catch (error) {
     console.warn("⚠ Database connection failed. Starting API in degraded mode:", error);
     console.warn("⚠ Endpoints that require database access may fail until DB is reachable.");

@@ -1,12 +1,14 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { resolveHomeRoute, type AppRole } from "@/lib/roles";
 
 type ProtectedRouteProps = {
   children: JSX.Element;
   requireAdmin?: boolean;
+  allowedRoles?: AppRole[];
 };
 
-const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps) => {
+const ProtectedRoute = ({ children, requireAdmin = false, allowedRoles }: ProtectedRouteProps) => {
   const { isAuthenticated, isHydrating, user } = useAuth();
 
   if (isHydrating) {
@@ -18,7 +20,11 @@ const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps)
   }
 
   if (requireAdmin && user?.role !== "ADMIN") {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={resolveHomeRoute(user?.role)} replace />;
+  }
+
+  if (allowedRoles && user?.role && !allowedRoles.includes(user.role)) {
+    return <Navigate to={resolveHomeRoute(user.role)} replace />;
   }
 
   return children;

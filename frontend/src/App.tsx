@@ -30,6 +30,7 @@ import Credits from "./pages/dashboard/Credits";
 import CustomerJourney from "./pages/dashboard/CustomerJourney";
 import ProfessionalSearch from "./pages/dashboard/ProfessionalSearch";
 import Profile from "./pages/dashboard/Profile";
+import MyMessages from "./pages/dashboard/MyMessages";
 
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminOverview from "./pages/admin/AdminOverview";
@@ -44,6 +45,16 @@ import EngineerProjects from "./pages/engineer/EngineerProjects";
 import EngineerPortfolio from "./pages/engineer/EngineerPortfolio";
 import EngineerAnalytics from "./pages/engineer/EngineerAnalytics";
 import EngineerSupport from "./pages/engineer/EngineerSupport";
+import RolePortalLayout from "./components/roleportal/RolePortalLayout";
+import RolePortalHome from "./pages/roleportal/RolePortalHome";
+import RoleInbox from "./pages/roleportal/RoleInbox";
+import RoleNotifications from "./pages/roleportal/RoleNotifications";
+import RolePortfolio from "./pages/roleportal/RolePortfolio";
+import RoleTasks from "./pages/roleportal/RoleTasks";
+import RoleMarketplace from "./pages/roleportal/RoleMarketplace";
+import RoleNetwork from "./pages/roleportal/RoleNetwork";
+import RoleSupport from "./pages/roleportal/RoleSupport";
+import { SPECIALIZED_PORTAL_ROLES } from "@/lib/roles";
 
 const queryClient = new QueryClient();
 
@@ -67,7 +78,7 @@ const App = () => (
                 <Route
                   path="/dashboard"
                   element={
-                    <ProtectedRoute>
+                    <ProtectedRoute allowedRoles={["USER"]}>
                       <DashboardLayout />
                     </ProtectedRoute>
                   }
@@ -86,6 +97,7 @@ const App = () => (
                   <Route path="credits" element={<Credits />} />
                   <Route path="journey" element={<CustomerJourney />} />
                   <Route path="search" element={<ProfessionalSearch />} />
+                  <Route path="messages" element={<MyMessages />} />
                   <Route path="profile" element={<Profile />} />
                 </Route>
 
@@ -112,7 +124,7 @@ const App = () => (
                 <Route
                   path="/engineer"
                   element={
-                    <ProtectedRoute>
+                    <ProtectedRoute allowedRoles={["ENGINEER"]}>
                       <EngineerLayout />
                     </ProtectedRoute>
                   }
@@ -127,6 +139,26 @@ const App = () => (
                   <Route path="profile" element={<Profile />} />
                   <Route path="settings" element={<SettingsPage />} />
                   <Route path="support" element={<EngineerSupport />} />
+                </Route>
+
+                <Route
+                  path="/portal"
+                  element={
+                    <ProtectedRoute allowedRoles={SPECIALIZED_PORTAL_ROLES}>
+                      <RolePortalLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route index element={<RolePortalHome />} />
+                  <Route path="inbox" element={<RoleInbox />} />
+                  <Route path="notifications" element={<RoleNotifications />} />
+                  <Route path="portfolio" element={<RolePortfolio />} />
+                  <Route path="tasks" element={<RoleTasks />} />
+                  <Route path="marketplace" element={<RoleMarketplace />} />
+                  <Route path="network" element={<RoleNetwork />} />
+                  <Route path="profile" element={<Profile />} />
+                  <Route path="settings" element={<SettingsPage />} />
+                  <Route path="support" element={<RoleSupport />} />
                 </Route>
 
                 <Route path="*" element={<NotFound />} />

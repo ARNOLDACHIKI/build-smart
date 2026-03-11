@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { toast } from 'sonner';
 import { apiUrl } from '@/lib/api';
+import { authStorage } from '@/lib/auth';
 
 const professionals = [
   { name: 'Eng. David Mwangi', role: 'Structural Engineer', location: 'Nairobi', rating: 4.9, projects: 48, skills: ['Structural Design', 'BIM', 'Seismic Analysis'], portfolio: 'Nairobi Tower, JKIA Terminal 2, Thika Road Bridge', avatar: 'DM' },
@@ -121,9 +122,13 @@ const ProfessionalSearch = () => {
     }
 
     try {
+      const token = authStorage.getToken();
       const response = await fetch(apiUrl('/api/inquiries'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           recipientId: selectedProfessional.id,
           senderName: contactForm.name,

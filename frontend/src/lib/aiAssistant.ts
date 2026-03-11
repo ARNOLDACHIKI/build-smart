@@ -11,11 +11,17 @@ type AssistantResponse = {
   source?: string;
   fallbackReason?: string | null;
   model?: string;
+  conversationId?: string | null;
+  limit?: number;
+  remainingChats?: number;
+  dailyLimit?: number;
+  remainingDailyMessages?: number;
 };
 
 export const askAssistant = async (input: {
   message: string;
   history: AssistantChatMessage[];
+  conversationId?: string;
 }): Promise<AssistantResponse> => {
   const token = authStorage.getToken();
   const response = await fetch(apiUrl("/api/ai/assistant"), {

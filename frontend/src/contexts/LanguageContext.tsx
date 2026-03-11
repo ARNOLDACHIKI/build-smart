@@ -121,6 +121,7 @@ const translations: Translations = {
   'sidebar.documents': { en: 'Documents', sw: 'Hati' },
   'sidebar.team': { en: 'Team', sw: 'Timu' },
   'sidebar.notifications': { en: 'Notifications', sw: 'Arifa' },
+  'sidebar.messages': { en: 'Messages', sw: 'Ujumbe' },
   'sidebar.settings': { en: 'Settings', sw: 'Mipangilio' },
   'sidebar.support': { en: 'Support', sw: 'Msaada' },
   'sidebar.search': { en: 'Find Professionals', sw: 'Tafuta Wataalamu' },

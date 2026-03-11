@@ -25,6 +25,10 @@ model User {
   updatedAt      DateTime   @updatedAt
   
   receivedInquiries Inquiry[] @relation("ReceivedInquiries")
+  sentInquiries     Inquiry[] @relation("SentInquiries")
+  assistantConversations AssistantConversation[]
+  assistantTasks AssistantTask[]
+  assistantMeetings AssistantMeeting[]
 
   @@map("users")
 }
@@ -35,23 +39,112 @@ model Inquiry {
   senderEmail String
   senderPhone String?
   message     String
+  senderUserId String?
+  senderUser  User?         @relation("SentInquiries", fields: [senderUserId], references: [id], onDelete: SetNull)
+  replyMessage String?
+  senderViewedAt DateTime?
   recipientId String
   recipient   User          @relation("ReceivedInquiries", fields: [recipientId], references: [id], onDelete: Cascade)
   status      InquiryStatus @default(PENDING)
+  respondedAt DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
   @@map("inquiries")
 }
 
+model AssistantConversation {
+  id            String                       @id @default(cuid())
+  userId        String
+  user          User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String                       @default("New chat")
+  lastMessageAt DateTime                     @default(now())
+  createdAt     DateTime                     @default(now())
+  updatedAt     DateTime                     @updatedAt
+  messages      AssistantConversationMessage[]
+
+  @@index([userId, lastMessageAt])
+  @@map("assistant_conversations")
+}
+
+model AssistantConversationMessage {
+  id             String                @id @default(cuid())
+  conversationId String
+  conversation   AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           AssistantChatRole
+  content        String
+  createdAt      DateTime              @default(now())
+
+  @@index([conversationId, createdAt])
+  @@map("assistant_conversation_messages")
+}
+
+model PlatformSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("platform_settings")
+}
+
+model AssistantTask {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  context   String?
+  dueDate   DateTime?
+  priority  String   @default("MEDIUM")
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status, dueDate])
+  @@map("assistant_tasks")
+}
+
+model AssistantMeeting {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  participant  String
+  purpose      String
+  scheduledFor DateTime
+  status       String   @default("SCHEDULED")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId, scheduledFor, status])
+  @@map("assistant_meetings")
+}
+
 enum UserRole {
   USER
   ADMIN
   ENGINEER
+  LABOURER
+  CEMENT_SUPPLIER
+  GENERAL_SUPPLIER
+  DEVELOPER
+  FINANCIER
+  CONTRACTOR
+  REAL_ESTATE
+  CONSULTANT
+  TENANT
+  PROJECT_MANAGER
+  REGULATOR
+  LOCAL_STAKEHOLDER
 }
 
 enum InquiryStatus {
   PENDING
   READ
   REPLIED
+}
+
+enum AssistantChatRole {
+  USER
+  ASSISTANT
 }

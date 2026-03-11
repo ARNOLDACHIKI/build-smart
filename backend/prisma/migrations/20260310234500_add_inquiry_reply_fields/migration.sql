@@ -1,0 +1,3 @@
+ALTER TABLE "inquiries"
+ADD COLUMN IF NOT EXISTS "replyMessage" TEXT,
+ADD COLUMN IF NOT EXISTS "respondedAt" TIMESTAMP(3);

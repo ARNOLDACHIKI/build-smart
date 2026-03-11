@@ -12,18 +12,19 @@ import logoDark from '@/assets/logo-dark.png';
 import logoLight from '@/assets/logo-light.png';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { REGISTERABLE_ROLES, resolveHomeRoute, type AppRole } from '@/lib/roles';
 
 const Register = () => {
   const { t } = useLanguage();
   const { theme } = useTheme();
-  const { signup, isAuthenticated } = useAuth();
+  const { signup, isAuthenticated, user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
-  const [role, setRole] = useState('developer');
+  const [role, setRole] = useState<AppRole>('USER');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -32,9 +33,9 @@ const Register = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard', { replace: true });
+      navigate(resolveHomeRoute(user?.role), { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, user?.role]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -65,9 +66,10 @@ const Register = () => {
         phone,
         company,
         password,
+        role,
       });
       toast({ title: 'Account created', description: 'Welcome to Build Buddy AI.' });
-      navigate('/dashboard', { replace: true });
+      navigate(resolveHomeRoute(role), { replace: true });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unable to create account.';
       const isEmailExists = errorMessage.includes('Email already exists') || errorMessage.includes('already exists');
@@ -146,19 +148,16 @@ const Register = () => {
               <Select value={role} onValueChange={setRole}>
                 <SelectTrigger className="h-11"><SelectValue placeholder="Select your role" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="developer">{t('auth.developer')}</SelectItem>
-                  <SelectItem value="financier">{t('auth.financier')}</SelectItem>
-                  <SelectItem value="contractor">{t('auth.contractor')}</SelectItem>
-                  <SelectItem value="realEstate">{t('auth.realEstate')}</SelectItem>
-                  <SelectItem value="consultant">{t('auth.consultant')}</SelectItem>
-                  <SelectItem value="tenant">{t('auth.tenant')}</SelectItem>
-                  <SelectItem value="pm">{t('auth.projectManager')}</SelectItem>
-                  <SelectItem value="supplier">{t('auth.supplier')}</SelectItem>
-                  <SelectItem value="regulator">{t('auth.regulator')}</SelectItem>
-                  <SelectItem value="engineer">{t('auth.engineer')}</SelectItem>
-                  <SelectItem value="architect">{t('auth.architect')}</SelectItem>
+                  {REGISTERABLE_ROLES.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                {REGISTERABLE_ROLES.find((option) => option.value === role)?.description}
+              </p>
             </div>
 
             <div className="space-y-2">

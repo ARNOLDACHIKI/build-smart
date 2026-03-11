@@ -13,6 +13,7 @@ import logoLight from '@/assets/logo-light.png';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { authStorage } from '@/lib/auth';
+import { resolveHomeRoute } from '@/lib/roles';
 
 const Login = () => {
   const { t } = useLanguage();
@@ -29,8 +30,7 @@ const Login = () => {
   useEffect(() => {
     if (isAuthenticated) {
       const loggedInUser = authStorage.getUser();
-      const destination = loggedInUser?.role === 'ENGINEER' ? '/engineer' : loggedInUser?.role === 'ADMIN' ? '/admin' : '/dashboard';
-      navigate(destination, { replace: true });
+      navigate(resolveHomeRoute(loggedInUser?.role), { replace: true });
     }
   }, [isAuthenticated, navigate]);
 
@@ -51,8 +51,7 @@ const Login = () => {
       await login({ email, password });
       toast({ title: 'Welcome back', description: 'Login successful.' });
       const loggedInUser = authStorage.getUser();
-      const destination = loggedInUser?.role === 'ENGINEER' ? '/engineer' : loggedInUser?.role === 'ADMIN' ? '/admin' : '/dashboard';
-      navigate(destination, { replace: true });
+      navigate(resolveHomeRoute(loggedInUser?.role), { replace: true });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unable to login.';
       const isAccountNotFound = errorMessage.includes('Account not found') || errorMessage.includes('No account exists');

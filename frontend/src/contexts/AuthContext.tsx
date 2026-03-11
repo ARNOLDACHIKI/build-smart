@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { authStorage, fetchCurrentUser, loginUser, registerUser, type AuthUser } from "@/lib/auth";
+import type { AppRole } from "@/lib/roles";
 
 type LoginInput = {
   email: string;
@@ -12,6 +13,7 @@ type SignupInput = {
   phone?: string;
   company?: string;
   password: string;
+  role?: AppRole;
 };
 
 type AuthContextType = {

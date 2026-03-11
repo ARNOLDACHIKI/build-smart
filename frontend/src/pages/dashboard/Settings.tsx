@@ -12,12 +12,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Camera } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { assetUrl } from '@/lib/api';
+import { getRoleLabel, resolveHomeRoute } from '@/lib/roles';
 
 const SettingsPage = () => {
   const { t, language, setLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const baseRoute = resolveHomeRoute(user?.role);
 
   const getInitials = (name: string | undefined, email: string | undefined) => {
     if (name) {
@@ -60,15 +62,15 @@ const SettingsPage = () => {
                     </AvatarFallback>
                   </Avatar>
                 </div>
-                <div><Button variant="outline" size="sm" onClick={() => navigate('/dashboard/profile')}>Change Photo</Button></div>
+                <div><Button variant="outline" size="sm" onClick={() => navigate(`${baseRoute}/profile`)}>Change Photo</Button></div>
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2"><Label>Full Name</Label><Input value={user?.name || ''} disabled /></div>
                 <div className="space-y-2"><Label>Email</Label><Input value={user?.email || ''} disabled /></div>
                 <div className="space-y-2"><Label>Phone</Label><Input value={user?.phone || ''} disabled /></div>
-                <div className="space-y-2"><Label>Role</Label><Input value={user?.role || 'USER'} disabled /></div>
+                <div className="space-y-2"><Label>Role</Label><Input value={getRoleLabel(user?.role)} disabled /></div>
               </div>
-              <Button className="gradient-primary text-primary-foreground" onClick={() => navigate('/dashboard/profile')}>Edit Profile</Button>
+              <Button className="gradient-primary text-primary-foreground" onClick={() => navigate(`${baseRoute}/profile`)}>Edit Profile</Button>
             </CardContent>
           </Card>
         </TabsContent>
