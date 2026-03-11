@@ -1295,6 +1295,59 @@ const buildPricingReply = () => {
   ].join("\n");
 };
 
+type ContactDirectoryEntry = {
+  id: string;
+  name: string | null;
+  email: string;
+  location: string | null;
+  company: string | null;
+};
+
+type ContractorDirectoryEntry = {
+  name: string | null;
+  email: string;
+  location: string | null;
+  company: string | null;
+  bio: string | null;
+};
+
+type LocationSearchEntry = {
+  name: string | null;
+  email: string;
+  role: AppUserRole;
+  location: string | null;
+  company: string | null;
+};
+
+type AssistantTaskRecord = {
+  id: string;
+  title: string;
+  status: string;
+  dueDate: Date | null;
+  priority: string;
+};
+
+type InboxInquiryRecord = {
+  id: string;
+  status: "PENDING" | "READ" | "REPLIED";
+  senderName: string;
+  senderEmail: string;
+  senderPhone: string | null;
+  message: string;
+  replyMessage?: string | null;
+  createdAt: Date;
+  recipient?: {
+    name: string | null;
+    email: string;
+    role: AppUserRole;
+  };
+};
+
+type EngineerCandidateScore = {
+  engineer: ContactDirectoryEntry;
+  score: number;
+};
+
 const buildTargetMarketReply = () => {
   return [
     "ICDBO target market:",
@@ -3212,7 +3265,7 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
       reply: [
         `Intent: CONTRACTOR_RECOMMENDATION (confidence ${detectedIntent.confidence.toFixed(2)})`,
         "Recommended contractors:",
-        ...contractors.map((c) => `• ${c.name || c.email} — ${c.company || "Independent"} (${c.location || "Location not set"}) | ${c.email}`),
+        ...contractors.map((c: ContractorDirectoryEntry) => `• ${c.name || c.email} — ${c.company || "Independent"} (${c.location || "Location not set"}) | ${c.email}`),
       ].join("\n"),
       source: "intent-contractor-recommendation",
     });
@@ -3243,7 +3296,7 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
         : [
             `Intent: LOCATION_BASED_SEARCH (confidence ${detectedIntent.confidence.toFixed(2)})`,
             `Professionals in ${location}:`,
-            ...professionals.map((p) => `• ${p.name || p.email} — ${p.role} | ${p.company || "Independent"} | ${p.email}`),
+            ...professionals.map((p: LocationSearchEntry) => `• ${p.name || p.email} — ${p.role} | ${p.company || "Independent"} | ${p.email}`),
           ].join("\n"),
       source: "intent-location-based-search",
     });
@@ -3317,7 +3370,7 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
         : [
             `Intent: TASK_FOLLOWUP (confidence ${detectedIntent.confidence.toFixed(2)})`,
             `Here are your ${filter.toLowerCase()} tasks:`,
-            ...tasks.map((task) => `• ${task.title} | ${task.status} | due ${task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "not set"}`),
+            ...tasks.map((task: AssistantTaskRecord) => `• ${task.title} | ${task.status} | due ${task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "not set"}`),
           ].join("\n"),
       source: "intent-task-followup",
     });
@@ -3503,9 +3556,9 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
       }
 
       if (isInboxSummaryIntent(trimmedMessage)) {
-        const pending = inquiries.filter((item) => item.status === "PENDING").length;
-        const read = inquiries.filter((item) => item.status === "READ").length;
-        const replied = inquiries.filter((item) => item.status === "REPLIED").length;
+        const pending = inquiries.filter((item: InboxInquiryRecord) => item.status === "PENDING").length;
+        const read = inquiries.filter((item: InboxInquiryRecord) => item.status === "READ").length;
+        const replied = inquiries.filter((item: InboxInquiryRecord) => item.status === "REPLIED").length;
 
         return sendAssistantResponse({
           reply: [
@@ -3521,10 +3574,10 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
       }
 
       const inquiryLines = useSentRequests
-        ? inquiries.map((inquiry) =>
+        ? inquiries.map((inquiry: InboxInquiryRecord) =>
             formatSentInquiryPreview(inquiry as never)
           )
-        : inquiries.map((inquiry) =>
+        : inquiries.map((inquiry: InboxInquiryRecord) =>
             formatInquiryPreview(inquiry as never)
           );
 
@@ -3581,16 +3634,16 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
       });
 
       const ranked = potentialEngineers
-        .map((engineer) => ({
+        .map((engineer: ContactDirectoryEntry): EngineerCandidateScore => ({
           engineer,
           score: scoreEngineerNameMatch(engineer.name, requestedName),
         }))
-        .sort((a, b) => b.score - a.score);
+        .sort((a: EngineerCandidateScore, b: EngineerCandidateScore) => b.score - a.score);
 
       let selected = ranked[0]?.engineer;
 
       if (sendToAnotherProfessional && selected) {
-        const alternativeFromRanked = ranked.find((item) => item.engineer.id !== selected.id && item.score > 0)?.engineer;
+        const alternativeFromRanked = ranked.find((item: EngineerCandidateScore) => item.engineer.id !== selected.id && item.score > 0)?.engineer;
 
         if (alternativeFromRanked) {
           selected = alternativeFromRanked;
@@ -3632,11 +3685,11 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
 
       if (!selected) {
         const sampleMatch = SAMPLE_ENGINEERS
-          .map((engineer) => ({
+          .map((engineer: typeof SAMPLE_ENGINEERS[number]) => ({
             engineer,
             score: scoreEngineerNameMatch(engineer.name, requestedName),
           }))
-          .sort((a, b) => b.score - a.score)[0];
+          .sort((a: { engineer: typeof SAMPLE_ENGINEERS[number]; score: number }, b: { engineer: typeof SAMPLE_ENGINEERS[number]; score: number }) => b.score - a.score)[0];
 
         if (sampleMatch && sampleMatch.score >= 2) {
           return sendAssistantResponse({
@@ -3744,9 +3797,9 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
       });
 
       const fallbackEngineers = SAMPLE_ENGINEERS
-        .filter((engineer) => !locationHint || engineer.location.toLowerCase().includes(locationHint.toLowerCase()))
+        .filter((engineer: typeof SAMPLE_ENGINEERS[number]) => !locationHint || engineer.location.toLowerCase().includes(locationHint.toLowerCase()))
         .slice(0, 8)
-        .map((engineer) => ({
+        .map((engineer: typeof SAMPLE_ENGINEERS[number]) => ({
           name: engineer.name,
           email: engineer.email,
           company: engineer.company,
@@ -3767,20 +3820,20 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
         : "Here are engineers I found:";
 
       return sendAssistantResponse({
-        reply: [heading, ...result.map((engineer) => formatEngineerLine(engineer))].join("\n"),
+        reply: [heading, ...result.map((engineer: { name: string | null; email: string; company: string | null; location: string | null; bio: string | null }) => formatEngineerLine(engineer))].join("\n"),
         source: "engineers",
       });
     } catch (error) {
       console.error("Assistant engineer lookup error:", error);
       const fallbackEngineers = SAMPLE_ENGINEERS
-        .filter((engineer) => !locationHint || engineer.location.toLowerCase().includes(locationHint.toLowerCase()))
+        .filter((engineer: typeof SAMPLE_ENGINEERS[number]) => !locationHint || engineer.location.toLowerCase().includes(locationHint.toLowerCase()))
         .slice(0, 8);
 
       if (fallbackEngineers.length > 0) {
         return sendAssistantResponse({
           reply: [
             "I used sample directory data because live lookup is unavailable right now:",
-            ...fallbackEngineers.map((engineer) => formatEngineerLine(engineer)),
+            ...fallbackEngineers.map((engineer: typeof SAMPLE_ENGINEERS[number]) => formatEngineerLine(engineer)),
           ].join("\n"),
           source: "engineers-fallback",
         });
