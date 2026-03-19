@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Mail, MessageSquareReply, Phone, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -70,7 +70,7 @@ const RoleNotifications = () => {
     }
   };
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!token) return;
 
     setLoading(true);
@@ -98,7 +98,7 @@ const RoleNotifications = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     void load();
@@ -109,7 +109,7 @@ const RoleNotifications = () => {
     }, 15000);
 
     return () => window.clearInterval(intervalId);
-  }, [token]);
+  }, [load, token]);
 
   const filtered = useMemo(() => {
     if (filter === 'all') return items;

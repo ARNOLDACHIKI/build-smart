@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,17 +10,52 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { Camera } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { assetUrl } from '@/lib/api';
+import { assetUrl, apiUrl } from '@/lib/api';
 import { getRoleLabel, resolveHomeRoute } from '@/lib/roles';
+import { toast } from 'sonner';
 
 const SettingsPage = () => {
   const { t, language, setLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
-  const { user } = useAuth();
+  const { user, token, updateUser } = useAuth();
   const navigate = useNavigate();
   const baseRoute = resolveHomeRoute(user?.role);
+  const [isUpdatingTwoFactor, setIsUpdatingTwoFactor] = useState(false);
+
+  const twoFactorEnabled = Boolean(user?.twoFactorEnabled);
+
+  const handleTwoFactorToggle = async (enabled: boolean) => {
+    if (!token || !user) {
+      toast.error('You need to be signed in to change security settings');
+      return;
+    }
+
+    setIsUpdatingTwoFactor(true);
+    try {
+      const response = await fetch(apiUrl('/api/auth/profile'), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ twoFactorEnabled: enabled }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update two-factor settings');
+      }
+
+      const data = await response.json();
+      updateUser(data.user);
+      toast.success(enabled ? 'Two-factor authentication enabled' : 'Two-factor authentication disabled');
+    } catch (error) {
+      console.error('Two-factor update error:', error);
+      toast.error('Failed to update two-factor authentication');
+    } finally {
+      setIsUpdatingTwoFactor(false);
+    }
+  };
 
   const getInitials = (name: string | undefined, email: string | undefined) => {
     if (name) {
@@ -91,21 +127,14 @@ const SettingsPage = () => {
 
         <TabsContent value="security" className="mt-4 space-y-4">
           <Card className="glass-card border-0">
-            <CardContent className="p-6 space-y-4">
-              <h3 className="font-semibold">Change Password</h3>
-              <div className="space-y-4 max-w-md">
-                <div className="space-y-2"><Label>Current Password</Label><Input type="password" /></div>
-                <div className="space-y-2"><Label>New Password</Label><Input type="password" /></div>
-                <div className="space-y-2"><Label>Confirm Password</Label><Input type="password" /></div>
-              </div>
-              <Button className="gradient-primary text-primary-foreground">Update Password</Button>
-            </CardContent>
-          </Card>
-          <Card className="glass-card border-0">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div><h3 className="font-semibold">Two-Factor Authentication</h3><p className="text-sm text-muted-foreground">Add extra security to your account</p></div>
-                <Switch />
+                <Switch
+                  checked={twoFactorEnabled}
+                  onCheckedChange={(checked) => void handleTwoFactorToggle(checked)}
+                  disabled={isUpdatingTwoFactor}
+                />
               </div>
             </CardContent>
           </Card>

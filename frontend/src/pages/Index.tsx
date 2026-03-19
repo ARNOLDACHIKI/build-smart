@@ -4,6 +4,7 @@ import FeaturesSection from '@/components/landing/FeaturesSection';
 import HowItWorksSection from '@/components/landing/HowItWorksSection';
 import TestimonialsSection from '@/components/landing/TestimonialsSection';
 import PricingSection from '@/components/landing/PricingSection';
+import MobileAppDashboardSection from '@/components/landing/MobileAppDashboardSection';
 import Footer from '@/components/landing/Footer';
 
 const Index = () => {
@@ -13,6 +14,7 @@ const Index = () => {
       <HeroSection />
       <FeaturesSection />
       <HowItWorksSection />
+      <MobileAppDashboardSection />
       <TestimonialsSection />
       <PricingSection />
       <Footer />

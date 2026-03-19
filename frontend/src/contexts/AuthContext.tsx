@@ -1,5 +1,16 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { authStorage, fetchCurrentUser, loginUser, registerUser, type AuthUser } from "@/lib/auth";
+import {
+  authStorage,
+  fetchCurrentUser,
+  loginUser,
+  registerUser,
+  resendVerificationCode,
+  resendTwoFactorCode,
+  verifyEmailCode,
+  verifyTwoFactorCode,
+  type AuthUser,
+  type RegisterResponse,
+} from "@/lib/auth";
 import type { AppRole } from "@/lib/roles";
 
 type LoginInput = {
@@ -22,7 +33,11 @@ type AuthContextType = {
   isAuthenticated: boolean;
   isHydrating: boolean;
   login: (input: LoginInput) => Promise<void>;
-  signup: (input: SignupInput) => Promise<void>;
+  signup: (input: SignupInput) => Promise<RegisterResponse>;
+  verifyEmail: (input: { email: string; code: string }) => Promise<void>;
+  resendVerification: (input: { email: string }) => Promise<void>;
+  verifyTwoFactor: (input: { email: string; code: string }) => Promise<void>;
+  resendTwoFactor: (input: { email: string }) => Promise<void>;
   logout: () => void;
   updateUser: (updatedUser: AuthUser) => void;
 };
@@ -67,12 +82,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     authStorage.setUser(data.user);
   };
 
-  const signup = async (input: SignupInput) => {
+  const signup = async (input: SignupInput): Promise<RegisterResponse> => {
     const data = await registerUser(input);
+    if (data.token) {
+      setToken(data.token);
+      setUser(data.user);
+      authStorage.setToken(data.token);
+      authStorage.setUser(data.user);
+    }
+    return data;
+  };
+
+  const verifyEmail = async (input: { email: string; code: string }) => {
+    const data = await verifyEmailCode(input);
     setToken(data.token);
     setUser(data.user);
     authStorage.setToken(data.token);
     authStorage.setUser(data.user);
+  };
+
+  const resendVerification = async (input: { email: string }) => {
+    await resendVerificationCode(input);
+  };
+
+  const verifyTwoFactor = async (input: { email: string; code: string }) => {
+    const data = await verifyTwoFactorCode(input);
+    setToken(data.token);
+    setUser(data.user);
+    authStorage.setToken(data.token);
+    authStorage.setUser(data.user);
+  };
+
+  const resendTwoFactor = async (input: { email: string }) => {
+    await resendTwoFactorCode(input);
   };
 
   const logout = () => {
@@ -94,6 +136,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isHydrating,
       login,
       signup,
+      verifyEmail,
+      resendVerification,
+      verifyTwoFactor,
+      resendTwoFactor,
       logout,
       updateUser,
     }),

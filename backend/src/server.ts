@@ -8,6 +8,13 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import { 
+  verifyEmailService, 
+  sendVerificationEmail,
+  sendTwoFactorCodeEmail,
+  sendWelcomeEmail,
+  sendPasswordResetEmail
+} from "./emailService.js";
 
 dotenv.config();
 
@@ -53,6 +60,12 @@ const DEV_AUTH_BYPASS = process.env.DEV_AUTH_BYPASS === "true";
 const DEV_ENGINEER_EMAIL = process.env.DEV_ENGINEER_EMAIL || "engineer@local.test";
 const DEV_ENGINEER_PASSWORD = process.env.DEV_ENGINEER_PASSWORD || "Engineer1234";
 const DEV_ENGINEER_NAME = process.env.DEV_ENGINEER_NAME || "Mock Engineer";
+let devEngineerTwoFactorEnabled = false;
+
+// Offline-mode state — set true only after a successful DB connection at startup
+let dbAvailable = false;
+// Pre-hashed password for seeded accounts (populated in start() even when DB is down)
+let seededPasswordHash = "";
 const ASSISTANT_CHAT_LIMIT = Math.max(1, Number(process.env.ASSISTANT_CHAT_LIMIT || "12"));
 const ASSISTANT_DAILY_MESSAGE_LIMIT = Math.max(1, Number(process.env.ASSISTANT_DAILY_MESSAGE_LIMIT || "50"));
 const ASSISTANT_CHAT_LIMIT_SETTING_KEY = "assistant.chat.limit";
@@ -1592,6 +1605,8 @@ type SafeUser = {
   company: string | null;
   location: string | null;
   role: AppUserRole;
+  emailVerified: boolean;
+  twoFactorEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -1616,6 +1631,8 @@ const toSafeUser = (user: {
   company: string | null;
   location: string | null;
   role: AppUserRole;
+  emailVerified: boolean;
+  twoFactorEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
 }): SafeUser => ({
@@ -1628,6 +1645,8 @@ const toSafeUser = (user: {
   company: user.company,
   location: user.location,
   role: user.role,
+  emailVerified: user.emailVerified,
+  twoFactorEnabled: user.twoFactorEnabled,
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
 });
@@ -1644,6 +1663,8 @@ const buildDevEngineerSafeUser = (): SafeUser => {
     company: null,
     location: null,
     role: "ENGINEER",
+    emailVerified: true,
+    twoFactorEnabled: devEngineerTwoFactorEnabled,
     createdAt: now,
     updatedAt: now,
   };
@@ -1678,141 +1699,6 @@ const DEFAULT_ROLE_PROFILES: Array<{
   bio: string;
 }> = [
   {
-    email: "david@gmail.com",
-    name: "David Mwangi",
-    role: "ENGINEER",
-    phone: "+254712345601",
-    company: "Mwangi Structural Studio",
-    location: "Nairobi",
-    bio: "Structural engineer focused on apartment and commercial building delivery in Nairobi.",
-  },
-  {
-    email: "grace@gmail.com",
-    name: "Grace Njeri",
-    role: "ENGINEER",
-    phone: "+254712345602",
-    company: "Njeri Design Collaborative",
-    location: "Nairobi",
-    bio: "Architect and engineering consultant for mixed-use and sustainable developments.",
-  },
-  {
-    email: "joseph@gmail.com",
-    name: "Joseph Otieno",
-    role: "ENGINEER",
-    phone: "+254712345603",
-    company: "Lake Infrastructure Partners",
-    location: "Kisumu",
-    bio: "Civil engineer specializing in roads, drainage and public infrastructure delivery.",
-  },
-  {
-    email: "kevin@gmail.com",
-    name: "Kevin Kamau",
-    role: "LABOURER",
-    phone: "+254712345604",
-    company: "SiteWorks Crew",
-    location: "Nairobi",
-    bio: "Experienced site labourer supporting formwork, finishing and daily site operations.",
-  },
-  {
-    email: "brenda@gmail.com",
-    name: "Brenda Achieng",
-    role: "CEMENT_SUPPLIER",
-    phone: "+254712345605",
-    company: "Achieng Cement Distributors",
-    location: "Mombasa",
-    bio: "Cement supplier coordinating bulk dispatch, stock planning and sample approvals.",
-  },
-  {
-    email: "brian@gmail.com",
-    name: "Brian Kiptoo",
-    role: "GENERAL_SUPPLIER",
-    phone: "+254712345606",
-    company: "Kiptoo Build Supplies",
-    location: "Eldoret",
-    bio: "General supplier for fittings, finishes, hardware and rapid procurement support.",
-  },
-  {
-    email: "faith@gmail.com",
-    name: "Faith Wanjiku",
-    role: "DEVELOPER",
-    phone: "+254712345607",
-    company: "Wanjiku Urban Developments",
-    location: "Nairobi",
-    bio: "Property developer managing residential and mixed-use investment projects.",
-  },
-  {
-    email: "samuel@gmail.com",
-    name: "Samuel Mutiso",
-    role: "FINANCIER",
-    phone: "+254712345608",
-    company: "Mutiso Capital Advisory",
-    location: "Nairobi",
-    bio: "Project financier reviewing construction viability, risk and return performance.",
-  },
-  {
-    email: "hassan@gmail.com",
-    name: "Hassan Ali",
-    role: "CONTRACTOR",
-    phone: "+254712345609",
-    company: "Ali Construction Kenya",
-    location: "Mombasa",
-    bio: "General contractor handling residential, commercial and industrial site execution.",
-  },
-  {
-    email: "lillian@gmail.com",
-    name: "Lillian Atieno",
-    role: "REAL_ESTATE",
-    phone: "+254712345610",
-    company: "Atieno Realty Advisory",
-    location: "Nairobi",
-    bio: "Real estate analyst tracking buyer demand, tenant behavior and location potential.",
-  },
-  {
-    email: "mary@gmail.com",
-    name: "Mary Akinyi",
-    role: "CONSULTANT",
-    phone: "+254712345611",
-    company: "Akinyi Cost and Advisory",
-    location: "Kisumu",
-    bio: "Construction consultant supporting value engineering, advisory reviews and cost control.",
-  },
-  {
-    email: "esther@gmail.com",
-    name: "Esther Wambui",
-    role: "TENANT",
-    phone: "+254712345612",
-    company: "Tenant Voice Network",
-    location: "Nairobi",
-    bio: "Tenant representative sharing occupancy needs and end-user experience insights.",
-  },
-  {
-    email: "patrick@gmail.com",
-    name: "Patrick Odhiambo",
-    role: "PROJECT_MANAGER",
-    phone: "+254712345613",
-    company: "Odhiambo PMO",
-    location: "Nakuru",
-    bio: "Project manager coordinating scope, cost, approvals and stakeholder timelines.",
-  },
-  {
-    email: "dorcas@gmail.com",
-    name: "Dorcas Chebet",
-    role: "REGULATOR",
-    phone: "+254712345614",
-    company: "County Built Environment Office",
-    location: "Uasin Gishu",
-    bio: "Regulatory officer overseeing compliance, approvals and built environment standards.",
-  },
-  {
-    email: "moses@gmail.com",
-    name: "Moses Kariuki",
-    role: "LOCAL_STAKEHOLDER",
-    phone: "+254712345615",
-    company: "Kilimani Residents Forum",
-    location: "Nairobi",
-    bio: "Local stakeholder documenting community concerns, utilities and neighborhood impact.",
-  },
-  {
     email: "admin@gmail.com",
     name: "Platform Admin",
     role: "ADMIN",
@@ -1821,19 +1707,84 @@ const DEFAULT_ROLE_PROFILES: Array<{
     location: "Nairobi",
     bio: "System administrator managing governance, users and platform controls.",
   },
-  {
-    email: "ivy@gmail.com",
-    name: "Ivy Naliaka",
-    role: "USER",
-    phone: "+254712345616",
-    company: "ICDBO Client Workspace",
-    location: "Nairobi",
-    bio: "General platform user tracking project performance and collaboration workflows.",
-  },
 ];
+
+const DEPRECATED_DUMMY_EMAILS = [
+  "david@gmail.com",
+  "grace@gmail.com",
+  "joseph@gmail.com",
+  "kevin@gmail.com",
+  "brenda@gmail.com",
+  "brian@gmail.com",
+  "faith@gmail.com",
+  "samuel@gmail.com",
+  "hassan@gmail.com",
+  "lillian@gmail.com",
+  "mary@gmail.com",
+  "esther@gmail.com",
+  "patrick@gmail.com",
+  "dorcas@gmail.com",
+  "moses@gmail.com",
+  "ivy@gmail.com",
+];
+
+// ---------------------------------------------------------------------------
+// Offline / in-memory user helpers
+// Used automatically when the database is unreachable so seeded demo accounts
+// can still log in without a live DB connection.
+// ---------------------------------------------------------------------------
+
+/** Build a stable deterministic ID for an in-memory (offline) user. */
+const buildOfflineUserId = (email: string): string =>
+  `offline-${Buffer.from(email).toString("base64").replace(/[^a-zA-Z0-9]/g, "")}`;
+
+/** Look up a seeded profile by email or by its offline ID. */
+const findInMemoryUser = (
+  value: string,
+  byId = false
+): { profile: (typeof DEFAULT_ROLE_PROFILES)[0]; id: string } | null => {
+  for (const profile of DEFAULT_ROLE_PROFILES) {
+    const id = buildOfflineUserId(profile.email);
+    if (byId ? id === value : profile.email === value) {
+      return { profile, id };
+    }
+  }
+  return null;
+};
+
+/** Convert a seeded profile into the SafeUser shape returned by the API. */
+const buildInMemorySafeUser = (
+  profile: (typeof DEFAULT_ROLE_PROFILES)[0],
+  id: string
+): SafeUser => {
+  const now = new Date("2026-01-01T00:00:00Z");
+  return {
+    id,
+    email: profile.email,
+    name: profile.name,
+    profilePicture: null,
+    phone: profile.phone,
+    bio: profile.bio,
+    company: profile.company,
+    location: profile.location,
+    role: profile.role,
+    emailVerified: true,
+    twoFactorEnabled: false,
+    createdAt: now,
+    updatedAt: now,
+  };
+};
+
+// ---------------------------------------------------------------------------
 
 const seedDefaultProfiles = async () => {
   const hashedPassword = await bcrypt.hash(SEEDED_DEFAULT_PASSWORD, 10);
+
+  await prisma.user.deleteMany({
+    where: {
+      email: { in: DEPRECATED_DUMMY_EMAILS },
+    },
+  });
 
   for (const profile of DEFAULT_ROLE_PROFILES) {
     await prisma.user.upsert({
@@ -1845,6 +1796,9 @@ const seedDefaultProfiles = async () => {
         location: profile.location,
         bio: profile.bio,
         role: profile.role as never,
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpiry: null,
       },
       create: {
         email: profile.email,
@@ -1855,6 +1809,9 @@ const seedDefaultProfiles = async () => {
         location: profile.location,
         bio: profile.bio,
         role: profile.role as never,
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpiry: null,
       },
     });
   }
@@ -1865,6 +1822,15 @@ const generateToken = (payload: JwtPayload): string => {
     expiresIn: JWT_EXPIRES_IN as jwt.SignOptions["expiresIn"],
   });
 };
+
+/**
+ * Generate a random 6-digit verification code
+ */
+const generateVerificationCode = (): string => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+const TWO_FACTOR_CODE_TTL_MS = 10 * 60 * 1000;
 
 const resolveOptionalAuth = (req: express.Request): JwtPayload | null => {
   const authHeader = req.headers.authorization;
@@ -1929,6 +1895,14 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", message: "Server is running" });
 });
 
+// Root endpoint to make local API access clearer in the browser
+app.get("/", (_req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:8080";
+  res.status(200).send(
+    `Build Buddy API is running. Open the frontend at ${frontendUrl}. Health check: /health`
+  );
+});
+
 // Database health check
 app.get("/api/health/db", async (_req, res) => {
   try {
@@ -1973,6 +1947,11 @@ app.post("/api/auth/register", async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Generate verification code
+    const verificationCode = generateVerificationCode();
+    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
+
     const user = await prisma.user.create({
       data: {
         email,
@@ -1981,20 +1960,347 @@ app.post("/api/auth/register", async (req, res) => {
         phone: phone || null,
         company: company || null,
         role: selectedRole as never,
+        emailVerificationToken: verificationCode,
+        emailVerificationExpiry: verificationExpiry,
+        emailVerificationSent: new Date(),
       },
     });
 
-    const token = generateToken({
-      userId: user.id,
-      email,
-      role: user.role,
+    // Send verification email (fire and forget, don't block response)
+    sendVerificationEmail(
+      user.email,
+      verificationCode,
+      user.name || user.email
+    ).catch((error) => {
+      console.error("Failed to send verification email:", error);
     });
 
-    return res.status(201).json({ user: toSafeUser(user), token });
+    return res.status(201).json({ 
+      user: toSafeUser(user),
+      message: "Registration successful! A verification email has been sent. Please verify your email using the code sent to your inbox.",
+      emailVerificationRequired: true,
+      verificationEmail: user.email,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("Can't reach database server")) {
+      return res.status(503).json({
+        error: "Database is temporarily unavailable. Please try again shortly.",
+      });
+    }
+
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+});
+
+// Auth - verify email
+app.post("/api/auth/verify-email", async (req, res) => {
+  const { email, code } = req.body as {
+    email?: string;
+    code?: string;
+  };
+
+  if (!email || !code) {
+    return res.status(400).json({ error: "Email and verification code are required" });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (user.emailVerified) {
+      return res.status(400).json({ error: "Email is already verified" });
+    }
+
+    if (!user.emailVerificationToken) {
+      return res.status(400).json({ error: "No verification code found. Please register again." });
+    }
+
+    if (user.emailVerificationExpiry && new Date() > user.emailVerificationExpiry) {
+      return res.status(400).json({ 
+        error: "Verification code has expired. Please request a new one.",
+        expired: true
+      });
+    }
+
+    if (user.emailVerificationToken !== code) {
+      return res.status(400).json({ error: "Invalid verification code" });
+    }
+
+    // Update user as verified
+    const verifiedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpiry: null,
+      },
+    });
+
+    // Send welcome email
+    sendWelcomeEmail(
+      verifiedUser.email,
+      verifiedUser.name || verifiedUser.email
+    ).catch((error) => {
+      console.error("Failed to send welcome email:", error);
+    });
+
+    const token = generateToken({
+      userId: verifiedUser.id,
+      email: verifiedUser.email,
+      role: verifiedUser.role,
+    });
+
+    return res.status(200).json({ 
+      message: "Email verified successfully!",
+      user: toSafeUser(verifiedUser), 
+      token 
+    });
   } catch (error) {
     return res.status(500).json({
       error: error instanceof Error ? error.message : "Internal server error",
     });
+  }
+});
+
+// Auth - resend verification email
+app.post("/api/auth/resend-verification", async (req, res) => {
+  const { email } = req.body as {
+    email?: string;
+  };
+
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (user.emailVerified) {
+      return res.status(400).json({ error: "Email is already verified" });
+    }
+
+    // Generate new verification code
+    const verificationCode = generateVerificationCode();
+    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // Update user with new code
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationToken: verificationCode,
+        emailVerificationExpiry: verificationExpiry,
+        emailVerificationSent: new Date(),
+      },
+    });
+
+    // Send verification email
+    await sendVerificationEmail(
+      updatedUser.email,
+      verificationCode,
+      updatedUser.name || updatedUser.email
+    );
+
+    return res.status(200).json({ 
+      message: "Verification email resent successfully. Check your inbox." 
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+});
+
+// Auth - verify two-factor code
+app.post("/api/auth/verify-two-factor", async (req, res) => {
+  const { email, code } = req.body as {
+    email?: string;
+    code?: string;
+  };
+
+  if (!email || !code) {
+    return res.status(400).json({ error: "Email and verification code are required" });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!user.twoFactorEnabled) {
+      return res.status(400).json({ error: "Two-factor authentication is not enabled for this account" });
+    }
+
+    if (!user.emailVerificationToken) {
+      return res.status(400).json({ error: "No active two-factor code found. Please sign in again." });
+    }
+
+    if (user.emailVerificationExpiry && new Date() > user.emailVerificationExpiry) {
+      return res.status(400).json({
+        error: "Two-factor code has expired. Please request a new one.",
+        expired: true,
+      });
+    }
+
+    if (user.emailVerificationToken !== code) {
+      return res.status(400).json({ error: "Invalid two-factor code" });
+    }
+
+    const authenticatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationToken: null,
+        emailVerificationExpiry: null,
+      },
+    });
+
+    const token = generateToken({
+      userId: authenticatedUser.id,
+      email: authenticatedUser.email,
+      role: authenticatedUser.role,
+    });
+
+    return res.status(200).json({ user: toSafeUser(authenticatedUser), token });
+  } catch (error) {
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+});
+
+// Auth - resend two-factor code
+app.post("/api/auth/resend-two-factor", async (req, res) => {
+  const { email } = req.body as { email?: string };
+
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!user.twoFactorEnabled) {
+      return res.status(400).json({ error: "Two-factor authentication is not enabled for this account" });
+    }
+
+    const twoFactorCode = generateVerificationCode();
+    const twoFactorExpiry = new Date(Date.now() + TWO_FACTOR_CODE_TTL_MS);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationToken: twoFactorCode,
+        emailVerificationExpiry: twoFactorExpiry,
+      },
+    });
+
+    await sendTwoFactorCodeEmail(user.email, twoFactorCode, user.name || user.email);
+
+    return res.status(200).json({
+      message: "Two-factor code resent successfully. Check your inbox.",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+});
+
+// Auth - forgot password
+app.post("/api/auth/forgot-password", async (req, res) => {
+  const { email } = req.body as { email?: string };
+
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ error: "Account not found" });
+    }
+
+    const resetToken = jwt.sign(
+      {
+        userId: user.id,
+        email: user.email,
+        type: "password_reset",
+      },
+      JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    await sendPasswordResetEmail(user.email, resetToken, user.name || user.email);
+
+    return res.status(200).json({
+      message: "Password reset link has been sent.",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+});
+
+// Auth - reset password
+app.post("/api/auth/reset-password", async (req, res) => {
+  const { email, token, password } = req.body as {
+    email?: string;
+    token?: string;
+    password?: string;
+  };
+
+  if (!email || !token || !password) {
+    return res.status(400).json({
+      error: "Email, token, and new password are required",
+    });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({
+      error: "Password must be at least 6 characters",
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as {
+      userId?: string;
+      email?: string;
+      type?: string;
+    };
+
+    if (decoded.type !== "password_reset" || decoded.email !== email) {
+      return res.status(400).json({ error: "Invalid or expired reset token" });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user || user.id !== decoded.userId) {
+      return res.status(400).json({ error: "Invalid reset request" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword },
+    });
+
+    return res.status(200).json({ message: "Password reset successful" });
+  } catch (_error) {
+    return res.status(400).json({ error: "Invalid or expired reset token" });
   }
 });
 
@@ -2037,6 +2343,39 @@ app.post("/api/auth/login", async (req, res) => {
       });
     }
 
+    if (!user.emailVerified) {
+      return res.status(403).json({
+        error: "Email not verified",
+        message: "Please verify your email first using the code we sent to your inbox.",
+        emailVerificationRequired: true,
+        verificationEmail: user.email,
+      });
+    }
+
+    if (user.twoFactorEnabled) {
+      const twoFactorCode = generateVerificationCode();
+      const twoFactorExpiry = new Date(Date.now() + TWO_FACTOR_CODE_TTL_MS);
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerificationToken: twoFactorCode,
+          emailVerificationExpiry: twoFactorExpiry,
+        },
+      });
+
+      sendTwoFactorCodeEmail(user.email, twoFactorCode, user.name || user.email).catch((error) => {
+        console.error("Failed to send two-factor code:", error);
+      });
+
+      return res.status(403).json({
+        error: "Two-factor authentication required",
+        message: "Enter the 6-digit code sent to your email to complete sign in.",
+        twoFactorRequired: true,
+        twoFactorEmail: user.email,
+      });
+    }
+
     const token = generateToken({
       userId: user.id,
       email: user.email,
@@ -2045,6 +2384,27 @@ app.post("/api/auth/login", async (req, res) => {
 
     return res.status(200).json({ user: toSafeUser(user), token });
   } catch (error) {
+    // --- Offline fallback: when DB is unreachable use seeded in-memory accounts ---
+    if (!dbAvailable && seededPasswordHash) {
+      const match = findInMemoryUser(email);
+      if (match) {
+        const passwordOk = await bcrypt.compare(password, seededPasswordHash);
+        if (!passwordOk) {
+          return res.status(401).json({
+            error: "Invalid password",
+            message: "The password you entered is incorrect. Please try again.",
+          });
+        }
+        const { profile, id } = match;
+        const safeUser = buildInMemorySafeUser(profile, id);
+        const token = generateToken({ userId: id, email: profile.email, role: profile.role });
+        return res.status(200).json({ user: safeUser, token, mode: "offline" });
+      }
+      return res.status(404).json({
+        error: "Account not found",
+        message: "No account exists with this email address. Please create an account to continue.",
+      });
+    }
     return res.status(500).json({
       error: error instanceof Error ? error.message : "Internal server error",
     });
@@ -2069,6 +2429,16 @@ app.get("/api/auth/me", authMiddleware, async (req: AuthenticatedRequest, res) =
 
     return res.status(200).json({ user: toSafeUser(user) });
   } catch (error) {
+    // Offline fallback: resolve from in-memory seeded users
+    if (!dbAvailable) {
+      const match = findInMemoryUser(req.auth.userId, true);
+      if (match) {
+        return res.status(200).json({
+          user: buildInMemorySafeUser(match.profile, match.id),
+          mode: "offline",
+        });
+      }
+    }
     return res.status(500).json({
       error: error instanceof Error ? error.message : "Internal server error",
     });
@@ -2083,11 +2453,18 @@ app.post("/api/auth/logout", (_req, res) => {
 // Update profile endpoint
 app.put("/api/auth/profile", authMiddleware, async (req: AuthenticatedRequest, res) => {
   try {
-    const { name, phone, bio, company, location } = req.body;
+    const { name, phone, bio, company, location, twoFactorEnabled } = req.body;
     const userId = req.auth?.userId;
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (DEV_AUTH_BYPASS && userId === "dev-engineer") {
+      if (typeof twoFactorEnabled === "boolean") {
+        devEngineerTwoFactorEnabled = twoFactorEnabled;
+      }
+      return res.json({ user: buildDevEngineerSafeUser(), mode: "dev-bypass" });
     }
 
     const updatedUser = await prisma.user.update({
@@ -2098,6 +2475,8 @@ app.put("/api/auth/profile", authMiddleware, async (req: AuthenticatedRequest, r
         bio: bio || undefined,
         company: company || undefined,
         location: location || undefined,
+        twoFactorEnabled:
+          typeof twoFactorEnabled === "boolean" ? twoFactorEnabled : undefined,
       },
     });
 
@@ -3866,10 +4245,20 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
 // Start server
 const start = async () => {
+  // Pre-hash the seeded password so offline login works even when DB is down
+  seededPasswordHash = await bcrypt.hash(SEEDED_DEFAULT_PASSWORD, 10);
+
+  // Initialize email service
+  const emailServiceReady = await verifyEmailService();
+  if (!emailServiceReady) {
+    console.warn("⚠ Email service failed to initialize. Email notifications will not be sent.");
+  }
+
   let dbConnected = false;
   try {
     await prisma.$queryRaw`SELECT 1`;
     dbConnected = true;
+    dbAvailable = true;
     await seedDefaultProfiles();
   } catch (error) {
     console.warn("⚠ Database connection failed. Starting API in degraded mode:", error);
@@ -3880,6 +4269,9 @@ const start = async () => {
     console.log(`✓ Server running on http://localhost:${PORT}`);
     if (dbConnected) {
       console.log("✓ Database connection successful");
+    }
+    if (emailServiceReady) {
+      console.log("✓ Email service connected");
     }
   }
   );

@@ -1,19 +1,17 @@
 import { motion } from 'framer-motion';
-import { BarChart3, Brain, Wallet, Users, FileText, ClipboardList, Search, Award } from 'lucide-react';
+import { BarChart3, ClipboardList, Users, Search, BellRing, FolderKanban } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const FeaturesSection = () => {
   const { t } = useLanguage();
 
   const features = [
-    { icon: BarChart3, title: t('features.projectTracking'), desc: t('features.projectTrackingDesc') },
-    { icon: Brain, title: t('features.aiInsights'), desc: t('features.aiInsightsDesc') },
-    { icon: Wallet, title: t('features.budgetMgmt'), desc: t('features.budgetMgmtDesc') },
-    { icon: Users, title: t('features.teamCollab'), desc: t('features.teamCollabDesc') },
-    { icon: Search, title: t('features.professionalDirectory'), desc: t('features.professionalDirectoryDesc') },
-    { icon: Award, title: t('features.creditScore'), desc: t('features.creditScoreDesc') },
-    { icon: FileText, title: t('features.docMgmt'), desc: t('features.docMgmtDesc') },
-    { icon: ClipboardList, title: t('features.reporting'), desc: t('features.reportingDesc') },
+    { icon: BarChart3, title: t('features.realTimeInsights'), desc: t('features.realTimeInsightsDesc') },
+    { icon: ClipboardList, title: t('features.projectManagementTools'), desc: t('features.projectManagementToolsDesc') },
+    { icon: Users, title: t('features.collaborationNetworking'), desc: t('features.collaborationNetworkingDesc') },
+    { icon: Search, title: t('features.aiPoweredSearch'), desc: t('features.aiPoweredSearchDesc') },
+    { icon: BellRing, title: t('features.specialisedReminders'), desc: t('features.specialisedRemindersDesc') },
+    { icon: FolderKanban, title: t('features.curatedPortfolios'), desc: t('features.curatedPortfoliosDesc') },
   ];
 
   return (

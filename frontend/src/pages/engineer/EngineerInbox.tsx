@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Mail, Phone, Clock, CheckCircle2, MessageSquare, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,22 +44,7 @@ const EngineerInbox = () => {
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
 
-  useEffect(() => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
-    void fetchInquiries();
-
-    const intervalId = window.setInterval(() => {
-      void fetchInquiries({ silent: true });
-    }, 4000);
-
-    return () => window.clearInterval(intervalId);
-  }, [token]);
-
-  const fetchInquiries = async (options?: { silent?: boolean }) => {
+  const fetchInquiries = useCallback(async (options?: { silent?: boolean }) => {
     if (!token) {
       setLoading(false);
       return;
@@ -88,6 +73,28 @@ const EngineerInbox = () => {
     } finally {
       setLoading(false);
     }
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    void fetchInquiries();
+
+    const intervalId = window.setInterval(() => {
+      void fetchInquiries({ silent: true });
+    }, 4000);
+
+    return () => window.clearInterval(intervalId);
+  }, [fetchInquiries, token]);
+
+  const parseFilter = (value: string): 'all' | 'PENDING' | 'READ' | 'REPLIED' => {
+    if (value === 'PENDING' || value === 'READ' || value === 'REPLIED' || value === 'all') {
+      return value;
+    }
+    return 'all';
   };
 
   const markAsRead = async (id: string) => {
@@ -319,7 +326,7 @@ const EngineerInbox = () => {
       </div>
 
       {/* Filters */}
-      <Tabs value={filter} onValueChange={(v) => setFilter(v as any)} className="w-full">
+      <Tabs value={filter} onValueChange={(value) => setFilter(parseFilter(value))} className="w-full">
         <TabsList>
           <TabsTrigger value="all">All ({stats.total})</TabsTrigger>
           <TabsTrigger value="PENDING">Pending ({stats.pending})</TabsTrigger>

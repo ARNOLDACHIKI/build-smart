@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -19,10 +19,10 @@ interface ProjectUpdateChatProps {
 }
 
 export const ProjectUpdateChat = ({ project, onUpdate }: ProjectUpdateChatProps) => {
-  const buildGreeting = () => ({
+  const buildGreeting = useCallback(() => ({
     role: 'assistant' as const,
     content: `Hi! I can help you update "${project.name}". Ask me about any field (for example: "what is workers?") or update it conversationally (for example: "change it to 80").`,
-  });
+  }), [project.name]);
 
   const [messages, setMessages] = useState<ChatMessage[]>([buildGreeting()]);
   const [input, setInput] = useState('');
@@ -40,7 +40,7 @@ export const ProjectUpdateChat = ({ project, onUpdate }: ProjectUpdateChatProps)
   useEffect(() => {
     setMessages([buildGreeting()]);
     setInput('');
-  }, [project.id, project.name]);
+  }, [buildGreeting, project.id]);
 
   const handleSendMessage = async () => {
     if (!input.trim()) return;

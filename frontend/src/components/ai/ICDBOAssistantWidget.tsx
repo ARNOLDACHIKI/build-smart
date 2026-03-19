@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Bot, MessageCircle, Minimize2, Plus, Send, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -38,10 +38,10 @@ const ICDBOAssistantWidget = () => {
     },
   ]);
 
-  const buildGreeting = () => ({
+  const buildGreeting = useCallback(() => ({
     role: "assistant" as const,
     content: `Hi ${firstName}. How can I help you today? You can ask me to find engineers, explain ICDBO packages, or help you plan a project.`,
-  });
+  }), [firstName]);
 
   const quickPrompts = [
     "List engineers in Nairobi",
@@ -82,7 +82,7 @@ const ICDBOAssistantWidget = () => {
     };
 
     void loadConversations();
-  }, [isOpen]);
+  }, [activeConversationId, buildGreeting, isOpen]);
 
   const hasReachedLimit = Boolean(chatLimit !== null && remainingChats !== null && remainingChats <= 0);
   const hasReachedDailyLimit = Boolean(

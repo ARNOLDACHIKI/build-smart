@@ -12,8 +12,11 @@ import logoDark from '@/assets/logo-dark.png';
 import logoLight from '@/assets/logo-light.png';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { authStorage } from '@/lib/auth';
+import { authStorage, type ApiRequestError } from '@/lib/auth';
 import { resolveHomeRoute } from '@/lib/roles';
+
+const PENDING_VERIFY_EMAIL_KEY = 'pending_verify_email';
+const PENDING_TWO_FACTOR_EMAIL_KEY = 'pending_two_factor_email';
 
 const Login = () => {
   const { t } = useLanguage();
@@ -54,6 +57,13 @@ const Login = () => {
       navigate(resolveHomeRoute(loggedInUser?.role), { replace: true });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unable to login.';
+      const apiError = error as ApiRequestError;
+      const needsVerification = Boolean(apiError?.data?.emailVerificationRequired);
+      const needsTwoFactor = Boolean(apiError?.data?.twoFactorRequired);
+      const verificationEmail =
+        (typeof apiError?.data?.verificationEmail === 'string' && apiError.data.verificationEmail) || email;
+      const twoFactorEmail =
+        (typeof apiError?.data?.twoFactorEmail === 'string' && apiError.data.twoFactorEmail) || email;
       const isAccountNotFound = errorMessage.includes('Account not found') || errorMessage.includes('No account exists');
       const isWrongPassword = errorMessage.includes('Invalid password') || errorMessage.includes('incorrect');
       
@@ -66,6 +76,12 @@ const Login = () => {
       } else if (isWrongPassword) {
         title = 'Incorrect password';
         description = 'The password you entered is incorrect.';
+      } else if (needsTwoFactor) {
+        title = 'Two-factor authentication required';
+        description = 'Enter the 6-digit code sent to your email to complete sign in.';
+      } else if (needsVerification) {
+        title = 'Email verification required';
+        description = 'Enter the verification code sent to your email to complete login.';
       }
       
       toast({
@@ -83,6 +99,14 @@ const Login = () => {
           </Button>
         ) : undefined,
       });
+
+      if (needsVerification) {
+        localStorage.setItem(PENDING_VERIFY_EMAIL_KEY, verificationEmail);
+        navigate('/verify-email', { state: { email: verificationEmail } });
+      } else if (needsTwoFactor) {
+        localStorage.setItem(PENDING_TWO_FACTOR_EMAIL_KEY, twoFactorEmail);
+        navigate('/verify-two-factor', { state: { email: twoFactorEmail } });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -150,7 +174,7 @@ const Login = () => {
                 <Checkbox id="remember" />
                 <Label htmlFor="remember" className="text-sm font-normal">{t('auth.rememberMe')}</Label>
               </div>
-              <a href="#" className="text-sm text-primary hover:underline">{t('auth.forgotPassword')}</a>
+              <Link to="/forgot-password" className="text-sm text-primary hover:underline">{t('auth.forgotPassword')}</Link>
             </div>
 
             <Button type="submit" className="w-full h-11 gradient-primary text-primary-foreground glow mt-2" disabled={isSubmitting}>

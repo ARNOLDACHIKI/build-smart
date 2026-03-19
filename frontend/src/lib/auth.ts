@@ -11,6 +11,8 @@ export type AuthUser = {
   company?: string | null;
   location?: string | null;
   role: AppRole;
+  emailVerified?: boolean;
+  twoFactorEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -18,6 +20,21 @@ export type AuthUser = {
 type AuthResponse = {
   user: AuthUser;
   token: string;
+};
+
+export type TwoFactorVerifyResponse = AuthResponse;
+
+export type RegisterResponse = {
+  user: AuthUser;
+  token?: string;
+  message?: string;
+  emailVerificationRequired?: boolean;
+  verificationEmail?: string;
+};
+
+export type ApiRequestError = Error & {
+  status?: number;
+  data?: Record<string, unknown>;
 };
 
 const AUTH_TOKEN_KEY = "auth_token";
@@ -41,7 +58,10 @@ const request = async <T>(path: string, options: RequestInit = {}): Promise<T> =
 
   if (!response.ok) {
     const message = (data as { error?: string }).error || "Request failed";
-    throw new Error(message);
+    const error = new Error(message) as ApiRequestError;
+    error.status = response.status;
+    error.data = data as Record<string, unknown>;
+    throw error;
   }
 
   return data as T;
@@ -76,8 +96,8 @@ export const registerUser = async (payload: {
   company?: string;
   password: string;
   role?: AppRole;
-}): Promise<AuthResponse> => {
-  return request<AuthResponse>("/api/auth/register", {
+}): Promise<RegisterResponse> => {
+  return request<RegisterResponse>("/api/auth/register", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -101,4 +121,62 @@ export const fetchCurrentUser = async (token: string): Promise<AuthUser> => {
   });
 
   return data.user;
+};
+
+export const verifyEmailCode = async (payload: {
+  email: string;
+  code: string;
+}): Promise<AuthResponse> => {
+  return request<AuthResponse>("/api/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const resendVerificationCode = async (payload: {
+  email: string;
+}): Promise<{ message: string }> => {
+  return request<{ message: string }>("/api/auth/resend-verification", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const verifyTwoFactorCode = async (payload: {
+  email: string;
+  code: string;
+}): Promise<TwoFactorVerifyResponse> => {
+  return request<TwoFactorVerifyResponse>("/api/auth/verify-two-factor", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const resendTwoFactorCode = async (payload: {
+  email: string;
+}): Promise<{ message: string }> => {
+  return request<{ message: string }>("/api/auth/resend-two-factor", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const forgotPassword = async (payload: {
+  email: string;
+}): Promise<{ message: string }> => {
+  return request<{ message: string }>("/api/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const resetPassword = async (payload: {
+  email: string;
+  token: string;
+  password: string;
+}): Promise<{ message: string }> => {
+  return request<{ message: string }>("/api/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 };

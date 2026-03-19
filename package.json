@@ -6,6 +6,11 @@
   "scripts": {
     "dev": "concurrently \"npm run dev -w frontend\" \"npm run dev -w backend\"",
     "build": "npm run build -w frontend && npm run build -w backend",
+    "lint": "npm run lint -w frontend",
+    "test": "npm run test -w frontend",
+    "smoke": "node scripts/smoke-check.mjs",
+    "smoke:roles": "npm run test:smoke:roles -w frontend",
+    "verify:all": "npm run lint && npm run test && npm run smoke:roles && npm run smoke",
     "frontend:dev": "npm run dev -w frontend",
     "backend:dev": "npm run dev -w backend",
     "backend:migrate": "npm run prisma:migrate -w backend",

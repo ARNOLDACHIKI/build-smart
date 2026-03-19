@@ -470,7 +470,7 @@ const applyKnownFieldLine = (
   const duration = line.match(/duration(?:\s*weeks?)?\s*(?:to|=|:)?\s*(\d+)/i);
   if (duration) updated.durationWeeks = Math.max(1, Number(duration[1]));
 
-  const progress = line.match(/progress\s*(?:to|=|:)?\s*(\d{1,3})\%?/i);
+  const progress = line.match(/progress\s*(?:to|=|:)?\s*(\d{1,3})%?/i);
   if (progress) updated.progress = Math.max(0, Math.min(100, Number(progress[1])));
 
   const budget = line.match(/budget(?:\s*estimate)?\s*(?:to|=|:)?\s*(.+)$/i);

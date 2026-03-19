@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Bell, Mail, CheckCircle2, Clock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,16 +23,7 @@ const EngineerNotifications = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
-    void fetchInquiries();
-  }, [token]);
-
-  const fetchInquiries = async () => {
+  const fetchInquiries = useCallback(async () => {
     if (!token) return;
 
     try {
@@ -56,7 +47,16 @@ const EngineerNotifications = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    void fetchInquiries();
+  }, [fetchInquiries, token]);
 
   const markAsRead = async (id: string) => {
     if (!token) return;

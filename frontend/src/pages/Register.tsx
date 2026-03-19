@@ -14,6 +14,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { REGISTERABLE_ROLES, resolveHomeRoute, type AppRole } from '@/lib/roles';
 
+const PENDING_VERIFY_EMAIL_KEY = 'pending_verify_email';
+
 const Register = () => {
   const { t } = useLanguage();
   const { theme } = useTheme();
@@ -60,7 +62,7 @@ const Register = () => {
 
     try {
       setIsSubmitting(true);
-      await signup({
+      const data = await signup({
         name,
         email,
         phone,
@@ -68,6 +70,20 @@ const Register = () => {
         password,
         role,
       });
+      if (data.emailVerificationRequired) {
+        const verificationEmail = data.verificationEmail || email;
+        localStorage.setItem(PENDING_VERIFY_EMAIL_KEY, verificationEmail);
+        toast({
+          title: 'Check your email',
+          description: 'We sent a real verification code to your email. Enter it on the next page.',
+        });
+        navigate('/verify-email', {
+          replace: true,
+          state: { email: verificationEmail },
+        });
+        return;
+      }
+
       toast({ title: 'Account created', description: 'Welcome to Build Buddy AI.' });
       navigate(resolveHomeRoute(role), { replace: true });
     } catch (error) {

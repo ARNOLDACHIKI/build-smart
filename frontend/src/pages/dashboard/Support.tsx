@@ -27,8 +27,8 @@ const Support = () => {
         <div className="space-y-4">
           {[
             { icon: MessageCircle, title: 'Live Chat', desc: 'Chat with our support team', action: 'Start Chat' },
-            { icon: Mail, title: 'Email', desc: 'support@icdbo.com', action: 'Send Email' },
-            { icon: Phone, title: 'Phone', desc: '+254 20 XXX XXXX', action: 'Call Now' },
+            { icon: Mail, title: 'Email', desc: 'Icdboanalytics@gmail.com', action: 'Send Email' },
+            { icon: Phone, title: 'Phone', desc: '+254727796479', action: 'Call Now' },
             { icon: FileText, title: 'Documentation', desc: 'Browse help articles', action: 'View Docs' },
           ].map((item, i) => (
             <Card key={i} className="card-3d border-0">

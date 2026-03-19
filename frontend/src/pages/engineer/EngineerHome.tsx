@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Inbox, Bell, MessageSquare, TrendingUp, Mail, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,16 +18,7 @@ const EngineerHome = () => {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
-    void fetchInquiries();
-  }, [token]);
-
-  const fetchInquiries = async () => {
+  const fetchInquiries = useCallback(async () => {
     if (!token) return;
 
     try {
@@ -46,7 +37,16 @@ const EngineerHome = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    void fetchInquiries();
+  }, [fetchInquiries, token]);
 
   const stats = {
     total: inquiries.length,

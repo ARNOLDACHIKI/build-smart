@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Clock, Mail, MessageSquare, Phone } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -33,16 +33,7 @@ const RoleInbox = () => {
   const [replyMessage, setReplyMessage] = useState('');
   const [filter, setFilter] = useState<'all' | 'PENDING' | 'READ' | 'REPLIED'>('all');
 
-  useEffect(() => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
-    void fetchInquiries();
-  }, [token]);
-
-  const fetchInquiries = async () => {
+  const fetchInquiries = useCallback(async () => {
     if (!token) return;
 
     try {
@@ -64,7 +55,16 @@ const RoleInbox = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    void fetchInquiries();
+  }, [fetchInquiries, token]);
 
   const updateInquiryStatus = async (id: string, status: Inquiry['status']) => {
     if (!token) return;
