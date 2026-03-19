@@ -1,9 +1,50 @@
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, TrendingUp, Users, Clock, Star, MoreVertical, Bell, Settings } from 'lucide-react';
+import { CheckCircle, TrendingUp, Users, Clock, Star } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { Link } from 'react-router-dom';
+import { trackEvent } from '@/lib/utils';
 
 const MobileAppDashboardSection = () => {
   const { t } = useLanguage();
+  const [isPreviewMenuOpen, setIsPreviewMenuOpen] = useState(false);
+  const previewMenuRef = useRef<HTMLDivElement | null>(null);
+
+  const trackPreviewClick = (action: string) => {
+    trackEvent('iphone_preview_click', {
+      action,
+      surface: 'landing_mobile_preview',
+    });
+  };
+
+  const handlePreviewMenuItemClick = (action: string) => {
+    trackPreviewClick(action);
+    setIsPreviewMenuOpen(false);
+  };
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!isPreviewMenuOpen) return;
+      const target = event.target as Node | null;
+      if (previewMenuRef.current && target && !previewMenuRef.current.contains(target)) {
+        setIsPreviewMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsPreviewMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isPreviewMenuOpen]);
 
   const containerVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -46,94 +87,162 @@ const MobileAppDashboardSection = () => {
             viewport={{ once: true, margin: '-100px' }}
             className="flex justify-center"
           >
-            <div className="relative w-72 h-96 rounded-3xl bg-gradient-to-br from-slate-900 to-slate-800 p-2 shadow-2xl border border-slate-700">
-              {/* Phone notch */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-7 bg-slate-900 rounded-b-2xl z-10 border-l border-r border-b border-slate-700" />
+            <div className="relative w-[292px] h-[600px]">
+              {/* Ambient glow */}
+              <div className="absolute inset-0 rounded-[3.5rem] bg-blue-500/10 blur-2xl scale-105" />
 
-              {/* Actual content area */}
-              <div className="w-full h-full rounded-2xl bg-gradient-to-b from-slate-50 to-slate-100 overflow-hidden flex flex-col">
-                {/* Header */}
-                <div className="bg-gradient-primary text-white px-4 pt-6 pb-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                        <TrendingUp className="w-4 h-4" />
-                      </div>
-                      <span className="text-sm font-semibold">9:41</span>
+              {/* Titanium-like outer frame */}
+              <div className="relative h-full w-full rounded-[3.5rem] bg-gradient-to-b from-slate-300 via-slate-500 to-slate-700 p-[3px] shadow-[0_30px_80px_rgba(2,6,23,0.55)]">
+                {/* Side hardware details */}
+                <div className="absolute -left-[2px] top-28 h-12 w-[3px] rounded-r bg-slate-300/70" />
+                <div className="absolute -left-[2px] top-44 h-16 w-[3px] rounded-r bg-slate-300/70" />
+                <div className="absolute -left-[2px] top-64 h-16 w-[3px] rounded-r bg-slate-300/70" />
+                <div className="absolute -right-[2px] top-52 h-24 w-[3px] rounded-l bg-slate-300/70" />
+
+                {/* Black bezel shell */}
+                <div className="relative h-full w-full rounded-[3.2rem] bg-black p-[7px]">
+                  {/* Display */}
+                  <div className="relative h-full w-full rounded-[2.8rem] bg-gradient-to-b from-slate-50 to-slate-100 overflow-hidden flex flex-col border border-slate-300/80">
+                    {/* Dynamic island */}
+                    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 w-28 h-7 rounded-full bg-black shadow-inner">
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-slate-600" />
                     </div>
-                    <div className="flex gap-1">
-                      <Bell className="w-4 h-4" />
-                      <Settings className="w-4 h-4" />
+
+                    {/* Glass reflection */}
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent" />
+
+                    {/* Mini mobile website preview (scaled to phone proportions) */}
+                    <div className="flex-1 overflow-y-auto bg-gradient-to-b from-slate-50 via-white to-slate-100 pt-14 px-2.5 pb-3 space-y-2.5">
+                      {/* Mobile navbar */}
+                      <div ref={previewMenuRef} className="relative rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-[0_2px_8px_rgba(15,23,42,0.05)]">
+                        <div className="flex items-center justify-between">
+                          <div className="h-2.5 w-16 rounded-full bg-slate-800" />
+                          <button
+                            type="button"
+                            aria-label="Open preview menu"
+                            onClick={() => {
+                              setIsPreviewMenuOpen((prev) => !prev);
+                              trackPreviewClick('hamburger_toggle');
+                            }}
+                            className="space-y-1 rounded-md p-0.5 hover:bg-slate-100 transition-colors"
+                          >
+                            <div className="h-1 w-5 rounded-full bg-slate-300" />
+                            <div className="h-1 w-5 rounded-full bg-slate-300" />
+                            <div className="h-1 w-5 rounded-full bg-slate-300" />
+                          </button>
+                        </div>
+
+                        {isPreviewMenuOpen && (
+                          <div className="absolute right-2 top-9 z-20 w-24 rounded-lg border border-slate-200 bg-white/95 backdrop-blur px-1.5 py-1.5 shadow-md">
+                            <div className="flex flex-col text-[7px] text-slate-600">
+                              <a href="#features" onClick={() => handlePreviewMenuItemClick('menu_features')} className="rounded px-1.5 py-1 hover:bg-slate-100">Features</a>
+                              <Link to="/solutions" onClick={() => handlePreviewMenuItemClick('menu_solutions')} className="rounded px-1.5 py-1 hover:bg-slate-100 block">Solutions</Link>
+                              <a href="#pricing" onClick={() => handlePreviewMenuItemClick('menu_plans')} className="rounded px-1.5 py-1 hover:bg-slate-100">Plans</a>
+                              <a href="#pricing" onClick={() => handlePreviewMenuItemClick('menu_pricing')} className="rounded px-1.5 py-1 hover:bg-slate-100">Pricing</a>
+                              <a href="#about" onClick={() => handlePreviewMenuItemClick('menu_resources')} className="rounded px-1.5 py-1 hover:bg-slate-100">Resources</a>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="mt-2.5 flex gap-1 text-[7px] text-slate-500 overflow-hidden">
+                          <a href="#features" onClick={() => trackPreviewClick('chip_features')} className="rounded-full border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100 transition-colors">Features</a>
+                          <Link to="/solutions" onClick={() => trackPreviewClick('chip_solutions')} className="rounded-full border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100 transition-colors">Solutions</Link>
+                          <a href="#pricing" onClick={() => trackPreviewClick('chip_plans')} className="rounded-full border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100 transition-colors">Plans</a>
+                          <a href="#pricing" onClick={() => trackPreviewClick('chip_pricing')} className="rounded-full border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100 transition-colors">Pricing</a>
+                          <a href="#about" onClick={() => trackPreviewClick('chip_resources')} className="rounded-full border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100 transition-colors">Resources</a>
+                        </div>
+                      </div>
+
+                      {/* Hero section */}
+                      <div className="rounded-xl gradient-primary p-2.5 text-white shadow-sm">
+                        <p className="text-[9px] font-semibold leading-tight">Build smarter projects with AI</p>
+                        <p className="text-[8px] opacity-90 mt-1 leading-tight">Find contractors, compare plans, and manage delivery from one platform.</p>
+                        <div className="mt-2 flex gap-1.5">
+                          <Link to="/register" onClick={() => trackPreviewClick('hero_get_started')} className="text-[7px] rounded-full bg-white/20 px-2 py-0.5 hover:bg-white/30 transition-colors">Get Started</Link>
+                          <a href="#pricing" onClick={() => trackPreviewClick('hero_watch_demo')} className="text-[7px] rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20 transition-colors">Watch Demo</a>
+                        </div>
+                      </div>
+
+                      {/* Search strip from landing */}
+                      <Link to="/search" onClick={() => trackPreviewClick('search_open')} className="h-6 rounded-lg border border-slate-200 bg-white px-2 flex items-center hover:border-primary/40 transition-colors">
+                        <span className="text-[7px] text-slate-400">Search projects, talent, or services...</span>
+                      </Link>
+
+                      {/* Features section */}
+                      <div className="rounded-xl border border-slate-200 bg-white p-2.5">
+                        <p className="text-[9px] font-semibold text-slate-800 mb-2">Core features</p>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <div className="rounded-md bg-blue-50 border border-blue-100 px-1.5 py-1.5">
+                            <p className="text-[8px] font-medium text-blue-700">AI Search</p>
+                            <p className="text-[7px] text-blue-600/80 mt-0.5">Find vetted experts fast</p>
+                          </div>
+                          <div className="rounded-md bg-emerald-50 border border-emerald-100 px-1.5 py-1.5">
+                            <p className="text-[8px] font-medium text-emerald-700">Collaboration</p>
+                            <p className="text-[7px] text-emerald-600/80 mt-0.5">Team and client updates</p>
+                          </div>
+                          <div className="rounded-md bg-amber-50 border border-amber-100 px-1.5 py-1.5">
+                            <p className="text-[8px] font-medium text-amber-700">Live Tracking</p>
+                            <p className="text-[7px] text-amber-700/80 mt-0.5">Progress in real time</p>
+                          </div>
+                          <div className="rounded-md bg-violet-50 border border-violet-100 px-1.5 py-1.5">
+                            <p className="text-[8px] font-medium text-violet-700">Role Portals</p>
+                            <p className="text-[7px] text-violet-700/80 mt-0.5">Engineer, admin, client</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Pricing section (mobile stacked cards) */}
+                      <div className="rounded-xl border border-slate-200 bg-white p-2.5">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-[9px] font-semibold text-slate-800">Pricing plans</p>
+                          <a href="#pricing" onClick={() => trackPreviewClick('pricing_compare')} className="text-[7px] text-slate-500 hover:text-primary transition-colors">Compare</a>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Link to="/register" onClick={() => trackPreviewClick('plan_free')} className="rounded-md border border-slate-200 px-2 py-1.5 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                            <span className="text-[8px] text-slate-700 font-medium">Free</span>
+                            <span className="text-[8px] text-slate-500">$0</span>
+                          </Link>
+                          <Link to="/register" onClick={() => trackPreviewClick('plan_standard')} className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1.5 flex items-center justify-between hover:bg-blue-100 transition-colors">
+                            <span className="text-[8px] text-blue-700 font-medium">Standard</span>
+                            <span className="text-[8px] text-blue-600">$30</span>
+                          </Link>
+                          <Link to="/register" onClick={() => trackPreviewClick('plan_premium')} className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1.5 flex items-center justify-between hover:bg-violet-100 transition-colors">
+                            <span className="text-[8px] text-violet-700 font-medium">Premium</span>
+                            <span className="text-[8px] text-violet-600">$50</span>
+                          </Link>
+                          <Link to="/register" onClick={() => trackPreviewClick('plan_enterprise')} className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 flex items-center justify-between hover:bg-amber-100 transition-colors">
+                            <span className="text-[8px] text-amber-700 font-medium">Enterprise</span>
+                            <span className="text-[8px] text-amber-600">$75</span>
+                          </Link>
+                        </div>
+                      </div>
+
+                      {/* Testimonials and CTA */}
+                      <div className="rounded-xl border border-slate-200 bg-white p-2.5">
+                        <p className="text-[9px] font-semibold text-slate-800">Trusted by builders</p>
+                        <p className="text-[8px] text-slate-600 mt-1 leading-tight">"We reduced project delays by 38% in one quarter using Build Smart workflows."</p>
+                        <div className="mt-2 flex items-center gap-0.5">
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl gradient-primary text-white px-2.5 py-2.5 shadow-sm">
+                        <p className="text-[9px] font-semibold">Start your next project today</p>
+                        <p className="text-[8px] opacity-90 mt-1">Join teams using the mobile-first Build Smart platform.</p>
+                        <div className="mt-2">
+                          <Link to="/register" onClick={() => trackPreviewClick('cta_start_now')} className="inline-block text-[7px] rounded-full bg-white/20 px-2 py-0.5 hover:bg-white/30 transition-colors">Start now</Link>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Home indicator */}
+                    <div className="pb-2 pt-1 flex justify-center bg-slate-100">
+                      <div className="h-1.5 w-24 rounded-full bg-slate-400/70" />
                     </div>
                   </div>
-                  <h3 className="text-sm font-bold">Active Projects</h3>
-                  <p className="text-xs opacity-80">4 projects in progress</p>
                 </div>
-
-                {/* Content */}
-                <div className="flex-1 px-3 py-3 overflow-y-auto space-y-3">
-                  {/* Project Card 1 */}
-                  <div className="bg-white rounded-lg p-3 shadow-sm border border-slate-200">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p className="text-xs font-bold text-slate-900">Downtown Tower</p>
-                        <p className="text-xs text-slate-500">Phase 2 - Foundation</p>
-                      </div>
-                      <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">75%</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                      <div className="h-full w-3/4 bg-gradient-primary rounded-full" />
-                    </div>
-                  </div>
-
-                  {/* Stats Row */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-blue-50 rounded-lg p-2 border border-blue-200">
-                      <p className="text-xs text-slate-600">Team Members</p>
-                      <p className="text-sm font-bold text-slate-900">12</p>
-                    </div>
-                    <div className="bg-amber-50 rounded-lg p-2 border border-amber-200">
-                      <p className="text-xs text-slate-600">Tasks Pending</p>
-                      <p className="text-sm font-bold text-slate-900">8</p>
-                    </div>
-                  </div>
-
-                  {/* Project Card 2 */}
-                  <div className="bg-white rounded-lg p-3 shadow-sm border border-slate-200">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p className="text-xs font-bold text-slate-900">Harbor Plaza</p>
-                        <p className="text-xs text-slate-500">Phase 1 - Design</p>
-                      </div>
-                      <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">45%</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                      <div className="h-full w-5/12 bg-yellow-400 rounded-full" />
-                    </div>
-                  </div>
-
-                  {/* Quick Actions */}
-                  <div className="bg-white rounded-lg p-2 border border-slate-200">
-                    <p className="text-xs font-bold text-slate-900 mb-2">Quick Actions</p>
-                    <div className="grid grid-cols-3 gap-1">
-                      <button className="text-center p-1.5 bg-blue-50 rounded hover:bg-blue-100 transition-colors">
-                        <CheckCircle className="w-4 h-4 mx-auto text-blue-600 mb-0.5" />
-                        <p className="text-xs text-slate-600">Update</p>
-                      </button>
-                      <button className="text-center p-1.5 bg-emerald-50 rounded hover:bg-emerald-100 transition-colors">
-                        <Users className="w-4 h-4 mx-auto text-emerald-600 mb-0.5" />
-                        <p className="text-xs text-slate-600">Invite</p>
-                      </button>
-                      <button className="text-center p-1.5 bg-purple-50 rounded hover:bg-purple-100 transition-colors">
-                        <MoreVertical className="w-4 h-4 mx-auto text-purple-600 mb-0.5" />
-                        <p className="text-xs text-slate-600">More</p>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="bg-slate-200 h-1 border-t border-slate-300" />
               </div>
             </div>
           </motion.div>

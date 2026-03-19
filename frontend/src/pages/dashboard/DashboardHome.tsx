@@ -1,187 +1,136 @@
 import { motion } from 'framer-motion';
-import { FolderKanban, Wallet, CheckSquare, AlertTriangle, Plus, BarChart3, FileText, Brain, TrendingUp, ArrowUpRight, ArrowDownRight, Clock, Award } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowRight, Sparkles, Star } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'react-router-dom';
 
-const budgetData = [
-  { month: 'Jan', budget: 4.2, actual: 3.8 },
-  { month: 'Feb', budget: 5.1, actual: 5.4 },
-  { month: 'Mar', budget: 6.3, actual: 5.9 },
-  { month: 'Apr', budget: 4.8, actual: 5.2 },
-  { month: 'May', budget: 7.1, actual: 6.8 },
-  { month: 'Jun', budget: 5.5, actual: 5.1 },
-];
-
-const timelineData = [
-  { week: 'W1', progress: 12 },
-  { week: 'W2', progress: 28 },
-  { week: 'W3', progress: 35 },
-  { week: 'W4', progress: 48 },
-  { week: 'W5', progress: 55 },
-  { week: 'W6', progress: 68 },
-  { week: 'W7', progress: 72 },
-  { week: 'W8', progress: 85 },
-];
-
-const activities = [
-  { text: 'Nairobi Tower - Phase 3 milestone completed', time: '2 hours ago', type: 'success' },
-  { text: 'Mombasa Road Project - Budget overrun alert (8%)', time: '4 hours ago', type: 'warning' },
-  { text: 'Kisumu Bridge - New team member added', time: '6 hours ago', type: 'info' },
-  { text: 'Thika Highway - Risk assessment updated', time: '1 day ago', type: 'info' },
-  { text: 'Nakuru Complex - Document uploaded: Soil Report', time: '1 day ago', type: 'info' },
-];
-
-const insights = [
-  { text: 'Mombasa Road project is trending 8% over budget. Consider renegotiating supplier contracts.', priority: 'high' },
-  { text: 'Labor productivity on Nairobi Tower improved 15% this month. Current crew composition is optimal.', priority: 'low' },
-  { text: 'Weather forecast predicts heavy rainfall next week. Consider adjusting outdoor schedules.', priority: 'medium' },
-];
-
 const DashboardHome = () => {
-  const { t } = useLanguage();
   const { user } = useAuth();
 
-  const stats = [
-    { label: t('dashboard.activeProjects'), value: '12', icon: FolderKanban, change: '+2', up: true },
-    { label: t('dashboard.budgetUsage'), value: '73%', icon: Wallet, change: '-5%', up: false },
-    { label: t('dashboard.tasksDue'), value: '28', icon: CheckSquare, change: '+8', up: true },
-    { label: t('dashboard.riskAlerts'), value: '3', icon: AlertTriangle, change: '-1', up: false },
-  ];
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold font-['Space_Grotesk']">{t('dashboard.welcome')}, {user?.name || user?.email?.split('@')[0] || 'User'} 👋</h1>
-          <p className="text-sm text-muted-foreground">Here's what's happening with your projects today.</p>
+    <div className="space-y-5">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold font-['Space_Grotesk']">
+              Welcome, {user?.name || user?.email?.split('@')[0] || 'Builder'}
+            </h1>
+            <p className="text-sm text-muted-foreground">This is the same system preview shown in the iPhone mockup.</p>
+          </div>
+          <Badge variant="secondary" className="gap-1"><Sparkles className="w-3 h-3" /> Mobile-first workspace</Badge>
         </div>
-        <div className="flex gap-2">
-          <Button size="sm" className="gradient-primary text-primary-foreground"><Plus className="w-4 h-4 mr-1" /> {t('dashboard.createProject')}</Button>
-          <Button size="sm" variant="outline"><FileText className="w-4 h-4 mr-1" /> {t('dashboard.generateReport')}</Button>
-        </div>
-      </div>
+      </motion.div>
 
-      {/* Credit Score Banner */}
-      <Link to="/dashboard/credits">
-        <Card className="card-3d border-0 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
-              <Award className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <div className="flex-1">
-              <div className="text-sm font-medium">{t('dashboard.creditScore')}: <span className="text-primary font-bold">890 pts</span> - Gold Level</div>
-              <Progress value={59} className="h-1.5 mt-1 w-48" />
-            </div>
-            <Badge className="gradient-primary text-primary-foreground">6-Month Bonus Active</Badge>
-          </CardContent>
-        </Card>
-      </Link>
-
-      {/* Stats */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, i) => (
-          <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
-            <Card className="card-3d border-0">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <stat.icon className="w-5 h-5 text-primary" />
-                  </div>
-                  <div className={`flex items-center gap-0.5 text-xs font-medium ${stat.up ? 'text-primary' : 'text-destructive'}`}>
-                    {stat.up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                    {stat.change}
-                  </div>
-                </div>
-                <div className="text-2xl font-bold font-['Space_Grotesk']">{stat.value}</div>
-                <div className="text-xs text-muted-foreground mt-1">{stat.label}</div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Charts */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        <Card className="card-3d border-0">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-['Space_Grotesk']">{t('dashboard.budgetUsage')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={budgetData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
-                <Bar dataKey="budget" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} opacity={0.3} />
-                <Bar dataKey="actual" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="card-3d border-0">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-['Space_Grotesk']">Project Timeline</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={timelineData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="week" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
-                <Area type="monotone" dataKey="progress" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.15} strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* AI Insights & Activity */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        <Card className="card-3d border-0">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-['Space_Grotesk'] flex items-center gap-2">
-              <Brain className="w-4 h-4 text-primary" /> {t('dashboard.aiInsights')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {insights.map((insight, i) => (
-              <div key={i} className="flex gap-3 p-3 rounded-lg bg-muted/50">
-                <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                  insight.priority === 'high' ? 'bg-destructive' : insight.priority === 'medium' ? 'bg-warning' : 'bg-primary'
-                }`} style={insight.priority === 'medium' ? { background: 'hsl(var(--warning))' } : {}} />
-                <p className="text-sm leading-relaxed">{insight.text}</p>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
+        <Card className="border border-border/70 overflow-hidden">
+          <CardContent className="p-0">
+            <div className="gradient-primary text-primary-foreground p-5">
+              <p className="text-lg font-semibold leading-tight">Build smarter projects with AI</p>
+              <p className="text-sm opacity-90 mt-1.5 max-w-2xl">Find contractors, compare plans, and manage delivery from one platform.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button asChild size="sm" variant="secondary">
+                  <Link to="/dashboard/projects">Get Started</Link>
+                </Button>
+                <Button asChild size="sm" variant="outline" className="border-white/40 text-primary-foreground hover:bg-white/15">
+                  <Link to="/dashboard/reports">Watch Demo</Link>
+                </Button>
               </div>
-            ))}
+            </div>
           </CardContent>
         </Card>
+      </motion.div>
 
-        <Card className="card-3d border-0">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-['Space_Grotesk']">{t('dashboard.recentActivity')}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {activities.map((activity, i) => (
-              <div key={i} className="flex items-start gap-3 text-sm">
-                <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                  activity.type === 'success' ? 'bg-primary' : activity.type === 'warning' ? 'bg-destructive' : 'bg-muted-foreground'
-                }`} />
-                <div className="flex-1">
-                  <p>{activity.text}</p>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5"><Clock className="w-3 h-3" /> {activity.time}</p>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
+        <Input
+          className="h-10 bg-card"
+          placeholder="Search projects, talent, or services..."
+        />
+      </motion.div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <p className="text-sm font-semibold">Core features</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg bg-blue-50 border border-blue-100 p-2">
+                  <p className="text-xs font-semibold text-blue-700">AI Search</p>
+                  <p className="text-[11px] text-blue-600/90 mt-0.5">Find vetted experts fast</p>
+                </div>
+                <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-2">
+                  <p className="text-xs font-semibold text-emerald-700">Collaboration</p>
+                  <p className="text-[11px] text-emerald-700/90 mt-0.5">Team and client updates</p>
+                </div>
+                <div className="rounded-lg bg-amber-50 border border-amber-100 p-2">
+                  <p className="text-xs font-semibold text-amber-700">Live Tracking</p>
+                  <p className="text-[11px] text-amber-700/90 mt-0.5">Progress in real time</p>
+                </div>
+                <div className="rounded-lg bg-violet-50 border border-violet-100 p-2">
+                  <p className="text-xs font-semibold text-violet-700">Role Portals</p>
+                  <p className="text-[11px] text-violet-700/90 mt-0.5">Engineer, admin, client</p>
                 </div>
               </div>
-            ))}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold">Pricing plans</p>
+                <Link to="/dashboard/credits" className="text-xs text-muted-foreground hover:text-primary">Compare</Link>
+              </div>
+              <div className="space-y-2">
+                <div className="rounded-lg border border-border px-3 py-2 flex items-center justify-between">
+                  <span className="text-xs font-medium">Free</span><span className="text-xs text-muted-foreground">$0</span>
+                </div>
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 flex items-center justify-between">
+                  <span className="text-xs font-medium text-blue-700">Standard</span><span className="text-xs text-blue-700">$30</span>
+                </div>
+                <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 flex items-center justify-between">
+                  <span className="text-xs font-medium text-violet-700">Premium</span><span className="text-xs text-violet-700">$50</span>
+                </div>
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 flex items-center justify-between">
+                  <span className="text-xs font-medium text-amber-700">Enterprise</span><span className="text-xs text-amber-700">$75</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14 }}>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-sm font-semibold">Trusted by builders</p>
+              <p className="text-sm text-muted-foreground mt-1">"We reduced project delays by 38% in one quarter using Build Smart workflows."</p>
+              <div className="mt-3 flex items-center gap-1">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }}>
+          <Card className="gradient-primary text-primary-foreground border-0">
+            <CardContent className="p-4">
+              <p className="text-base font-semibold">Start your next project today</p>
+              <p className="text-sm opacity-90 mt-1">Join teams using the mobile-first Build Smart platform.</p>
+              <Button asChild variant="secondary" size="sm" className="mt-3">
+                <Link to="/dashboard/projects" className="inline-flex items-center gap-1">
+                  Open Projects <ArrowRight className="w-4 h-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     </div>
   );

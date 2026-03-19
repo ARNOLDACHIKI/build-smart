@@ -75,9 +75,9 @@ const Navbar = () => {
             </DropdownMenu>
 
             {/* Solutions Link */}
-            <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors px-3 py-2">
+            <Link to="/solutions" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors px-3 py-2">
               Solutions
-            </a>
+            </Link>
 
             {/* Plans Dropdown */}
             <DropdownMenu>
@@ -184,9 +184,9 @@ const Navbar = () => {
               </Collapsible>
 
               {/* Solutions Link */}
-              <a href="#features" onClick={() => setMobileOpen(false)} className="block text-sm font-medium text-muted-foreground hover:text-primary transition-colors py-2">
+              <Link to="/solutions" onClick={() => setMobileOpen(false)} className="block text-sm font-medium text-muted-foreground hover:text-primary transition-colors py-2">
                 Solutions
-              </a>
+              </Link>
 
               {/* Plans Collapsible */}
               <Collapsible open={mobilePlans} onOpenChange={setMobilePlans}>
