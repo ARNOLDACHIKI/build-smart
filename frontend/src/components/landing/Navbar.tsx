@@ -14,6 +14,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { trackEvent } from '@/lib/utils';
 import logoDark from '@/assets/logo-dark.png';
 import logoLight from '@/assets/logo-light.png';
 
@@ -65,7 +66,11 @@ const Navbar = () => {
               <DropdownMenuContent align="start" className="w-56">
                 {featuresMenu.map((item, i) => (
                   <DropdownMenuItem key={i} asChild>
-                    <a href={item.href} className="flex items-center gap-3 cursor-pointer">
+                    <a 
+                      href={item.href} 
+                      onClick={() => trackEvent('navbar_feature_click', { feature: item.label })}
+                      className="flex items-center gap-3 cursor-pointer"
+                    >
                       <item.icon className="w-4 h-4" />
                       <span>{item.label}</span>
                     </a>
@@ -173,7 +178,10 @@ const Navbar = () => {
                     <a
                       key={i}
                       href={item.href}
-                      onClick={() => setMobileOpen(false)}
+                      onClick={() => {
+                        trackEvent('navbar_feature_click', { feature: item.label });
+                        setMobileOpen(false);
+                      }}
                       className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors py-1"
                     >
                       <item.icon className="w-4 h-4" />
