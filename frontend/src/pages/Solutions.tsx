@@ -87,13 +87,13 @@ const Solutions = () => {
   };
 
   const getColorClasses = (color: string) => {
-    const colorMap: Record<string, { bg: string; border: string; icon: string }> = {
-      blue: { bg: 'bg-blue-50', border: 'border-blue-200', icon: 'text-blue-600' },
-      emerald: { bg: 'bg-emerald-50', border: 'border-emerald-200', icon: 'text-emerald-600' },
-      violet: { bg: 'bg-violet-50', border: 'border-violet-200', icon: 'text-violet-600' },
-      amber: { bg: 'bg-amber-50', border: 'border-amber-200', icon: 'text-amber-600' },
-      pink: { bg: 'bg-pink-50', border: 'border-pink-200', icon: 'text-pink-600' },
-      indigo: { bg: 'bg-indigo-50', border: 'border-indigo-200', icon: 'text-indigo-600' },
+    const colorMap: Record<string, { bg: string; border: string; iconBg: string; icon: string; checkmark: string }> = {
+      blue: { bg: 'bg-blue-100/50 dark:bg-blue-950/30', border: 'border-blue-200/50 dark:border-blue-800', iconBg: 'bg-blue-200/60 dark:bg-blue-900/50 border-blue-300/60 dark:border-blue-700', icon: 'text-blue-700 dark:text-blue-300', checkmark: 'text-yellow-500' },
+      emerald: { bg: 'bg-emerald-100/50 dark:bg-emerald-950/30', border: 'border-emerald-200/50 dark:border-emerald-800', iconBg: 'bg-emerald-200/60 dark:bg-emerald-900/50 border-emerald-300/60 dark:border-emerald-700', icon: 'text-emerald-700 dark:text-emerald-300', checkmark: 'text-yellow-500' },
+      violet: { bg: 'bg-violet-100/50 dark:bg-violet-950/30', border: 'border-violet-200/50 dark:border-violet-800', iconBg: 'bg-violet-200/60 dark:bg-violet-900/50 border-violet-300/60 dark:border-violet-700', icon: 'text-violet-700 dark:text-violet-300', checkmark: 'text-yellow-500' },
+      amber: { bg: 'bg-amber-100/50 dark:bg-amber-950/30', border: 'border-amber-200/50 dark:border-amber-800', iconBg: 'bg-amber-200/60 dark:bg-amber-900/50 border-amber-300/60 dark:border-amber-700', icon: 'text-amber-700 dark:text-amber-300', checkmark: 'text-yellow-500' },
+      pink: { bg: 'bg-pink-100/50 dark:bg-pink-950/30', border: 'border-pink-200/50 dark:border-pink-800', iconBg: 'bg-pink-200/60 dark:bg-pink-900/50 border-pink-300/60 dark:border-pink-700', icon: 'text-pink-700 dark:text-pink-300', checkmark: 'text-yellow-500' },
+      indigo: { bg: 'bg-indigo-100/50 dark:bg-indigo-950/30', border: 'border-indigo-200/50 dark:border-indigo-800', iconBg: 'bg-indigo-200/60 dark:bg-indigo-900/50 border-indigo-300/60 dark:border-indigo-700', icon: 'text-indigo-700 dark:text-indigo-300', checkmark: 'text-yellow-500' },
     };
     return colorMap[color] || colorMap.blue;
   };
@@ -164,17 +164,17 @@ const Solutions = () => {
               const Icon = solution.icon;
               const colors = getColorClasses(solution.color);
               return (
-                <motion.div key={i} variants={itemVariants} className={`rounded-2xl border border-border p-8 hover:shadow-lg transition-shadow ${colors.bg}`}>
-                  <div className={`w-14 h-14 rounded-lg ${colors.bg} border ${colors.border} flex items-center justify-center mb-4`}>
-                    <Icon className={`w-7 h-7 ${colors.icon}`} />
+                <motion.div key={i} variants={itemVariants} className={`rounded-3xl border-2 p-8 hover:shadow-2xl hover:scale-105 transition-all duration-300 ${colors.bg} ${colors.border}`}>
+                  <div className={`w-16 h-16 rounded-2xl ${colors.iconBg} border-2 flex items-center justify-center mb-6`}>
+                    <Icon className={`w-8 h-8 ${colors.icon}`} />
                   </div>
-                  <h3 className="text-xl font-bold mb-3">{solution.title}</h3>
-                  <p className="text-muted-foreground mb-6">{solution.description}</p>
-                  <div className="space-y-2">
+                  <h3 className="text-xl font-bold mb-3 text-slate-900 dark:text-white">{solution.title}</h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 mb-6 leading-relaxed">{solution.description}</p>
+                  <div className="space-y-3">
                     {solution.features.map((feature, j) => (
-                      <div key={j} className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="w-4 h-4 text-primary flex-shrink-0" />
-                        {feature}
+                      <div key={j} className="flex items-center gap-3">
+                        <CheckCircle className={`w-5 h-5 ${colors.checkmark} flex-shrink-0`} />
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{feature}</span>
                       </div>
                     ))}
                   </div>
@@ -211,13 +211,13 @@ const Solutions = () => {
             className="grid md:grid-cols-2 lg:grid-cols-4 gap-6"
           >
             {useCases.map((useCase, i) => (
-              <motion.div key={i} variants={itemVariants} className="rounded-xl border border-border bg-white dark:bg-slate-900 p-6 hover:shadow-xl transition-shadow">
-                <h3 className="font-bold text-lg mb-4">{useCase.role}</h3>
+              <motion.div key={i} variants={itemVariants} className="rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5 p-6 hover:shadow-lg hover:border-primary/40 transition-all duration-300">
+                <h3 className="font-bold text-lg mb-5 text-slate-900 dark:text-white">{useCase.role}</h3>
                 <ul className="space-y-3">
                   {useCase.benefits.map((benefit, j) => (
                     <li key={j} className="flex items-start gap-3">
-                      <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0 mt-2" />
-                      <span className="text-sm text-muted-foreground">{benefit}</span>
+                      <div className="w-2 h-2 rounded-full bg-gradient-to-r from-primary to-accent flex-shrink-0 mt-2" />
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{benefit}</span>
                     </li>
                   ))}
                 </ul>
