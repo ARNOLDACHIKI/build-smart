@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: build-buddy-backend
+    runtime: node
+    rootDir: .
+    buildCommand: npm install && npm run build -w backend && cd backend && npx prisma generate && npx prisma migrate deploy
+    startCommand: npm run start -w backend
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DEV_AUTH_BYPASS
+        value: "false"
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false

@@ -2,6 +2,9 @@
 
 Use a **Render Web Service** for the backend.
 
+This repository now includes a Render blueprint file at `render.yaml`.
+You can deploy from that blueprint or use the manual settings below.
+
 ## Recommended Render settings
 
 - **Root Directory:** leave blank (use the repo root)
