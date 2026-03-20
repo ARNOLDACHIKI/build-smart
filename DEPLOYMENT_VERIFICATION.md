@@ -1,5 +1,28 @@
 # ✅ DEPLOYMENT VERIFICATION & GITHUB PUSH COMPLETE
 
+## ✅ Latest Pre-Release Verification (March 20, 2026)
+
+Executed from repo root:
+
+```bash
+npm run verify:all
+```
+
+Results:
+
+- ✅ `npm run lint` passed
+- ✅ `npm run test` passed (8 tests)
+- ✅ `npm run smoke:roles` passed (7 tests)
+- ✅ `npm run smoke` passed (frontend routes + backend probes)
+
+Key smoke outcomes:
+
+- ✅ Frontend routes healthy (`/`, `/login`, `/register`, `/search`, `/dashboard`, `/admin`, `/engineer`, `/portal`)
+- ✅ Backend health endpoints healthy (`/health`, `/api/health/db`)
+- ✅ Backend auth + AI endpoints healthy (`/api/auth/*`, `/api/ai/*`)
+
+Conclusion: backend (Render target) and frontend (Vercel target) are verified deployable with current codebase.
+
 ## 🚀 Status: READY FOR VERCEL DEPLOYMENT
 
 **Date**: March 19, 2026  
