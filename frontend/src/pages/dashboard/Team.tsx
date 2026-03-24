@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -68,7 +68,7 @@ const Team = () => {
   });
   const [newRole, setNewRole] = useState(ROLE_OPTIONS[0]);
 
-  const loadMembers = async () => {
+  const loadMembers = useCallback(async () => {
     if (!token) {
       setMembers([]);
       setIsLoading(false);
@@ -97,11 +97,11 @@ const Team = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     void loadMembers();
-  }, [token]);
+  }, [loadMembers]);
 
   const totalProjects = useMemo(
     () => members.reduce((sum, member) => sum + member.projects, 0),
