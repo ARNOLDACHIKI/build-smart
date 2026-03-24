@@ -5,10 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 
 const DashboardHome = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [query, setQuery] = useState('');
 
   return (
     <div className="space-y-5">
@@ -47,6 +50,13 @@ const DashboardHome = () => {
         <Input
           className="h-10 bg-card"
           placeholder="Search projects, talent, or services..."
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              navigate(`/dashboard/search?q=${encodeURIComponent(query.trim())}`);
+            }
+          }}
         />
       </motion.div>
 

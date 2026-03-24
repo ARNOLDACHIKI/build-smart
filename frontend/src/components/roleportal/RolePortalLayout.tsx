@@ -8,6 +8,7 @@ import RolePortalSidebar from '@/components/roleportal/RolePortalSidebar';
 import ICDBOAssistantWidget from '@/components/ai/ICDBOAssistantWidget';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiUrl } from '@/lib/api';
+import MobileBottomNav from '@/components/mobile/MobileBottomNav';
 
 type SentInquiryNotification = {
   id: string;
@@ -75,7 +76,7 @@ const RolePortalLayout = () => {
       <div className="flex min-h-screen w-full bg-background">
         <RolePortalSidebar unreadRepliesCount={unreadRepliesCount} />
         <main className="flex-1 overflow-y-auto">
-          <div className="container mx-auto p-6">
+          <div className="container mx-auto p-6 pb-24 md:pb-6">
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card/50 px-4 py-3">
               <div>
                 <p className="text-sm font-medium">Portal notifications</p>
@@ -100,6 +101,12 @@ const RolePortalLayout = () => {
           </div>
         </main>
       </div>
+      <MobileBottomNav
+        homePath="/portal"
+        searchPath="/search"
+        yourSpacePath="/portal/profile"
+        confirmRequestPath="/portal/notifications"
+      />
       <ICDBOAssistantWidget />
     </SidebarProvider>
   );

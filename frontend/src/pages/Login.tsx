@@ -185,6 +185,14 @@ const Login = () => {
           <p className="mt-6 text-center text-sm text-muted-foreground">
             <Link to="/register" className="text-primary hover:underline">{t('auth.signupInstead')}</Link>
           </p>
+
+          <p className="mt-2 text-center text-xs text-muted-foreground">
+            By continuing, you acknowledge the{' '}
+            <Link to="/terms" className="text-primary hover:underline">
+              Terms and Conditions
+            </Link>
+            .
+          </p>
         </motion.div>
       </div>
     </div>

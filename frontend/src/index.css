@@ -121,6 +121,14 @@ html {
 }
 
 @layer utilities {
+  .tap-feedback {
+    @apply touch-manipulation transition-transform duration-150 active:scale-[0.98];
+  }
+
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
   .glass {
     @apply backdrop-blur-xl border;
     background: hsl(var(--glass));
@@ -174,7 +182,20 @@ html {
     box-shadow: 0 0 20px hsl(69 68% 51% / 0.3), 0 0 60px hsl(69 68% 51% / 0.1);
   }
 
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
   .dark .glow {
     box-shadow: 0 0 20px hsl(69 68% 51% / 0.4), 0 0 60px hsl(69 68% 51% / 0.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-3d,
+  .card-3d:hover,
+  .tap-feedback {
+    transition-duration: 0ms !important;
+    transform: none !important;
   }
 }

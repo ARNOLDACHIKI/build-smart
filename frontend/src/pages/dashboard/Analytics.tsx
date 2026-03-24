@@ -1,7 +1,9 @@
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Download, Filter } from 'lucide-react';
+import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
 
 const costOverruns = [
@@ -41,14 +43,35 @@ const COLORS = ['hsl(69, 68%, 51%)', 'hsl(217, 91%, 60%)', 'hsl(38, 92%, 50%)', 
 
 const Analytics = () => {
   const { t } = useLanguage();
+  const [viewMode, setViewMode] = useState<'q1' | 'q2'>('q1');
+
+  const filteredCashFlow = useMemo(() => {
+    if (viewMode === 'q1') return cashFlow.slice(0, 3);
+    return cashFlow.slice(3);
+  }, [viewMode]);
+
+  const handleExport = () => {
+    const rows = [['Month', 'Inflow', 'Outflow'], ...filteredCashFlow.map((item) => [item.month, item.inflow.toString(), item.outflow.toString()])];
+    const csv = rows.map((row) => row.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = `analytics-${viewMode}.csv`;
+    link.click();
+    URL.revokeObjectURL(href);
+    toast.success('Analytics export downloaded');
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold font-['Space_Grotesk']">{t('sidebar.analytics')}</h1>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm"><Filter className="w-4 h-4 mr-1" /> {t('common.filter')}</Button>
-          <Button variant="outline" size="sm"><Download className="w-4 h-4 mr-1" /> Export PDF</Button>
+          <Button variant="outline" size="sm" onClick={() => setViewMode((prev) => (prev === 'q1' ? 'q2' : 'q1'))}>
+            <Filter className="w-4 h-4 mr-1" /> {viewMode === 'q1' ? 'View Q2' : 'View Q1'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExport}><Download className="w-4 h-4 mr-1" /> Export</Button>
         </div>
       </div>
 
@@ -72,7 +95,7 @@ const Analytics = () => {
           <CardHeader><CardTitle className="text-base font-['Space_Grotesk']">Cash Flow (KES M)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
-              <AreaChart data={cashFlow}>
+              <AreaChart data={filteredCashFlow}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
                 <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />

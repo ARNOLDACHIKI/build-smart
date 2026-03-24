@@ -19,6 +19,8 @@ model User {
   phone          String?
   bio            String?
   company        String?
+  registrationNo String?
+  industry       String?
   location       String?
   role           UserRole   @default(USER)
   emailVerified  Boolean    @default(false)
@@ -34,8 +36,25 @@ model User {
   assistantConversations AssistantConversation[]
   assistantTasks AssistantTask[]
   assistantMeetings AssistantMeeting[]
+  teamMembers TeamMember[]
 
   @@map("users")
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name      String
+  email     String
+  role      String
+  projects  Int      @default(0)
+  avatar    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId, createdAt])
+  @@map("team_members")
 }
 
 model Inquiry {

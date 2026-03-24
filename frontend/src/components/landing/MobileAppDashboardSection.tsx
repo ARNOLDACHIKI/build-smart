@@ -237,6 +237,26 @@ const MobileAppDashboardSection = () => {
                       </div>
                     </div>
 
+                    {/* Bottom app buttons */}
+                    <div className="border-t border-slate-200 bg-white px-1.5 py-1.5">
+                      <div className="grid grid-cols-5 gap-1">
+                        {['Home', 'Search', 'Explore', 'Plans', 'Your Space'].map((item, index) => (
+                          <button
+                            key={item}
+                            type="button"
+                            onClick={() => trackPreviewClick(`bottom_nav_${item.toLowerCase().replace(/\s+/g, '_')}`)}
+                            className={`rounded-md px-1 py-1 text-[6.5px] font-medium transition-colors ${
+                              index === 0
+                                ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                                : 'text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            {item}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Home indicator */}
                     <div className="pb-2 pt-1 flex justify-center bg-slate-100">
                       <div className="h-1.5 w-24 rounded-full bg-slate-400/70" />

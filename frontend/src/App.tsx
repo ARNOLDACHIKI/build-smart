@@ -15,6 +15,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import VerifyTwoFactor from "./pages/VerifyTwoFactor";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import TermsAndConditions from "./pages/TermsAndConditions";
 import NotFound from "./pages/NotFound";
 import Search from "./pages/Search";
 import Solutions from "./pages/Solutions";
@@ -81,6 +82,7 @@ const App = () => (
                 <Route path="/verify-two-factor" element={<VerifyTwoFactor />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/terms" element={<TermsAndConditions />} />
                 <Route path="/search" element={<Search />} />
                 <Route path="/solutions" element={<Solutions />} />
 

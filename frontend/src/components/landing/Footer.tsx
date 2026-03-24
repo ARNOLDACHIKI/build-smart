@@ -1,5 +1,6 @@
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { Link } from 'react-router-dom';
 import logoDark from '@/assets/logo-dark.png';
 import logoLight from '@/assets/logo-light.png';
 
@@ -17,9 +18,9 @@ const Footer = () => {
             <p className="text-sm text-muted-foreground">{t('footer.description')}</p>
           </div>
           {[
-            { title: t('footer.product'), links: ['Features', 'Pricing', 'Directory', 'API'] },
-            { title: t('footer.company'), links: ['About', 'Blog', 'Careers', 'Contact'] },
-            { title: t('footer.support'), links: ['Help Center', 'Documentation', 'Status', 'Community'] },
+            { title: t('footer.product'), links: ['Features', 'Plans', 'Request Matching', 'Smart Insights'] },
+            { title: t('footer.company'), links: ['About', 'Updates', 'Partners', 'Contact'] },
+            { title: t('footer.support'), links: ['Support Center', 'Documentation', 'Service Status', 'Community'] },
           ].map((col, i) => (
             <div key={i}>
               <h4 className="font-semibold text-sm mb-3">{col.title}</h4>
@@ -33,6 +34,10 @@ const Footer = () => {
         </div>
         <div className="mt-10 pt-6 border-t border-border text-center text-sm text-muted-foreground">
           {t('footer.rights')}
+          <span className="mx-2">•</span>
+          <Link to="/terms" className="hover:text-primary transition-colors">
+            Terms and Conditions
+          </Link>
         </div>
       </div>
     </footer>

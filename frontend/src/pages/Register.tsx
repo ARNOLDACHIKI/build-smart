@@ -4,6 +4,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -31,6 +32,7 @@ const Register = () => {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -55,6 +57,15 @@ const Register = () => {
       toast({
         title: 'Password mismatch',
         description: 'Password and confirm password must match.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!acceptedTerms) {
+      toast({
+        title: 'Terms acceptance required',
+        description: 'You must accept the Terms and Conditions to create an account.',
         variant: 'destructive',
       });
       return;
@@ -205,6 +216,21 @@ const Register = () => {
             <Button type="submit" className="w-full h-11 gradient-primary text-primary-foreground glow mt-2" disabled={isSubmitting}>
               {isSubmitting ? 'Creating account...' : t('auth.createAccount')}
             </Button>
+
+            <div className="flex items-start gap-2 pt-1">
+              <Checkbox
+                id="accept-terms"
+                checked={acceptedTerms}
+                onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
+              />
+              <Label htmlFor="accept-terms" className="text-xs font-normal leading-relaxed text-muted-foreground">
+                I agree to the{' '}
+                <Link to="/terms" className="text-primary hover:underline">
+                  Terms and Conditions
+                </Link>
+                .
+              </Label>
+            </div>
           </form>
 
           <p className="mt-6 text-center text-sm text-muted-foreground">

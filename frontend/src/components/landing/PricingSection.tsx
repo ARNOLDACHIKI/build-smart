@@ -13,8 +13,8 @@ const PricingSection = () => {
       name: t('pricing.student'),
       price: 'USD 5',
       period: t('pricing.year'),
-      desc: 'Free for 1st year, then USD 5/year',
-      features: ['Platform Access', 'Community Access', 'Basic Data', 'Learning Resources', '6-Month Bonus Credits'],
+      desc: 'Best for students and first-time users',
+      features: ['Platform access', 'Community access', 'Basic sector data', 'Learning resources', '6-month bonus credits'],
       cta: t('pricing.getStarted'),
       featured: false,
     },
@@ -22,8 +22,8 @@ const PricingSection = () => {
       name: t('pricing.basic'),
       price: 'USD 30',
       period: t('pricing.year'),
-      desc: 'Access platform, products & community',
-      features: ['Full Platform Access', 'Community Messaging', 'Product Directory', 'Basic Analytics', 'Direct Contact', '6-Month Bonus Credits'],
+      desc: 'For growing teams placing regular requests',
+      features: ['Full platform access', 'Community messaging', 'Product directory', 'Basic analytics', 'Direct contact', '6-month bonus credits'],
       cta: t('pricing.getStarted'),
       featured: false,
     },
@@ -31,8 +31,8 @@ const PricingSection = () => {
       name: t('pricing.professional'),
       price: 'USD 50',
       period: t('pricing.year'),
-      desc: 'Consultant & team project support',
-      features: ['Everything in Basic', 'Consultant Access', 'Team Support', 'AI Insights', 'Advanced Reports', 'Risk Predictions', 'Priority Support', '6-Month Bonus Credits'],
+      desc: 'For advanced teams needing stronger AI support',
+      features: ['Everything in Basic', 'Consultant access', 'Team support', 'AI insights', 'Advanced reports', 'Risk predictions', 'Priority support', '6-month bonus credits'],
       cta: t('pricing.getStarted'),
       featured: true,
     },
@@ -40,8 +40,8 @@ const PricingSection = () => {
       name: t('pricing.enterprise'),
       price: 'USD 75',
       period: t('pricing.year'),
-      desc: 'Full access + suppliers & specialised data',
-      features: ['Everything in Pro', 'Supplier Access', 'Product Samples', 'Contractor Network', 'Specialised Data', 'Custom Integrations', 'Dedicated Support', '6-Month Bonus Credits'],
+      desc: 'For organizations requiring full-scale coordination',
+      features: ['Everything in Pro', 'Supplier access', 'Product samples', 'Contractor network', 'Specialized data', 'Custom integrations', 'Dedicated support', '6-month bonus credits'],
       cta: t('pricing.contactSales'),
       featured: false,
     },
@@ -83,7 +83,7 @@ const PricingSection = () => {
             >
               {plan.featured && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full gradient-primary text-primary-foreground text-xs font-medium">
-                  Most Popular
+                  Recommended
                 </div>
               )}
               <h3 className="text-lg font-semibold font-['Space_Grotesk']">{plan.name}</h3>

@@ -10,6 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiUrl } from '@/lib/api';
 import ICDBOAssistantWidget from '@/components/ai/ICDBOAssistantWidget';
+import MobileBottomNav from '@/components/mobile/MobileBottomNav';
 
 type SentInquiryNotification = {
   id: string;
@@ -93,11 +94,18 @@ const DashboardLayout = () => {
               {unreadRepliesCount > 0 && <Badge variant="default">{unreadRepliesCount}</Badge>}
             </div>
           </header>
-          <main className="flex-1 p-6 overflow-auto">
+          <main className="flex-1 overflow-auto p-6 pb-24 md:pb-6">
             <Outlet />
           </main>
         </div>
       </div>
+      <MobileBottomNav
+        homePath="/dashboard"
+        homeActivePrefixes={['/dashboard/home']}
+        searchPath="/dashboard/search"
+        yourSpacePath="/dashboard/profile"
+        confirmRequestPath="/dashboard/messages"
+      />
       <ICDBOAssistantWidget />
     </SidebarProvider>
   );

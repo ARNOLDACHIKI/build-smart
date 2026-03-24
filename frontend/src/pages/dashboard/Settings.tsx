@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { assetUrl, apiUrl } from '@/lib/api';
 import { getRoleLabel, resolveHomeRoute } from '@/lib/roles';
 import { toast } from 'sonner';
+import { Loader2, Save } from 'lucide-react';
 
 const SettingsPage = () => {
   const { t, language, setLanguage } = useLanguage();
@@ -22,8 +23,92 @@ const SettingsPage = () => {
   const navigate = useNavigate();
   const baseRoute = resolveHomeRoute(user?.role);
   const [isUpdatingTwoFactor, setIsUpdatingTwoFactor] = useState(false);
+  const [isSavingCompany, setIsSavingCompany] = useState(false);
+
+  const [companyFormData, setCompanyFormData] = useState({
+    companyName: user?.company || '',
+    registrationNo: user?.registrationNo || '',
+    address: user?.location || '',
+    industry: user?.industry || 'Construction & Engineering',
+  });
 
   const twoFactorEnabled = Boolean(user?.twoFactorEnabled);
+
+  useEffect(() => {
+    setCompanyFormData({
+      companyName: user?.company || '',
+      registrationNo: user?.registrationNo || '',
+      address: user?.location || '',
+      industry: user?.industry || 'Construction & Engineering',
+    });
+  }, [user?.company, user?.registrationNo, user?.location, user?.industry]);
+
+  const handleCompanyFieldChange = (field: keyof typeof companyFormData, value: string) => {
+    setCompanyFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCompanySave = async () => {
+    if (!token || !user) {
+      toast.error('You need to be signed in to update company settings');
+      return;
+    }
+
+    if (!companyFormData.companyName.trim()) {
+      toast.error('Company name is required');
+      return;
+    }
+
+    if (!companyFormData.address.trim()) {
+      toast.error('Address is required');
+      return;
+    }
+
+    setIsSavingCompany(true);
+
+    try {
+      const response = await fetch(apiUrl('/api/auth/profile'), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          company: companyFormData.companyName.trim(),
+          registrationNo: companyFormData.registrationNo.trim(),
+          industry: companyFormData.industry.trim(),
+          location: companyFormData.address.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to update company profile';
+        try {
+          const errorBody = await response.json();
+          if (typeof errorBody?.error === 'string' && errorBody.error.trim()) {
+            errorMessage = errorBody.error;
+          }
+        } catch {
+          // Ignore malformed error bodies and keep the default message.
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      updateUser(data.user);
+
+      if (data?.mode === 'offline') {
+        toast.success('Company settings saved (offline mode)');
+      } else {
+        toast.success('Company settings saved');
+      }
+    } catch (error) {
+      console.error('Company settings update error:', error);
+      const message = error instanceof Error ? error.message : 'Failed to save company settings';
+      toast.error(message);
+    } finally {
+      setIsSavingCompany(false);
+    }
+  };
 
   const handleTwoFactorToggle = async (enabled: boolean) => {
     if (!token || !user) {
@@ -115,12 +200,60 @@ const SettingsPage = () => {
           <Card className="glass-card border-0">
             <CardContent className="p-6 space-y-4">
               <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>Company Name</Label><Input defaultValue="BuildCo Kenya Ltd" /></div>
-                <div className="space-y-2"><Label>Registration No.</Label><Input defaultValue="PVT-2024-XXXXX" /></div>
-                <div className="space-y-2"><Label>Address</Label><Input defaultValue="Westlands, Nairobi" /></div>
-                <div className="space-y-2"><Label>Industry</Label><Input defaultValue="Construction & Engineering" disabled /></div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-name">Company Name</Label>
+                  <Input
+                    id="company-name"
+                    value={companyFormData.companyName}
+                    onChange={(event) => handleCompanyFieldChange('companyName', event.target.value)}
+                    placeholder="BuildCo Kenya Ltd"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-registration">Registration No.</Label>
+                  <Input
+                    id="company-registration"
+                    value={companyFormData.registrationNo}
+                    onChange={(event) => handleCompanyFieldChange('registrationNo', event.target.value)}
+                    placeholder="PVT-2024-XXXXX"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-address">Address</Label>
+                  <Input
+                    id="company-address"
+                    value={companyFormData.address}
+                    onChange={(event) => handleCompanyFieldChange('address', event.target.value)}
+                    placeholder="Westlands, Nairobi"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-industry">Industry</Label>
+                  <Input
+                    id="company-industry"
+                    value={companyFormData.industry}
+                    onChange={(event) => handleCompanyFieldChange('industry', event.target.value)}
+                  />
+                </div>
               </div>
-              <Button className="gradient-primary text-primary-foreground">{t('common.save')}</Button>
+              <Button
+                type="button"
+                className="gradient-primary text-primary-foreground"
+                onClick={() => void handleCompanySave()}
+                disabled={isSavingCompany}
+              >
+                {isSavingCompany ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    {t('common.save')}
+                  </>
+                )}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

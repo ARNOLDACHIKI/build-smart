@@ -95,6 +95,18 @@ type SentInquiryRecord = {
   };
 };
 
+type TeamMemberRecord = {
+  id: string;
+  ownerId: string;
+  name: string;
+  email: string;
+  role: string;
+  projects: number;
+  avatar: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 type AppUserRole =
   | "USER"
   | "ADMIN"
@@ -1603,6 +1615,8 @@ type SafeUser = {
   phone: string | null;
   bio: string | null;
   company: string | null;
+  registrationNo: string | null;
+  industry: string | null;
   location: string | null;
   role: AppUserRole;
   emailVerified: boolean;
@@ -1629,6 +1643,8 @@ const toSafeUser = (user: {
   phone: string | null;
   bio: string | null;
   company: string | null;
+  registrationNo: string | null;
+  industry: string | null;
   location: string | null;
   role: AppUserRole;
   emailVerified: boolean;
@@ -1643,6 +1659,8 @@ const toSafeUser = (user: {
   phone: user.phone,
   bio: user.bio,
   company: user.company,
+  registrationNo: user.registrationNo,
+  industry: user.industry,
   location: user.location,
   role: user.role,
   emailVerified: user.emailVerified,
@@ -1661,6 +1679,8 @@ const buildDevEngineerSafeUser = (): SafeUser => {
     phone: null,
     bio: null,
     company: null,
+    registrationNo: null,
+    industry: null,
     location: null,
     role: "ENGINEER",
     emailVerified: true,
@@ -1689,12 +1709,68 @@ const REGISTERABLE_ROLES: AppUserRole[] = [
 
 const SEEDED_DEFAULT_PASSWORD = "123456";
 
+const DEFAULT_TEAM_MEMBERS: Array<{
+  name: string;
+  email: string;
+  role: string;
+  projects: number;
+}> = [
+  { name: "James Kariuki", email: "james@buildco.ke", role: "Project Manager", projects: 4 },
+  { name: "Amina Hassan", email: "amina@buildco.ke", role: "Civil Engineer", projects: 3 },
+  { name: "Peter Odhiambo", email: "peter@buildco.ke", role: "Contractor", projects: 5 },
+  { name: "Sarah Mwangi", email: "sarah@buildco.ke", role: "Architect", projects: 2 },
+  { name: "David Njeru", email: "david@buildco.ke", role: "Site Supervisor", projects: 3 },
+  { name: "Grace Wanjiku", email: "grace@buildco.ke", role: "QS Engineer", projects: 4 },
+];
+
+const offlineTeamMembers = new Map<string, TeamMemberRecord[]>();
+
+const getInitialsFromName = (name: string): string => {
+  const trimmed = name.trim();
+  if (!trimmed) return "TM";
+  const parts = trimmed.split(/\s+/);
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+  return trimmed.slice(0, 2).toUpperCase();
+};
+
+const buildDefaultTeamMemberRecords = (ownerId: string): TeamMemberRecord[] => {
+  const now = new Date();
+  return DEFAULT_TEAM_MEMBERS.map((member, index) => ({
+    id: `${ownerId}-tm-${index + 1}`,
+    ownerId,
+    name: member.name,
+    email: member.email,
+    role: member.role,
+    projects: member.projects,
+    avatar: getInitialsFromName(member.name),
+    createdAt: now,
+    updatedAt: now,
+  }));
+};
+
+const getOrCreateOfflineTeamMembers = (ownerId: string): TeamMemberRecord[] => {
+  const existing = offlineTeamMembers.get(ownerId);
+  if (existing) {
+    return existing;
+  }
+  const seeded = buildDefaultTeamMemberRecords(ownerId);
+  offlineTeamMembers.set(ownerId, seeded);
+  return seeded;
+};
+
+const shouldUseOfflineTeamMembers = (userId: string): boolean =>
+  !dbAvailable || (DEV_AUTH_BYPASS && userId === "dev-engineer") || userId.startsWith("offline-");
+
 const DEFAULT_ROLE_PROFILES: Array<{
   email: string;
   name: string;
   role: AppUserRole;
   phone: string;
   company: string;
+  registrationNo?: string | null;
+  industry?: string | null;
   location: string;
   bio: string;
 }> = [
@@ -1704,6 +1780,8 @@ const DEFAULT_ROLE_PROFILES: Array<{
     role: "ADMIN",
     phone: "+254712345617",
     company: "ICDBO Admin Office",
+    registrationNo: null,
+    industry: null,
     location: "Nairobi",
     bio: "System administrator managing governance, users and platform controls.",
   },
@@ -1766,6 +1844,8 @@ const buildInMemorySafeUser = (
     phone: profile.phone,
     bio: profile.bio,
     company: profile.company,
+    registrationNo: profile.registrationNo ?? null,
+    industry: profile.industry ?? null,
     location: profile.location,
     role: profile.role,
     emailVerified: true,
@@ -1793,6 +1873,8 @@ const seedDefaultProfiles = async () => {
         name: profile.name,
         phone: profile.phone,
         company: profile.company,
+        registrationNo: profile.registrationNo ?? null,
+        industry: profile.industry ?? null,
         location: profile.location,
         bio: profile.bio,
         role: profile.role as never,
@@ -1806,6 +1888,8 @@ const seedDefaultProfiles = async () => {
         name: profile.name,
         phone: profile.phone,
         company: profile.company,
+        registrationNo: profile.registrationNo ?? null,
+        industry: profile.industry ?? null,
         location: profile.location,
         bio: profile.bio,
         role: profile.role as never,
@@ -2450,10 +2534,214 @@ app.post("/api/auth/logout", (_req, res) => {
   res.json({ message: "Logout successful" });
 });
 
+app.get("/api/team-members", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (shouldUseOfflineTeamMembers(userId)) {
+      return res.json(getOrCreateOfflineTeamMembers(userId));
+    }
+
+    const existing = await prisma.teamMember.findMany({
+      where: { ownerId: userId },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (existing.length > 0) {
+      return res.json(existing);
+    }
+
+    await prisma.teamMember.createMany({
+      data: DEFAULT_TEAM_MEMBERS.map((member) => ({
+        ownerId: userId,
+        name: member.name,
+        email: member.email,
+        role: member.role,
+        projects: member.projects,
+        avatar: getInitialsFromName(member.name),
+      })),
+    });
+
+    const seeded = await prisma.teamMember.findMany({
+      where: { ownerId: userId },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return res.json(seeded);
+  } catch (error) {
+    console.error("Get team members error:", error);
+    return res.status(500).json({ error: "Failed to fetch team members" });
+  }
+});
+
+app.post("/api/team-members", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { name, email, role } = req.body as {
+      name?: string;
+      email?: string;
+      role?: string;
+    };
+
+    const trimmedName = name?.trim();
+    const normalizedEmail = email?.trim().toLowerCase();
+    const trimmedRole = role?.trim();
+
+    if (!trimmedName || !normalizedEmail || !trimmedRole) {
+      return res.status(400).json({ error: "name, email and role are required" });
+    }
+
+    if (shouldUseOfflineTeamMembers(userId)) {
+      const members = getOrCreateOfflineTeamMembers(userId);
+      if (members.some((member) => member.email.toLowerCase() === normalizedEmail)) {
+        return res.status(409).json({ error: "Member with this email already exists" });
+      }
+
+      const now = new Date();
+      const created: TeamMemberRecord = {
+        id: `${userId}-tm-${Date.now()}`,
+        ownerId: userId,
+        name: trimmedName,
+        email: normalizedEmail,
+        role: trimmedRole,
+        projects: 0,
+        avatar: getInitialsFromName(trimmedName),
+        createdAt: now,
+        updatedAt: now,
+      };
+      members.unshift(created);
+      offlineTeamMembers.set(userId, members);
+      return res.status(201).json(created);
+    }
+
+    const duplicate = await prisma.teamMember.findFirst({
+      where: {
+        ownerId: userId,
+        email: normalizedEmail,
+      },
+    });
+
+    if (duplicate) {
+      return res.status(409).json({ error: "Member with this email already exists" });
+    }
+
+    const created = await prisma.teamMember.create({
+      data: {
+        ownerId: userId,
+        name: trimmedName,
+        email: normalizedEmail,
+        role: trimmedRole,
+        projects: 0,
+        avatar: getInitialsFromName(trimmedName),
+      },
+    });
+
+    return res.status(201).json(created);
+  } catch (error) {
+    console.error("Create team member error:", error);
+    return res.status(500).json({ error: "Failed to create team member" });
+  }
+});
+
+app.patch("/api/team-members/:id", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { id } = req.params;
+    const { role } = req.body as { role?: string };
+    const trimmedRole = role?.trim();
+
+    if (!trimmedRole) {
+      return res.status(400).json({ error: "role is required" });
+    }
+
+    if (shouldUseOfflineTeamMembers(userId)) {
+      const members = getOrCreateOfflineTeamMembers(userId);
+      const index = members.findIndex((member) => member.id === id);
+      if (index < 0) {
+        return res.status(404).json({ error: "Team member not found" });
+      }
+
+      const updated: TeamMemberRecord = {
+        ...members[index],
+        role: trimmedRole,
+        updatedAt: new Date(),
+      };
+      members[index] = updated;
+      offlineTeamMembers.set(userId, members);
+      return res.json(updated);
+    }
+
+    const existing = await prisma.teamMember.findUnique({ where: { id } });
+    if (!existing || existing.ownerId !== userId) {
+      return res.status(404).json({ error: "Team member not found" });
+    }
+
+    const updated = await prisma.teamMember.update({
+      where: { id },
+      data: { role: trimmedRole },
+    });
+
+    return res.json(updated);
+  } catch (error) {
+    console.error("Update team member error:", error);
+    return res.status(500).json({ error: "Failed to update team member" });
+  }
+});
+
+app.delete("/api/team-members/:id", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { id } = req.params;
+
+    if (shouldUseOfflineTeamMembers(userId)) {
+      const members = getOrCreateOfflineTeamMembers(userId);
+      const exists = members.some((member) => member.id === id);
+      if (!exists) {
+        return res.status(404).json({ error: "Team member not found" });
+      }
+
+      const filtered = members.filter((member) => member.id !== id);
+      offlineTeamMembers.set(userId, filtered);
+      return res.status(204).send();
+    }
+
+    const result = await prisma.teamMember.deleteMany({
+      where: {
+        id,
+        ownerId: userId,
+      },
+    });
+
+    if (result.count === 0) {
+      return res.status(404).json({ error: "Team member not found" });
+    }
+
+    return res.status(204).send();
+  } catch (error) {
+    console.error("Delete team member error:", error);
+    return res.status(500).json({ error: "Failed to remove team member" });
+  }
+});
+
 // Update profile endpoint
 app.put("/api/auth/profile", authMiddleware, async (req: AuthenticatedRequest, res) => {
   try {
-    const { name, phone, bio, company, location, twoFactorEnabled } = req.body;
+    const { name, phone, bio, company, registrationNo, industry, location, twoFactorEnabled } = req.body;
     const userId = req.auth?.userId;
 
     if (!userId) {
@@ -2467,6 +2755,37 @@ app.put("/api/auth/profile", authMiddleware, async (req: AuthenticatedRequest, r
       return res.json({ user: buildDevEngineerSafeUser(), mode: "dev-bypass" });
     }
 
+    if (!dbAvailable) {
+      const match = findInMemoryUser(userId, true);
+      if (!match) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (typeof name === "string") {
+        match.profile.name = name || match.profile.name;
+      }
+      if (typeof phone === "string") {
+        match.profile.phone = phone || match.profile.phone;
+      }
+      if (typeof bio === "string") {
+        match.profile.bio = bio || match.profile.bio;
+      }
+      if (typeof company === "string") {
+        match.profile.company = company || match.profile.company;
+      }
+      if (typeof registrationNo === "string") {
+        match.profile.registrationNo = registrationNo || null;
+      }
+      if (typeof industry === "string") {
+        match.profile.industry = industry || null;
+      }
+      if (typeof location === "string") {
+        match.profile.location = location || match.profile.location;
+      }
+
+      return res.json({ user: buildInMemorySafeUser(match.profile, match.id), mode: "offline" });
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
@@ -2474,6 +2793,8 @@ app.put("/api/auth/profile", authMiddleware, async (req: AuthenticatedRequest, r
         phone: phone || undefined,
         bio: bio || undefined,
         company: company || undefined,
+        registrationNo: registrationNo || undefined,
+        industry: industry || undefined,
         location: location || undefined,
         twoFactorEnabled:
           typeof twoFactorEnabled === "boolean" ? twoFactorEnabled : undefined,

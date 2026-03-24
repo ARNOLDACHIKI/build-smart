@@ -9,6 +9,8 @@ export type AuthUser = {
   phone?: string | null;
   bio?: string | null;
   company?: string | null;
+  registrationNo?: string | null;
+  industry?: string | null;
   location?: string | null;
   role: AppRole;
   emailVerified?: boolean;

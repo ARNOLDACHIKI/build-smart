@@ -58,6 +58,7 @@ const ProfessionalSearch = () => {
   const [roleFilter, setRoleFilter] = useState('all');
   const [locationFilter, setLocationFilter] = useState('all');
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [selectedProfessional, setSelectedProfessional] = useState<Professional | null>(null);
   const [contactForm, setContactForm] = useState({ name: '', email: '', phone: '', message: '' });
 
@@ -108,6 +109,11 @@ const ProfessionalSearch = () => {
   const handleContact = (pro: Professional) => {
     setSelectedProfessional(pro);
     setContactDialogOpen(true);
+  };
+
+  const handleViewProfile = (pro: Professional) => {
+    setSelectedProfessional(pro);
+    setProfileDialogOpen(true);
   };
 
   const handleSendMessage = async () => {
@@ -214,7 +220,7 @@ const ProfessionalSearch = () => {
                     </div>
                     <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Portfolio: </span>{pro.portfolio}</p>
                     <div className="flex gap-2 mt-3">
-                      <Button size="sm" className="gradient-primary text-primary-foreground text-xs">{t('search.viewProfile')}</Button>
+                      <Button size="sm" className="gradient-primary text-primary-foreground text-xs" onClick={() => handleViewProfile(pro)}>{t('search.viewProfile')}</Button>
                       <Button size="sm" variant="outline" className="text-xs" onClick={() => handleContact(pro)}>{t('search.contact')}</Button>
                     </div>
                   </div>
@@ -224,6 +230,55 @@ const ProfessionalSearch = () => {
           </motion.div>
         ))}
       </div>
+
+      <Dialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>{selectedProfessional?.name}</DialogTitle>
+            <DialogDescription>
+              Professional profile overview
+            </DialogDescription>
+          </DialogHeader>
+          {selectedProfessional && (
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground font-bold">
+                  {selectedProfessional.avatar}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold">{selectedProfessional.role}</p>
+                  <p className="text-xs text-muted-foreground">{selectedProfessional.location}</p>
+                  <p className="text-xs text-muted-foreground">{selectedProfessional.projects} completed projects</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-1">Core skills</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedProfessional.skills.map((skill) => (
+                    <Badge key={skill} variant="secondary" className="text-[11px]">{skill}</Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-1">Portfolio</p>
+                <p className="text-sm">{selectedProfessional.portfolio}</p>
+              </div>
+
+              <Button
+                className="w-full gradient-primary text-primary-foreground"
+                onClick={() => {
+                  setProfileDialogOpen(false);
+                  setContactDialogOpen(true);
+                }}
+              >
+                Contact {selectedProfessional.name.split(' ')[0]}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Contact Dialog */}
       <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>

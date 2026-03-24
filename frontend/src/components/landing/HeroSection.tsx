@@ -36,7 +36,7 @@ const HeroSection = () => {
   ];
 
   return (
-    <section className="relative min-h-screen flex items-center pt-16 overflow-hidden">
+    <section className="relative min-h-screen flex items-center overflow-hidden pt-16">
       {/* Animated background */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-20 left-10 w-72 h-72 rounded-full bg-primary/10 blur-3xl animate-pulse" />
@@ -48,20 +48,20 @@ const HeroSection = () => {
         }} />
       </div>
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <div className="relative mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
         <div className="text-center max-w-4xl mx-auto">
           {/* Construction worker greeting */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="mb-8"
+            className="mb-6 sm:mb-8"
           >
-            <div className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl card-3d text-sm font-medium mb-6">
-              <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center">
+            <div className="mb-5 inline-flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-medium card-3d sm:mb-6 sm:gap-3 sm:px-6 sm:py-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full gradient-primary sm:h-12 sm:w-12">
                 <HardHat className="w-6 h-6 text-primary-foreground" />
               </div>
-              <span className="text-lg font-semibold font-['Space_Grotesk'] text-foreground">{t('hero.greeting')}</span>
+              <span className="font-['Space_Grotesk'] text-base font-semibold text-foreground sm:text-lg">{t('hero.greeting')}</span>
             </div>
           </motion.div>
 
@@ -70,13 +70,13 @@ const HeroSection = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
           >
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold font-['Space_Grotesk'] leading-[1.1] mb-6">
+            <h1 className="mb-5 font-['Space_Grotesk'] text-4xl font-bold leading-[1.08] sm:mb-6 sm:text-6xl lg:text-7xl">
               {t('hero.title')}
               <br />
               <span className="gradient-text">{t('hero.titleHighlight')}</span>
             </h1>
 
-            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
+            <p className="mx-auto mb-7 max-w-2xl text-base leading-relaxed text-muted-foreground sm:mb-8 sm:text-lg">
               {t('hero.subtitle')}
             </p>
 
@@ -85,14 +85,14 @@ const HeroSection = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.4, duration: 0.5 }}
-              className="max-w-2xl mx-auto mb-8"
+              className="mx-auto mb-7 max-w-2xl sm:mb-8"
             >
-              <form onSubmit={handleSearch} className="card-3d p-2 flex gap-2">
+              <form onSubmit={handleSearch} className="card-3d flex flex-col gap-2 p-2 sm:flex-row">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     placeholder={t('hero.searchPlaceholder')}
-                    className="pl-10 h-12 border-0 bg-transparent text-base"
+                    className="h-12 border-0 bg-transparent pl-10 text-base"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={handleKeyPress}
@@ -101,20 +101,25 @@ const HeroSection = () => {
                 <Button 
                   type="submit" 
                   size="lg" 
-                  className="gradient-primary text-primary-foreground glow h-12 px-6"
+                  className="h-12 px-6 gradient-primary text-primary-foreground glow"
                 >
                   <Search className="w-4 h-4 mr-2" /> Search
                 </Button>
               </form>
             </motion.div>
 
-            <div className="flex flex-wrap justify-center gap-4 mb-12">
-              <Link to="/register">
-                <Button size="lg" className="gradient-primary text-primary-foreground glow text-base px-8 h-12">
+            <div className="mb-10 grid w-full max-w-xl grid-cols-1 gap-3 sm:mb-12 sm:max-w-none sm:grid-cols-3 sm:gap-4">
+              <Link to="/register" className="w-full">
+                <Button size="lg" className="tap-feedback focus-ring h-12 w-full px-8 text-base gradient-primary text-primary-foreground glow">
                   {t('hero.cta')} <ArrowRight className="w-4 h-4 ml-1" />
                 </Button>
               </Link>
-              <Button variant="outline" size="lg" className="h-12 text-base">
+              <Link to="/search?intent=initiate-request" className="w-full">
+                <Button variant="secondary" size="lg" className="tap-feedback focus-ring h-12 w-full px-8 text-base">
+                  {t('hero.initiateRequest')}
+                </Button>
+              </Link>
+              <Button variant="outline" size="lg" className="tap-feedback focus-ring h-12 w-full text-base">
                 <Play className="w-4 h-4 mr-2" /> {t('hero.learnMore')}
               </Button>
             </div>
@@ -125,29 +130,29 @@ const HeroSection = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6, duration: 0.6 }}
-            className="mb-12"
+            className="mb-10 sm:mb-12"
           >
             <p className="text-sm text-muted-foreground mb-4 font-medium">{t('hero.explore')}</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
+            <div className="mx-auto grid max-w-3xl grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
               {journeySteps.map((step, i) => (
                 <motion.div
                   key={i}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.8 + i * 0.1 }}
-                  className="card-3d p-4 text-center group cursor-pointer"
+                  className="group cursor-pointer p-3 text-center card-3d sm:p-4"
                 >
-                  <div className="w-10 h-10 mx-auto rounded-xl gradient-primary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                  <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-xl gradient-primary transition-transform group-hover:scale-110 sm:h-10 sm:w-10">
                     <step.icon className="w-5 h-5 text-primary-foreground" />
                   </div>
-                  <p className="text-xs text-muted-foreground">{step.text}</p>
+                  <p className="text-[11px] text-muted-foreground sm:text-xs">{step.text}</p>
                 </motion.div>
               ))}
             </div>
           </motion.div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-6 max-w-lg mx-auto">
+          <div className="mx-auto grid max-w-lg grid-cols-3 gap-3 sm:gap-6">
             {stats.map((stat, i) => (
               <motion.div
                 key={i}
