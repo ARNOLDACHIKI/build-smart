@@ -157,8 +157,8 @@ const Navbar = () => {
             <Button variant="ghost" size="icon" className="tap-feedback focus-ring" onClick={toggleTheme}>
               {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
             </Button>
-            <Link to="/login"><Button variant="ghost" size="sm" className="tap-feedback focus-ring">{t('nav.login')}</Button></Link>
-            <Link to="/register"><Button size="sm" className="tap-feedback focus-ring gradient-primary text-primary-foreground glow">{t('nav.signup')}</Button></Link>
+            <Link to="/login"><Button size="sm" className="tap-feedback focus-ring gradient-primary text-primary-foreground glow">{t('nav.login')}</Button></Link>
+            <Link to="/search?mode=free"><Button variant="outline" size="sm" className="tap-feedback focus-ring">{t('nav.skipLogin')}</Button></Link>
           </div>
 
           <Button
@@ -279,16 +279,20 @@ const Navbar = () => {
 
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <Link to="/login" className="flex-1">
-                  <Button variant="outline" className="tap-feedback focus-ring h-11 w-full" size="sm">
+                  <Button className="tap-feedback focus-ring h-11 w-full gradient-primary text-primary-foreground" size="sm">
                     {t('nav.login')}
                   </Button>
                 </Link>
-                <Link to="/register" className="flex-1">
-                  <Button className="tap-feedback focus-ring h-11 w-full gradient-primary text-primary-foreground" size="sm">
-                    {t('nav.signup')}
+                <Link to="/search?mode=free" className="flex-1">
+                  <Button variant="outline" className="tap-feedback focus-ring h-11 w-full" size="sm">
+                    {t('nav.skipLogin')}
                   </Button>
                 </Link>
               </div>
+
+              <p className="px-1 text-center text-xs text-muted-foreground">
+                {t('nav.skipLoginHint')}
+              </p>
             </div>
           </motion.div>
         )}

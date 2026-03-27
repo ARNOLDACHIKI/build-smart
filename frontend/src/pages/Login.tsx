@@ -123,7 +123,7 @@ const Login = () => {
           <img src={logoDark} alt="ICDBO" className="h-24 w-auto mx-auto mb-6" />
           <h2 className="text-3xl font-bold font-['Space_Grotesk'] mb-4">ICDBO Data Analytics</h2>
           <p className="text-lg opacity-90 max-w-md">Informing the construction market. Shaping the future.</p>
-          <p className="text-sm opacity-75 mt-2">ACCESS. INCENTIVISE. ACTION.</p>
+          <p className="text-sm opacity-75 mt-2">INCENTIVISE. ENABLE. ACTION.</p>
         </motion.div>
       </div>
 
@@ -134,7 +134,7 @@ const Login = () => {
           </Link>
 
           <h1 className="text-3xl font-bold font-['Space_Grotesk'] mb-2">{t('nav.login')}</h1>
-          <p className="text-muted-foreground mb-8">Welcome back! Enter your credentials to continue.</p>
+          <p className="text-muted-foreground mb-8">{t('auth.loginOrSkipHint')}</p>
 
           <form className="space-y-4" onSubmit={handleSubmit}>
 
@@ -180,6 +180,14 @@ const Login = () => {
             <Button type="submit" className="w-full h-11 gradient-primary text-primary-foreground glow mt-2" disabled={isSubmitting}>
               {isSubmitting ? 'Signing in...' : t('nav.login')}
             </Button>
+
+            <Link to="/search?mode=free" className="block">
+              <Button type="button" variant="outline" className="w-full h-11 mt-2">
+                {t('auth.skipLoginFree')}
+              </Button>
+            </Link>
+
+            <p className="text-center text-xs text-muted-foreground">Browse first, then login later when you are ready to save and manage requests.</p>
           </form>
 
           <p className="mt-6 text-center text-sm text-muted-foreground">

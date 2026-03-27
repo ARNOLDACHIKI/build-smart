@@ -144,7 +144,7 @@ const Register = () => {
           <img src={logoDark} alt="ICDBO" className="h-24 w-auto mx-auto mb-6" />
           <h2 className="text-3xl font-bold font-['Space_Grotesk'] mb-4">Join ICDBO Data Analytics</h2>
           <p className="text-lg opacity-90 max-w-md">Start accessing construction sector data and connect with professionals today.</p>
-          <p className="text-sm opacity-75 mt-2">ACCESS. INCENTIVISE. ACTION.</p>
+          <p className="text-sm opacity-75 mt-2">INCENTIVISE. ENABLE. ACTION.</p>
         </motion.div>
       </div>
 

@@ -54,14 +54,23 @@ const getInitials = (nameOrEmail: string) =>
 
 const Search = () => {
   const { t } = useLanguage();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const isFreeMode = searchParams.get('mode') === 'free';
   const [availableProfessionals, setAvailableProfessionals] = useState<Professional[]>(fallbackProfessionals);
   const [query, setQuery] = useState(searchParams.get('q') || '');
   const [roleFilter, setRoleFilter] = useState('all');
   const [locationFilter, setLocationFilter] = useState('all');
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [selectedProfessional, setSelectedProfessional] = useState<Professional | null>(null);
   const [contactForm, setContactForm] = useState({ name: '', email: '', phone: '', message: '' });
+
+  const isMockProfessional = (id: string) => id.startsWith('mock-');
+
+  const handleViewProfile = (pro: Professional) => {
+    setSelectedProfessional(pro);
+    setProfileDialogOpen(true);
+  };
 
   useEffect(() => {
     const queryParam = searchParams.get('q');
@@ -115,6 +124,11 @@ const Search = () => {
   }, []);
 
   const handleContact = (pro: Professional) => {
+    if (isMockProfessional(pro.id)) {
+      toast.info(t('search.demoContactNotice'));
+      return;
+    }
+
     setSelectedProfessional(pro);
     setContactDialogOpen(true);
   };
@@ -178,6 +192,15 @@ const Search = () => {
           <p className="text-muted-foreground mb-8">{t('search.subtitle')}</p>
         </motion.div>
 
+        {isFreeMode ? (
+          <div className="mb-6 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-foreground">
+            <p>{t('search.freeModeBanner')}</p>
+            <Link to="/login" className="mt-2 inline-flex text-sm font-medium text-primary hover:underline">
+              Go to Login
+            </Link>
+          </div>
+        ) : null}
+
         {/* Filters */}
         <div className="card-3d p-4 mb-8 flex flex-wrap gap-4">
           <div className="relative flex-1 min-w-[200px]">
@@ -237,7 +260,7 @@ const Search = () => {
                       </div>
                       <p className="text-xs text-muted-foreground mb-4"><span className="font-medium text-foreground">Portfolio: </span>{pro.portfolio}</p>
                       <div className="flex gap-2">
-                        <Button size="sm" className="gradient-primary text-primary-foreground">{t('search.viewProfile')}</Button>
+                        <Button size="sm" className="gradient-primary text-primary-foreground" onClick={() => handleViewProfile(pro)}>{t('search.viewProfile')}</Button>
                         <Button size="sm" variant="outline" onClick={() => handleContact(pro)}>{t('search.contact')}</Button>
                       </div>
                     </div>
@@ -250,6 +273,53 @@ const Search = () => {
       </div>
 
       {/* Contact Dialog */}
+      <Dialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Professional Profile</DialogTitle>
+            <DialogDescription>
+              Profile overview and project highlights.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedProfessional ? (
+            <div className="space-y-4 py-2">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-lg gradient-primary flex items-center justify-center text-primary-foreground font-bold">
+                  {selectedProfessional.avatar}
+                </div>
+                <div>
+                  <p className="font-semibold">{selectedProfessional.name}</p>
+                  <p className="text-sm text-muted-foreground">{selectedProfessional.role} • {selectedProfessional.location}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Skills</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedProfessional.skills.map((skill, idx) => (
+                    <Badge key={idx} variant="outline" className="text-xs">{skill}</Badge>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Portfolio</p>
+                <p className="text-sm text-muted-foreground">{selectedProfessional.portfolio}</p>
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setProfileDialogOpen(false);
+                    handleContact(selectedProfessional);
+                  }}
+                >
+                  {t('search.contact')}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>

@@ -2858,9 +2858,44 @@ app.post(
 );
 
 // Inquiry endpoints
+const ENGINEERS_CACHE_TTL_MS = 60_000;
+const engineersCache = new Map<string, { expiresAt: number; engineers: unknown[] }>();
+
 // List engineers for search/discovery
 app.get("/api/engineers", async (req, res) => {
   const query = String(req.query.q || "").trim();
+  const cacheKey = query.toLowerCase();
+  const now = Date.now();
+  const cached = engineersCache.get(cacheKey);
+
+  if (cached && cached.expiresAt > now) {
+    return res.status(200).json({ engineers: cached.engineers, cached: true });
+  }
+
+  if (!dbAvailable) {
+    const fallbackEngineers = SAMPLE_ENGINEERS
+      .filter((engineer) => {
+        if (!query) return true;
+        const haystack = `${engineer.name} ${engineer.email} ${engineer.company} ${engineer.location} ${engineer.bio}`.toLowerCase();
+        return haystack.includes(query.toLowerCase());
+      })
+      .map((engineer, index) => ({
+        id: `offline-engineer-${index + 1}`,
+        name: engineer.name,
+        email: engineer.email,
+        company: engineer.company,
+        location: engineer.location,
+        bio: engineer.bio,
+        createdAt: new Date(0),
+      }));
+
+    engineersCache.set(cacheKey, {
+      engineers: fallbackEngineers,
+      expiresAt: now + ENGINEERS_CACHE_TTL_MS,
+    });
+
+    return res.status(200).json({ engineers: fallbackEngineers, cached: false, offline: true });
+  }
 
   try {
     const engineers = await prisma.user.findMany({
@@ -2891,9 +2926,19 @@ app.get("/api/engineers", async (req, res) => {
       take: 100,
     });
 
-    return res.status(200).json({ engineers });
+    engineersCache.set(cacheKey, {
+      engineers,
+      expiresAt: now + ENGINEERS_CACHE_TTL_MS,
+    });
+
+    return res.status(200).json({ engineers, cached: false });
   } catch (error) {
     console.error("List engineers error:", error);
+
+    if (cached) {
+      return res.status(200).json({ engineers: cached.engineers, cached: true, stale: true });
+    }
+
     return res.status(500).json({ error: "Failed to fetch engineers" });
   }
 });
@@ -2912,6 +2957,25 @@ app.post("/api/inquiries", async (req, res) => {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
+  if (!dbAvailable) {
+    return res.status(201).json({
+      id: `offline-inquiry-${Date.now()}`,
+      recipientId,
+      senderName,
+      senderEmail,
+      senderPhone: senderPhone || null,
+      message,
+      senderUserId: null,
+      replyMessage: null,
+      senderViewedAt: null,
+      status: "PENDING",
+      respondedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      offline: true,
+    });
+  }
+
   try {
     const optionalAuth = resolveOptionalAuth(req);
 
@@ -2919,7 +2983,7 @@ app.post("/api/inquiries", async (req, res) => {
     if (recipientId.startsWith('mock-')) {
       // For demo purposes, return success without storing in database
       console.log('Demo inquiry received:', { recipientId, senderName, senderEmail, message });
-      return res.status(201).json({ 
+      return res.status(201).json({
         id: 'demo-' + Date.now(),
         recipientId,
         senderName,
@@ -2931,15 +2995,6 @@ app.post("/api/inquiries", async (req, res) => {
         updatedAt: new Date().toISOString(),
         demo: true,
       });
-    }
-
-    // Verify recipient exists for real inquiries
-    const recipient = await prisma.user.findUnique({
-      where: { id: recipientId },
-    });
-
-    if (!recipient) {
-      return res.status(404).json({ error: "Recipient not found" });
     }
 
     const inquiry = await prisma.inquiry.create({
@@ -2954,7 +3009,11 @@ app.post("/api/inquiries", async (req, res) => {
     });
 
     return res.status(201).json(inquiry);
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === "P2003") {
+      return res.status(404).json({ error: "Recipient not found" });
+    }
+
     console.error("Create inquiry error:", error);
     return res.status(500).json({ error: "Failed to create inquiry" });
   }
