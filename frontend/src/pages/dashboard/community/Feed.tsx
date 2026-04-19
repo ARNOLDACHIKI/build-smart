@@ -7,6 +7,7 @@ type FeedProps = {
   posts: FeedItem[];
   isLoading: boolean;
   isMutating: boolean;
+  highlightedPostId: string | null;
   bookmarks: Record<string, boolean>;
   votes: Record<string, 'up' | 'down' | null>;
   onBookmark: (id: string) => Promise<void>;
@@ -50,6 +51,7 @@ const Feed = ({
   posts,
   isLoading,
   isMutating,
+  highlightedPostId,
   bookmarks,
   votes,
   onBookmark,
@@ -135,6 +137,7 @@ const Feed = ({
                 key={post.id}
                 post={post}
                 isMutating={isMutating}
+                isHighlighted={highlightedPostId === post.id}
                 isLiked={votes[post.id] === 'up'}
                 isSaved={Boolean(bookmarks[post.id])}
                 onLike={(id) => onVote(id, 'up')}
@@ -154,6 +157,7 @@ const Feed = ({
           key={post.id}
           post={post}
           isMutating={isMutating}
+          isHighlighted={highlightedPostId === post.id}
           isLiked={votes[post.id] === 'up'}
           isSaved={Boolean(bookmarks[post.id])}
           onLike={(id) => onVote(id, 'up')}

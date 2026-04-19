@@ -71,6 +71,7 @@ const CommunityHubV2 = () => {
 
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
   const [votes, setVotes] = useState<Record<string, 'up' | 'down' | null>>({});
+  const [highlightedPostId, setHighlightedPostId] = useState<string | null>(null);
 
   const loadIdRef = useRef(0);
 
@@ -124,6 +125,16 @@ const CommunityHubV2 = () => {
 
     return () => window.clearTimeout(timer);
   }, [refreshFeed]);
+
+  useEffect(() => {
+    if (!highlightedPostId) return;
+
+    const timer = window.setTimeout(() => {
+      setHighlightedPostId(null);
+    }, 2600);
+
+    return () => window.clearTimeout(timer);
+  }, [highlightedPostId]);
 
   const feedItems = useMemo<FeedItem[]>(() => {
     return feed.posts.map((post) => ({
@@ -246,6 +257,7 @@ const CommunityHubV2 = () => {
       setIsMutating(true);
       const result = await createCommunityPost(payload);
       setFeed((current) => ({ ...current, posts: [result.post, ...current.posts] }));
+      setHighlightedPostId(result.post.id);
       setSearch('');
       toast({
         title: 'Post published',
@@ -300,6 +312,7 @@ const CommunityHubV2 = () => {
             onShare={sharePost}
             onViewDiscussion={openComments}
             onJoinLiveRoom={joinLiveRoom}
+            highlightedPostId={highlightedPostId}
           />
         </CommunityLayout>
       )}

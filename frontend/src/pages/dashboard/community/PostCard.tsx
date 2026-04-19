@@ -16,6 +16,7 @@ import MediaRenderer from './MediaRenderer';
 type PostCardProps = {
   post: FeedItem;
   isMutating: boolean;
+  isHighlighted: boolean;
   isLiked: boolean;
   isSaved: boolean;
   onLike: (id: string) => Promise<void>;
@@ -49,6 +50,7 @@ const formatPublishedAt = (value: string) => {
 const PostCard = ({
   post,
   isMutating,
+  isHighlighted,
   isLiked,
   isSaved,
   onLike,
@@ -69,9 +71,25 @@ const PostCard = ({
   return (
     <motion.article
       initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.24 }}
-      className="overflow-hidden rounded-2xl border border-[#2A2D3C] bg-[#1A1D2B] shadow-[0_12px_28px_-24px_rgba(0,0,0,0.9)] transition-all hover:border-[#3A4156]"
+      animate={
+        isHighlighted
+          ? {
+              opacity: 1,
+              y: 0,
+              scale: [1, 1.012, 1],
+            }
+          : {
+              opacity: 1,
+              y: 0,
+              scale: 1,
+            }
+      }
+      transition={{ duration: isHighlighted ? 0.6 : 0.24, ease: 'easeOut' }}
+      className={`overflow-hidden rounded-2xl border bg-[#1A1D2B] shadow-[0_12px_28px_-24px_rgba(0,0,0,0.9)] transition-all hover:border-[#3A4156] ${
+        isHighlighted
+          ? 'border-[#BED234] shadow-[0_0_0_1px_rgba(190,210,52,0.25),0_14px_34px_-18px_rgba(190,210,52,0.45)]'
+          : 'border-[#2A2D3C]'
+      }`}
     >
       <div className="flex items-start justify-between gap-2.5 px-4 py-3">
         <div className="flex min-w-0 items-center gap-2.5">
