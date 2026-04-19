@@ -9,6 +9,7 @@ type CommunityLayoutProps = {
   onOpenCreatePost: () => void;
   onOpenProfile: () => void;
   onOpenReels?: () => void;
+  followCount?: number;
   children: React.ReactNode;
 };
 
@@ -18,6 +19,7 @@ const CommunityLayout = ({
   onOpenCreatePost,
   onOpenProfile,
   onOpenReels,
+  followCount = 0,
   children,
 }: CommunityLayoutProps) => {
   return (
@@ -26,6 +28,7 @@ const CommunityLayout = ({
         <div className="mx-auto flex h-full w-full max-w-[720px] items-center gap-3 px-4">
           <div className="min-w-[120px]">
             <p className="text-base font-bold tracking-wide text-[#BED234]">Community</p>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Following {followCount}</p>
           </div>
 
           <div className="relative flex-1">

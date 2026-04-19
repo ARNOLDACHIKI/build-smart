@@ -339,6 +339,7 @@ const CommunityHubV2 = () => {
           onOpenCreatePost={() => setIsCreateOpen(true)}
           onOpenProfile={() => toast({ title: 'Profile panel hidden in feed mode' })}
           onOpenReels={() => setViewMode('reels')}
+          followCount={Object.keys(follows).length}
         >
           <Feed
             posts={visibleFeedItems}
