@@ -13,7 +13,8 @@ import {
   sendVerificationEmail,
   sendTwoFactorCodeEmail,
   sendWelcomeEmail,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendReminderEmail
 } from "./emailService.js";
 
 dotenv.config();
@@ -49,6 +50,28 @@ const prismaDynamic = prisma as typeof prisma & {
     create: (...args: any[]) => Promise<any>;
     findMany: (...args: any[]) => Promise<any[]>;
   };
+  communityPost: {
+    findMany: (...args: any[]) => Promise<any[]>;
+    count: (...args: any[]) => Promise<number>;
+    createMany: (...args: any[]) => Promise<any>;
+    create: (...args: any[]) => Promise<any>;
+  };
+  communityUpdate: {
+    findMany: (...args: any[]) => Promise<any[]>;
+    count: (...args: any[]) => Promise<number>;
+    createMany: (...args: any[]) => Promise<any>;
+    update: (...args: any[]) => Promise<any>;
+  };
+  communityAd: {
+    findMany: (...args: any[]) => Promise<any[]>;
+    count: (...args: any[]) => Promise<number>;
+    createMany: (...args: any[]) => Promise<any>;
+    update: (...args: any[]) => Promise<any>;
+  };
+  communityPostReport: {
+    create: (...args: any[]) => Promise<any>;
+    findFirst: (...args: any[]) => Promise<any>;
+  };
 };
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me";
@@ -56,6 +79,17 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.1";
 const OLLAMA_TIMEOUT_MS = Number(process.env.OLLAMA_TIMEOUT_MS || "12000");
+const LIVE_ROOM_STUN_SERVERS = (process.env.LIVE_ROOM_STUN_SERVERS || "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+const LIVE_ROOM_TURN_URLS = (process.env.LIVE_ROOM_TURN_URLS || "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+const LIVE_ROOM_TURN_USERNAME = (process.env.LIVE_ROOM_TURN_USERNAME || "").trim();
+const LIVE_ROOM_TURN_CREDENTIAL = (process.env.LIVE_ROOM_TURN_CREDENTIAL || "").trim();
+const LIVE_ROOM_TURN_CREDENTIAL_TYPE = (process.env.LIVE_ROOM_TURN_CREDENTIAL_TYPE || "password").trim();
 const DEV_AUTH_BYPASS = process.env.DEV_AUTH_BYPASS === "true";
 const DEV_ENGINEER_EMAIL = process.env.DEV_ENGINEER_EMAIL || "engineer@local.test";
 const DEV_ENGINEER_PASSWORD = process.env.DEV_ENGINEER_PASSWORD || "Engineer1234";
@@ -70,6 +104,16 @@ const ASSISTANT_CHAT_LIMIT = Math.max(1, Number(process.env.ASSISTANT_CHAT_LIMIT
 const ASSISTANT_DAILY_MESSAGE_LIMIT = Math.max(1, Number(process.env.ASSISTANT_DAILY_MESSAGE_LIMIT || "50"));
 const ASSISTANT_CHAT_LIMIT_SETTING_KEY = "assistant.chat.limit";
 const ASSISTANT_DAILY_LIMIT_SETTING_KEY = "assistant.daily.limit";
+const PROJECT_REMINDER_DEFAULT_ENABLED = true;
+const PROJECT_REMINDER_DEFAULT_FREQUENCY = "daily" as const;
+const PROJECT_REMINDER_DEFAULT_QUIET_HOURS_START = 22;
+const PROJECT_REMINDER_DEFAULT_QUIET_HOURS_END = 7;
+
+const getProjectReminderEnabledSettingKey = (userId: string) => `project.reminders.enabled.${userId}`;
+const getProjectReminderFrequencySettingKey = (userId: string) => `project.reminders.frequency.${userId}`;
+const getProjectReminderQuietHoursStartSettingKey = (userId: string) => `project.reminders.quiet_start.${userId}`;
+const getProjectReminderQuietHoursEndSettingKey = (userId: string) => `project.reminders.quiet_end.${userId}`;
+const getProjectReminderLastSentSettingKey = (userId: string) => `project.reminders.last_sent.${userId}`;
 
 type SentInquiryRecord = {
   id: string;
@@ -214,6 +258,886 @@ type AssistantRoutingDebug = {
     fields: string[];
   };
 };
+
+type CommunityPostRecord = {
+  id: string;
+  title: string;
+  summary: string;
+  content: string;
+  postType: string;
+  authorName: string;
+  field: string;
+  interests: string[];
+  isPublished: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type CommunityMediaAsset = {
+  url: string;
+  mediaType: "image" | "video";
+  fileName: string;
+};
+
+type CommunityLiveSession = {
+  title: string;
+  startsAt: string;
+  roomUrl: string;
+  roomId?: string;
+  description?: string;
+};
+
+type LiveRoomSignal = {
+  seq: number;
+  fromParticipantId: string;
+  toParticipantId: string | null;
+  type: "offer" | "answer" | "ice-candidate" | "participant-joined" | "participant-left";
+  payload: Record<string, unknown>;
+  createdAt: string;
+};
+
+type LiveRoomParticipant = {
+  participantId: string;
+  userId: string;
+  role: AppUserRole;
+  displayName: string;
+  joinedAt: string;
+  lastSeenAt: string;
+};
+
+type LiveRoomTranscriptEntry = {
+  id: string;
+  participantId: string;
+  author: string;
+  text: string;
+  createdAt: string;
+};
+
+type LiveRoomRecordingState = {
+  isRecording: boolean;
+  startedAt: string | null;
+  startedByParticipantId: string | null;
+  stoppedAt: string | null;
+};
+
+type LiveRoomRecordingAsset = {
+  id: string;
+  participantId: string;
+  author: string;
+  fileUrl: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  durationMs: number | null;
+  uploadedAt: string;
+};
+
+type LiveRoomRecordingUploadSession = {
+  uploadId: string;
+  roomId: string;
+  participantId: string;
+  userId: string;
+  author: string;
+  fileName: string;
+  mimeType: string;
+  totalChunks: number;
+  durationMs: number | null;
+  tempPath: string;
+  receivedChunks: Set<number>;
+  createdAt: number;
+  updatedAt: number;
+};
+
+type LiveRoomState = {
+  roomId: string;
+  title: string;
+  createdAt: string;
+  hostUserId: string | null;
+  moderatorUserIds: Set<string>;
+  isLocked: boolean;
+  allowGuestJoin: boolean;
+  participants: Map<string, LiveRoomParticipant>;
+  signals: LiveRoomSignal[];
+  signalSeq: number;
+  transcript: LiveRoomTranscriptEntry[];
+  recording: LiveRoomRecordingState;
+  recordings: LiveRoomRecordingAsset[];
+};
+
+type EncodedCommunityPostContent = {
+  kind: "community-post-v1";
+  body: string;
+  media: CommunityMediaAsset[];
+  liveSession: CommunityLiveSession | null;
+};
+
+type CommunityUpdateRecord = {
+  id: string;
+  title: string;
+  body: string;
+  isPinned: boolean;
+  isPublished: boolean;
+  pinnedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type CommunityAdRecord = {
+  id: string;
+  title: string;
+  copy: string;
+  ctaUrl: string;
+  targetFields: string[];
+  targetRoles: AppUserRole[];
+  isApproved: boolean;
+  approvedAt: Date | null;
+  approvedById: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type CommunityRecommendation = {
+  id: string;
+  title: string;
+  format: string;
+  field: string;
+  score: number;
+};
+
+type CommunityInteractionState = {
+  bookmarks: string[];
+  follows: string[];
+  votes: Record<string, "up" | "down">;
+  pollVotes: Record<string, string>;
+  chatMessages: Array<{
+    id: string;
+    author: string;
+    message: string;
+    createdAt: string;
+  }>;
+};
+
+type CommunityInteractionAction =
+  | "bookmark_add"
+  | "bookmark_remove"
+  | "follow_add"
+  | "follow_remove"
+  | "vote_up"
+  | "vote_down"
+  | "vote_clear"
+  | "poll_vote"
+  | "poll_clear"
+  | "post_report"
+  | "chat_message";
+
+type CommunityInteractionEvent = {
+  action: CommunityInteractionAction;
+  itemId?: string;
+  field?: string;
+  tokens?: string[];
+  createdAt?: string;
+};
+
+type CommunityAnalyticsState = {
+  interactionsByAction: Partial<Record<CommunityInteractionAction, number>>;
+  interactionsByField: Record<string, number>;
+  interactionsByToken: Record<string, number>;
+  recentActions: Array<{
+    action: CommunityInteractionAction;
+    itemId: string | null;
+    field: string | null;
+    createdAt: string;
+  }>;
+  totalInteractions: number;
+  lastInteractionAt: string | null;
+};
+
+const COMMUNITY_MODERATOR_ROLES: AppUserRole[] = ["ADMIN", "PROJECT_MANAGER", "REGULATOR"];
+const COMMUNITY_STATE_PREFIX = "community.state";
+const COMMUNITY_ANALYTICS_PREFIX = "community.analytics";
+const communityStateCache = new Map<string, CommunityInteractionState>();
+const communityAnalyticsCache = new Map<string, CommunityAnalyticsState>();
+const communityLiveRooms = new Map<string, LiveRoomState>();
+const LIVE_ROOM_STALE_MS = 5 * 60 * 1000;
+const LIVE_ROOM_EMPTY_ROOM_TTL_MS = 60 * 60 * 1000;
+const LIVE_ROOM_MAX_SIGNALS = 500;
+const LIVE_ROOM_MAX_TRANSCRIPT_ENTRIES = 2000;
+const LIVE_ROOM_MAX_RECORDINGS = 200;
+const COMMUNITY_ANALYTICS_MAX_RECENT_ACTIONS = 120;
+const LIVE_ROOM_RECORDING_CHUNK_MAX_BYTES = 10 * 1024 * 1024;
+const LIVE_ROOM_RECORDING_UPLOAD_TTL_MS = 30 * 60 * 1000;
+const liveRoomRecordingUploads = new Map<string, LiveRoomRecordingUploadSession>();
+
+const createDefaultCommunityState = (): CommunityInteractionState => ({
+  bookmarks: [],
+  follows: [],
+  votes: {},
+  pollVotes: {},
+  chatMessages: [],
+});
+
+const normalizeCommunityState = (state?: Partial<CommunityInteractionState> | null): CommunityInteractionState => ({
+  bookmarks: Array.isArray(state?.bookmarks) ? state!.bookmarks : [],
+  follows: Array.isArray(state?.follows) ? state!.follows : [],
+  votes: state?.votes && typeof state.votes === "object" ? (state.votes as Record<string, "up" | "down">) : {},
+  pollVotes: state?.pollVotes && typeof state.pollVotes === "object" ? (state.pollVotes as Record<string, string>) : {},
+  chatMessages: Array.isArray(state?.chatMessages) ? state!.chatMessages : [],
+});
+
+const parseCommunityState = (raw: string | null | undefined): CommunityInteractionState => {
+  if (!raw) return createDefaultCommunityState();
+
+  try {
+    return normalizeCommunityState(JSON.parse(raw) as Partial<CommunityInteractionState>);
+  } catch {
+    return createDefaultCommunityState();
+  }
+};
+
+const toPostSummary = (content: string): string => {
+  const normalized = content.replace(/\s+/g, " ").trim();
+  if (normalized.length <= 180) return normalized;
+  return `${normalized.slice(0, 177)}...`;
+};
+
+const normalizeMediaAssets = (value: unknown): CommunityMediaAsset[] => {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const candidate = item as Partial<CommunityMediaAsset>;
+      if (!candidate.url || !candidate.fileName) return null;
+      if (candidate.mediaType !== "image" && candidate.mediaType !== "video") return null;
+      return {
+        url: String(candidate.url),
+        mediaType: candidate.mediaType,
+        fileName: String(candidate.fileName),
+      } as CommunityMediaAsset;
+    })
+    .filter((item): item is CommunityMediaAsset => Boolean(item));
+};
+
+const normalizeLiveSession = (value: unknown): CommunityLiveSession | null => {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<CommunityLiveSession>;
+  if (!candidate.title || !candidate.startsAt || !candidate.roomUrl) return null;
+
+  return {
+    title: String(candidate.title),
+    startsAt: String(candidate.startsAt),
+    roomUrl: String(candidate.roomUrl),
+    roomId: candidate.roomId ? String(candidate.roomId) : undefined,
+    description: candidate.description ? String(candidate.description) : undefined,
+  };
+};
+
+const normalizeRoomId = (input: string): string =>
+  input
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 48);
+
+const extractRoomIdFromUrl = (url: string): string | null => {
+  const normalized = url.trim();
+  const match = normalized.match(/\/community\/live\/([a-zA-Z0-9-]+)/);
+  if (!match?.[1]) return null;
+  const roomId = normalizeRoomId(match[1]);
+  return roomId || null;
+};
+
+const ensureLiveRoom = (roomId: string, title?: string, hostUserId?: string | null): LiveRoomState => {
+  const key = normalizeRoomId(roomId);
+  const nowIso = new Date().toISOString();
+  const existing = communityLiveRooms.get(key);
+  if (existing) {
+    if (title?.trim()) existing.title = title.trim();
+    if (hostUserId && !existing.hostUserId) {
+      existing.hostUserId = hostUserId;
+      existing.moderatorUserIds.add(hostUserId);
+    }
+    return existing;
+  }
+
+  const created: LiveRoomState = {
+    roomId: key,
+    title: title?.trim() || "Community live room",
+    createdAt: nowIso,
+    hostUserId: hostUserId || null,
+    moderatorUserIds: new Set(hostUserId ? [hostUserId] : []),
+    isLocked: false,
+    allowGuestJoin: true,
+    participants: new Map<string, LiveRoomParticipant>(),
+    signals: [],
+    signalSeq: 0,
+    transcript: [],
+    recording: {
+      isRecording: false,
+      startedAt: null,
+      startedByParticipantId: null,
+      stoppedAt: null,
+    },
+    recordings: [],
+  };
+  communityLiveRooms.set(key, created);
+  return created;
+};
+
+const isLiveRoomModerator = (room: LiveRoomState, userId: string, role: AppUserRole): boolean => {
+  return room.hostUserId === userId || room.moderatorUserIds.has(userId) || role === "ADMIN";
+};
+
+const canJoinLiveRoom = (room: LiveRoomState, userId: string, role: AppUserRole): boolean => {
+  if (!room.isLocked) return true;
+  if (room.allowGuestJoin) return true;
+  return isLiveRoomModerator(room, userId, role);
+};
+
+const resolveLiveRoomIceServers = (): Array<{
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+  credentialType?: string;
+}> => {
+  const stunServers = LIVE_ROOM_STUN_SERVERS.map((urls) => ({ urls }));
+  const turnServers =
+    LIVE_ROOM_TURN_URLS.length > 0 && LIVE_ROOM_TURN_USERNAME && LIVE_ROOM_TURN_CREDENTIAL
+      ? LIVE_ROOM_TURN_URLS.map((urls) => ({
+          urls,
+          username: LIVE_ROOM_TURN_USERNAME,
+          credential: LIVE_ROOM_TURN_CREDENTIAL,
+          credentialType: LIVE_ROOM_TURN_CREDENTIAL_TYPE,
+        }))
+      : [];
+
+  return [...turnServers, ...stunServers];
+};
+
+const pushLiveRoomSignal = (
+  room: LiveRoomState,
+  signal: Omit<LiveRoomSignal, "seq" | "createdAt">
+): LiveRoomSignal => {
+  room.signalSeq += 1;
+  const next: LiveRoomSignal = {
+    ...signal,
+    seq: room.signalSeq,
+    createdAt: new Date().toISOString(),
+  };
+
+  room.signals.push(next);
+  if (room.signals.length > LIVE_ROOM_MAX_SIGNALS) {
+    room.signals.splice(0, room.signals.length - LIVE_ROOM_MAX_SIGNALS);
+  }
+
+  return next;
+};
+
+const pruneLiveRooms = (): void => {
+  const now = Date.now();
+
+  for (const [roomId, room] of communityLiveRooms.entries()) {
+    for (const [participantId, participant] of room.participants.entries()) {
+      if (now - new Date(participant.lastSeenAt).getTime() > LIVE_ROOM_STALE_MS) {
+        room.participants.delete(participantId);
+        pushLiveRoomSignal(room, {
+          fromParticipantId: participantId,
+          toParticipantId: null,
+          type: "participant-left",
+          payload: { participantId },
+        });
+      }
+    }
+
+    if (
+      room.participants.size === 0 &&
+      now - new Date(room.createdAt).getTime() > LIVE_ROOM_EMPTY_ROOM_TTL_MS
+    ) {
+      communityLiveRooms.delete(roomId);
+    }
+  }
+};
+
+const pruneLiveRoomRecordingUploads = (): void => {
+  const now = Date.now();
+
+  for (const [uploadId, upload] of liveRoomRecordingUploads.entries()) {
+    if (now - upload.updatedAt <= LIVE_ROOM_RECORDING_UPLOAD_TTL_MS) {
+      continue;
+    }
+
+    try {
+      if (fs.existsSync(upload.tempPath)) {
+        fs.unlinkSync(upload.tempPath);
+      }
+    } catch {
+      // Ignore filesystem cleanup errors and drop stale upload session.
+    }
+
+    liveRoomRecordingUploads.delete(uploadId);
+  }
+};
+
+const decodePostContent = (rawContent: string): {
+  body: string;
+  media: CommunityMediaAsset[];
+  liveSession: CommunityLiveSession | null;
+} => {
+  try {
+    const parsed = JSON.parse(rawContent) as Partial<EncodedCommunityPostContent>;
+    if (parsed?.kind !== "community-post-v1") {
+      return { body: rawContent, media: [], liveSession: null };
+    }
+
+    return {
+      body: typeof parsed.body === "string" ? parsed.body : "",
+      media: normalizeMediaAssets(parsed.media),
+      liveSession: normalizeLiveSession(parsed.liveSession),
+    };
+  } catch {
+    return { body: rawContent, media: [], liveSession: null };
+  }
+};
+
+const getCommunityStateKey = (userId: string) => `${COMMUNITY_STATE_PREFIX}.${userId}`;
+const getCommunityAnalyticsKey = (userId: string) => `${COMMUNITY_ANALYTICS_PREFIX}.${userId}`;
+
+const createDefaultCommunityAnalyticsState = (): CommunityAnalyticsState => ({
+  interactionsByAction: {},
+  interactionsByField: {},
+  interactionsByToken: {},
+  recentActions: [],
+  totalInteractions: 0,
+  lastInteractionAt: null,
+});
+
+const normalizeCommunityAnalyticsState = (state?: Partial<CommunityAnalyticsState> | null): CommunityAnalyticsState => {
+  const actionCounts: Partial<Record<CommunityInteractionAction, number>> = {};
+  if (state?.interactionsByAction && typeof state.interactionsByAction === "object") {
+    for (const [key, value] of Object.entries(state.interactionsByAction)) {
+      const count = Number(value || 0);
+      if (!Number.isFinite(count) || count <= 0) continue;
+      actionCounts[key as CommunityInteractionAction] = Math.round(count);
+    }
+  }
+
+  const fieldCounts: Record<string, number> = {};
+  if (state?.interactionsByField && typeof state.interactionsByField === "object") {
+    for (const [key, value] of Object.entries(state.interactionsByField)) {
+      const normalizedKey = key.trim();
+      const count = Number(value || 0);
+      if (!normalizedKey || !Number.isFinite(count) || count <= 0) continue;
+      fieldCounts[normalizedKey] = Math.round(count);
+    }
+  }
+
+  const tokenCounts: Record<string, number> = {};
+  if (state?.interactionsByToken && typeof state.interactionsByToken === "object") {
+    for (const [key, value] of Object.entries(state.interactionsByToken)) {
+      const normalizedKey = key.trim().toLowerCase();
+      const count = Number(value || 0);
+      if (!normalizedKey || !Number.isFinite(count) || count <= 0) continue;
+      tokenCounts[normalizedKey] = Math.round(count);
+    }
+  }
+
+  const recentActions = Array.isArray(state?.recentActions)
+    ? state!.recentActions
+        .map((item) => {
+          if (!item || typeof item !== "object") return null;
+          const candidate = item as Partial<CommunityAnalyticsState["recentActions"][number]>;
+          const action = String(candidate.action || "") as CommunityInteractionAction;
+          const createdAt = String(candidate.createdAt || "").trim();
+          if (!action || !createdAt) return null;
+          return {
+            action,
+            itemId: typeof candidate.itemId === "string" ? candidate.itemId : null,
+            field: typeof candidate.field === "string" ? candidate.field : null,
+            createdAt,
+          };
+        })
+        .filter((item): item is CommunityAnalyticsState["recentActions"][number] => Boolean(item))
+        .slice(-COMMUNITY_ANALYTICS_MAX_RECENT_ACTIONS)
+    : [];
+
+  const totalInteractions = Number.isFinite(state?.totalInteractions) ? Number(state?.totalInteractions) : 0;
+  const lastInteractionAt = typeof state?.lastInteractionAt === "string" ? state.lastInteractionAt : null;
+
+  return {
+    interactionsByAction: actionCounts,
+    interactionsByField: fieldCounts,
+    interactionsByToken: tokenCounts,
+    recentActions,
+    totalInteractions: Math.max(0, Math.round(totalInteractions)),
+    lastInteractionAt,
+  };
+};
+
+const parseCommunityAnalyticsState = (raw: string | null | undefined): CommunityAnalyticsState => {
+  if (!raw) return createDefaultCommunityAnalyticsState();
+
+  try {
+    return normalizeCommunityAnalyticsState(JSON.parse(raw) as Partial<CommunityAnalyticsState>);
+  } catch {
+    return createDefaultCommunityAnalyticsState();
+  }
+};
+
+const loadCommunityState = async (userId: string): Promise<CommunityInteractionState> => {
+  if (!dbAvailable) {
+    return communityStateCache.get(userId) || createDefaultCommunityState();
+  }
+
+  const settings = await prismaDynamic.platformSetting.findMany({
+    where: { key: getCommunityStateKey(userId) },
+    take: 1,
+  });
+
+  return parseCommunityState(settings[0]?.value);
+};
+
+const saveCommunityState = async (userId: string, state: CommunityInteractionState): Promise<CommunityInteractionState> => {
+  const normalized = normalizeCommunityState(state);
+
+  if (!dbAvailable) {
+    communityStateCache.set(userId, normalized);
+    return normalized;
+  }
+
+  await prismaDynamic.platformSetting.upsert({
+    where: { key: getCommunityStateKey(userId) },
+    update: { value: JSON.stringify(normalized) },
+    create: { key: getCommunityStateKey(userId), value: JSON.stringify(normalized) },
+  });
+
+  return normalized;
+};
+
+const updateCommunityState = async (
+  userId: string,
+  updater: (current: CommunityInteractionState) => CommunityInteractionState
+): Promise<CommunityInteractionState> => {
+  const current = await loadCommunityState(userId);
+  const next = normalizeCommunityState(updater(current));
+  return saveCommunityState(userId, next);
+};
+
+const loadCommunityAnalyticsState = async (userId: string): Promise<CommunityAnalyticsState> => {
+  if (!dbAvailable) {
+    return communityAnalyticsCache.get(userId) || createDefaultCommunityAnalyticsState();
+  }
+
+  const settings = await prismaDynamic.platformSetting.findMany({
+    where: { key: getCommunityAnalyticsKey(userId) },
+    take: 1,
+  });
+
+  return parseCommunityAnalyticsState(settings[0]?.value);
+};
+
+const saveCommunityAnalyticsState = async (
+  userId: string,
+  state: CommunityAnalyticsState
+): Promise<CommunityAnalyticsState> => {
+  const normalized = normalizeCommunityAnalyticsState(state);
+
+  if (!dbAvailable) {
+    communityAnalyticsCache.set(userId, normalized);
+    return normalized;
+  }
+
+  await prismaDynamic.platformSetting.upsert({
+    where: { key: getCommunityAnalyticsKey(userId) },
+    update: { value: JSON.stringify(normalized) },
+    create: { key: getCommunityAnalyticsKey(userId), value: JSON.stringify(normalized) },
+  });
+
+  return normalized;
+};
+
+const updateCommunityAnalyticsState = async (
+  userId: string,
+  updater: (current: CommunityAnalyticsState) => CommunityAnalyticsState
+): Promise<CommunityAnalyticsState> => {
+  const current = await loadCommunityAnalyticsState(userId);
+  const next = normalizeCommunityAnalyticsState(updater(current));
+  return saveCommunityAnalyticsState(userId, next);
+};
+
+const recordCommunityInteraction = async (userId: string, event: CommunityInteractionEvent): Promise<CommunityAnalyticsState> => {
+  const action = event.action;
+  const createdAt = event.createdAt || new Date().toISOString();
+  const field = event.field?.trim() || null;
+  const tokens = Array.from(new Set((event.tokens || []).map((token) => token.trim().toLowerCase()).filter(Boolean)));
+
+  return updateCommunityAnalyticsState(userId, (current) => {
+    const next: CommunityAnalyticsState = {
+      ...current,
+      interactionsByAction: { ...current.interactionsByAction },
+      interactionsByField: { ...current.interactionsByField },
+      interactionsByToken: { ...current.interactionsByToken },
+      recentActions: [...current.recentActions],
+    };
+
+    next.totalInteractions = Math.max(0, current.totalInteractions) + 1;
+    next.lastInteractionAt = createdAt;
+    next.interactionsByAction[action] = Math.max(0, Number(next.interactionsByAction[action] || 0)) + 1;
+
+    if (field) {
+      next.interactionsByField[field] = Math.max(0, Number(next.interactionsByField[field] || 0)) + 1;
+    }
+
+    for (const token of tokens) {
+      next.interactionsByToken[token] = Math.max(0, Number(next.interactionsByToken[token] || 0)) + 1;
+    }
+
+    next.recentActions.push({
+      action,
+      itemId: event.itemId?.trim() || null,
+      field,
+      createdAt,
+    });
+
+    if (next.recentActions.length > COMMUNITY_ANALYTICS_MAX_RECENT_ACTIONS) {
+      next.recentActions.splice(0, next.recentActions.length - COMMUNITY_ANALYTICS_MAX_RECENT_ACTIONS);
+    }
+
+    return next;
+  });
+};
+
+const deriveCommunityBehaviorSignals = (
+  analytics: CommunityAnalyticsState
+): { dominantField: string | null; behaviorTokens: string[] } => {
+  const dominantFieldEntry = Object.entries(analytics.interactionsByField)
+    .sort((a, b) => b[1] - a[1])[0];
+  const dominantField = dominantFieldEntry?.[0] || null;
+
+  const behaviorTokens = Object.entries(analytics.interactionsByToken)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([token]) => token);
+
+  return { dominantField, behaviorTokens };
+};
+
+const FALLBACK_COMMUNITY_POSTS: CommunityPostRecord[] = [
+  {
+    id: "fallback-post-1",
+    title: "How AI-assisted scheduling reduced rework on a public transport terminal",
+    summary: "A practical breakdown of milestone tracking, procurement sequencing, and daily standup rhythms.",
+    content: "A practical breakdown of milestone tracking, procurement sequencing, and daily standup rhythms.",
+    postType: "Blog",
+    authorName: "Samuel Otieno",
+    field: "Project Management",
+    interests: ["Planning", "Delivery"],
+    isPublished: true,
+    createdAt: new Date("2026-03-20T08:15:00Z"),
+    updatedAt: new Date("2026-03-20T08:15:00Z"),
+  },
+  {
+    id: "fallback-post-2",
+    title: "Best way to structure weekly site updates for stakeholders",
+    summary: "Community members are sharing templates for concise progress updates and risk escalation.",
+    content: "Community members are sharing templates for concise progress updates and risk escalation.",
+    postType: "Discussion",
+    authorName: "Grace Mwikali",
+    field: "Engineering",
+    interests: ["Communication", "Quality"],
+    isPublished: true,
+    createdAt: new Date("2026-03-22T10:45:00Z"),
+    updatedAt: new Date("2026-03-22T10:45:00Z"),
+  },
+  {
+    id: "fallback-post-3",
+    title: "Concrete quality audits: lessons from three mixed-use towers",
+    summary: "Data-backed quality checkpoints and how teams aligned inspections with procurement windows.",
+    content: "Data-backed quality checkpoints and how teams aligned inspections with procurement windows.",
+    postType: "Case Study",
+    authorName: "Michael Njoroge",
+    field: "Engineering",
+    interests: ["Quality", "Safety"],
+    isPublished: true,
+    createdAt: new Date("2026-03-25T06:30:00Z"),
+    updatedAt: new Date("2026-03-25T06:30:00Z"),
+  },
+];
+
+const FALLBACK_COMMUNITY_UPDATES: CommunityUpdateRecord[] = [
+  {
+    id: "fallback-update-1",
+    title: "Tender board update",
+    body: "14 new county projects were published this week.",
+    isPinned: true,
+    isPublished: true,
+    pinnedAt: new Date("2026-03-29T07:10:00Z"),
+    createdAt: new Date("2026-03-29T07:10:00Z"),
+    updatedAt: new Date("2026-03-29T07:10:00Z"),
+  },
+  {
+    id: "fallback-update-2",
+    title: "Platform release",
+    body: "Community profiles now support field-based badges.",
+    isPinned: false,
+    isPublished: true,
+    pinnedAt: null,
+    createdAt: new Date("2026-03-30T09:20:00Z"),
+    updatedAt: new Date("2026-03-30T09:20:00Z"),
+  },
+  {
+    id: "fallback-update-3",
+    title: "Market insight",
+    body: "Reinforcement steel prices are trending down for the third week.",
+    isPinned: false,
+    isPublished: true,
+    pinnedAt: null,
+    createdAt: new Date("2026-03-31T11:05:00Z"),
+    updatedAt: new Date("2026-03-31T11:05:00Z"),
+  },
+];
+
+const FALLBACK_COMMUNITY_ADS: CommunityAdRecord[] = [
+  {
+    id: "fallback-ad-1",
+    title: "Construction ERP for mid-size contractors",
+    copy: "Track costs, inventory, and subcontractor billing in one connected system.",
+    ctaUrl: "https://example.com/erp",
+    targetFields: ["Engineering", "Project Management"],
+    targetRoles: ["CONTRACTOR", "PROJECT_MANAGER", "ENGINEER", "USER"],
+    isApproved: true,
+    approvedAt: new Date("2026-03-15T08:00:00Z"),
+    approvedById: "seed-admin",
+    createdAt: new Date("2026-03-14T08:00:00Z"),
+    updatedAt: new Date("2026-03-15T08:00:00Z"),
+  },
+  {
+    id: "fallback-ad-2",
+    title: "Professional certification bootcamp",
+    copy: "Join a 6-week online cohort for project controls and advanced reporting.",
+    ctaUrl: "https://example.com/bootcamp",
+    targetFields: ["Project Management", "Architecture"],
+    targetRoles: ["PROJECT_MANAGER", "CONSULTANT", "ENGINEER", "USER"],
+    isApproved: true,
+    approvedAt: new Date("2026-03-18T08:00:00Z"),
+    approvedById: "seed-admin",
+    createdAt: new Date("2026-03-17T08:00:00Z"),
+    updatedAt: new Date("2026-03-18T08:00:00Z"),
+  },
+];
+
+const FALLBACK_COMMUNITY_RECOMMENDATIONS: CommunityRecommendation[] = [
+  {
+    id: "fallback-rec-1",
+    field: "Engineering",
+    title: "Advanced structural peer-review checklist",
+    format: "Template pack",
+    score: 0,
+  },
+  {
+    id: "fallback-rec-2",
+    field: "Project Management",
+    title: "Risk matrix playbook for multi-site rollouts",
+    format: "Playbook",
+    score: 0,
+  },
+  {
+    id: "fallback-rec-3",
+    field: "Architecture",
+    title: "Sustainable facade strategy benchmark 2026",
+    format: "Industry report",
+    score: 0,
+  },
+];
+
+const ROLE_FIELD_MAP: Partial<Record<AppUserRole, string>> = {
+  ENGINEER: "Engineering",
+  PROJECT_MANAGER: "Project Management",
+  CONSULTANT: "Project Management",
+  CONTRACTOR: "Engineering",
+  REGULATOR: "Project Management",
+  DEVELOPER: "Architecture",
+  REAL_ESTATE: "Architecture",
+};
+
+const tokenizeInterestText = (...values: Array<string | null | undefined>): string[] => {
+  const joined = values
+    .filter((value): value is string => Boolean(value && value.trim().length > 0))
+    .join(" ")
+    .toLowerCase();
+
+  if (!joined) return [];
+
+  return Array.from(
+    new Set(
+      joined
+        .split(/[^a-z0-9]+/)
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 3)
+    )
+  );
+};
+
+const resolveCommunityInteractionContext = async (
+  itemId: string
+): Promise<{ field: string | null; tokens: string[] }> => {
+  const normalizedItemId = itemId.trim();
+  if (!normalizedItemId) return { field: null, tokens: [] };
+
+  if (!dbAvailable) {
+    const fallback = FALLBACK_COMMUNITY_POSTS.find((post) => post.id === normalizedItemId);
+    if (!fallback) return { field: null, tokens: [] };
+    const decoded = decodePostContent(fallback.content);
+    const tokens = Array.from(
+      new Set([...fallback.interests, ...tokenizeInterestText(fallback.title, decoded.body, fallback.field)])
+    );
+    return { field: fallback.field, tokens };
+  }
+
+  try {
+    const rows = (await prismaDynamic.communityPost.findMany({
+      where: { id: normalizedItemId },
+      take: 1,
+    })) as CommunityPostRecord[];
+
+    const post = rows[0];
+    if (!post) return { field: null, tokens: [] };
+
+    const decoded = decodePostContent(post.content);
+    const tokens = Array.from(new Set([...post.interests, ...tokenizeInterestText(post.title, decoded.body, post.field)]));
+    return { field: post.field, tokens };
+  } catch {
+    return { field: null, tokens: [] };
+  }
+};
+
+const buildPersonalizationContext = (user: {
+  role: AppUserRole;
+  industry: string | null;
+  bio: string | null;
+  company: string | null;
+  dominantField?: string | null;
+  behaviorTokens?: string[];
+}): { inferredField: string; interestTokens: string[] } => {
+  const inferredField = user.industry?.trim() || user.dominantField?.trim() || ROLE_FIELD_MAP[user.role] || "Engineering";
+  const profileTokens = tokenizeInterestText(user.industry, user.bio, user.company, inferredField, user.role);
+  const interestTokens = Array.from(new Set([...profileTokens, ...(user.behaviorTokens || [])]));
+  return { inferredField, interestTokens };
+};
+
+const scoreRecommendation = (
+  recommendation: CommunityRecommendation,
+  inferredField: string,
+  interestTokens: string[]
+): number => {
+  const fieldScore = recommendation.field.toLowerCase() === inferredField.toLowerCase() ? 3 : 0;
+  const tokenHitScore = interestTokens.some((token) => recommendation.title.toLowerCase().includes(token)) ? 2 : 0;
+  return fieldScore + tokenHitScore;
+};
+
+const isModeratorRole = (role: AppUserRole): boolean => COMMUNITY_MODERATOR_ROLES.includes(role);
+
 
 const getLocationFromMessage = (text: string) => {
   const cities = ["nairobi", "mombasa", "kisumu", "nakuru", "eldoret", "thika", "nyeri", "naivasha"];
@@ -1587,11 +2511,11 @@ const storage = multer.diskStorage({
   },
   filename: (_req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, "profile-" + uniqueSuffix + path.extname(file.originalname));
+    cb(null, `${file.fieldname || "file"}-${uniqueSuffix}${path.extname(file.originalname)}`);
   },
 });
 
-const upload = multer({
+const profileUpload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (_req, file, cb) => {
@@ -1604,6 +2528,58 @@ const upload = multer({
     } else {
       cb(new Error("Only image files are allowed!"));
     }
+  },
+});
+
+const communityUpload = multer({
+  storage,
+  limits: { fileSize: 25 * 1024 * 1024, files: 6 },
+  fileFilter: (_req, file, cb) => {
+    const imageTypes = /jpeg|jpg|png|gif|webp/;
+    const videoTypes = /mp4|webm|quicktime|x-matroska/;
+    const ext = path.extname(file.originalname).toLowerCase();
+    const isImage = imageTypes.test(ext) && imageTypes.test(file.mimetype);
+    const isVideo = videoTypes.test(ext) && videoTypes.test(file.mimetype);
+
+    if (isImage || isVideo) {
+      return cb(null, true);
+    }
+
+    cb(new Error("Only image and video files are allowed for community posts."));
+  },
+});
+
+const liveRecordingUpload = multer({
+  storage,
+  limits: { fileSize: 250 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const allowedTypes = /webm|mp4|ogg|mpeg|wav/;
+    const ext = path.extname(file.originalname).toLowerCase();
+    const isAllowedByExt = allowedTypes.test(ext);
+    const isAllowedByMime = allowedTypes.test(file.mimetype.toLowerCase());
+
+    if (isAllowedByExt || isAllowedByMime) {
+      return cb(null, true);
+    }
+
+    cb(new Error("Only audio/video recording files are allowed."));
+  },
+});
+
+const liveRecordingChunkUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: LIVE_ROOM_RECORDING_CHUNK_MAX_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const allowedTypes = /webm|mp4|ogg|mpeg|wav|octet-stream/;
+    const ext = path.extname(file.originalname).toLowerCase();
+    const isAllowedByExt = allowedTypes.test(ext);
+    const isAllowedByMime = allowedTypes.test(file.mimetype.toLowerCase());
+
+    if (isAllowedByExt || isAllowedByMime) {
+      return cb(null, true);
+    }
+
+    cb(new Error("Only audio/video recording files are allowed."));
   },
 });
 
@@ -1633,6 +2609,11 @@ type JwtPayload = {
 
 type AuthenticatedRequest = express.Request & {
   auth?: JwtPayload;
+};
+
+const authUserDisplayName = (auth?: JwtPayload): string => {
+  if (!auth?.email) return "Community member";
+  return auth.email.split("@")[0] || "Community member";
 };
 
 const toSafeUser = (user: {
@@ -1724,6 +2705,261 @@ const DEFAULT_TEAM_MEMBERS: Array<{
 ];
 
 const offlineTeamMembers = new Map<string, TeamMemberRecord[]>();
+const offlineProjectReminderEnabled = new Map<string, boolean>();
+const offlineProjectReminderFrequency = new Map<string, ProjectReminderFrequency>();
+const offlineProjectReminderQuietHoursStart = new Map<string, number>();
+const offlineProjectReminderQuietHoursEnd = new Map<string, number>();
+const offlineProjectReminderLastSent = new Map<string, string>();
+
+type ProjectReminderFrequency = "daily" | "weekly";
+
+type ProjectReminderSettings = {
+  enabled: boolean;
+  frequency: ProjectReminderFrequency;
+  quietHoursStart: number;
+  quietHoursEnd: number;
+  lastSentAt: string | null;
+};
+
+const shouldUseOfflineProjectReminderSettings = (userId: string): boolean =>
+  !dbAvailable || (DEV_AUTH_BYPASS && userId === "dev-engineer") || userId.startsWith("offline-");
+
+const parseBooleanSetting = (value: string | null | undefined, fallback: boolean): boolean => {
+  if (value == null) return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return fallback;
+};
+
+const parseProjectReminderFrequency = (
+  value: string | null | undefined,
+  fallback: ProjectReminderFrequency,
+): ProjectReminderFrequency => {
+  if (!value) return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "daily" || normalized === "weekly") {
+    return normalized;
+  }
+  return fallback;
+};
+
+const parseIntegerSetting = (
+  value: string | null | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number => {
+  if (value == null) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed)) return fallback;
+  if (parsed < min || parsed > max) return fallback;
+  return parsed;
+};
+
+const getProjectReminderMinIntervalMs = (frequency: ProjectReminderFrequency): number =>
+  frequency === "weekly" ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+
+const isWithinQuietHours = (hour: number, quietHoursStart: number, quietHoursEnd: number): boolean => {
+  if (quietHoursStart === quietHoursEnd) {
+    return false;
+  }
+
+  if (quietHoursStart < quietHoursEnd) {
+    return hour >= quietHoursStart && hour < quietHoursEnd;
+  }
+
+  return hour >= quietHoursStart || hour < quietHoursEnd;
+};
+
+const getProjectReminderSettings = async (userId: string): Promise<ProjectReminderSettings> => {
+  if (shouldUseOfflineProjectReminderSettings(userId)) {
+    return {
+      enabled: offlineProjectReminderEnabled.get(userId) ?? PROJECT_REMINDER_DEFAULT_ENABLED,
+      frequency: offlineProjectReminderFrequency.get(userId) ?? PROJECT_REMINDER_DEFAULT_FREQUENCY,
+      quietHoursStart: offlineProjectReminderQuietHoursStart.get(userId) ?? PROJECT_REMINDER_DEFAULT_QUIET_HOURS_START,
+      quietHoursEnd: offlineProjectReminderQuietHoursEnd.get(userId) ?? PROJECT_REMINDER_DEFAULT_QUIET_HOURS_END,
+      lastSentAt: offlineProjectReminderLastSent.get(userId) || null,
+    };
+  }
+
+  const settings = await prismaDynamic.platformSetting.findMany({
+    where: {
+      key: {
+        in: [
+          getProjectReminderEnabledSettingKey(userId),
+          getProjectReminderFrequencySettingKey(userId),
+          getProjectReminderQuietHoursStartSettingKey(userId),
+          getProjectReminderQuietHoursEndSettingKey(userId),
+          getProjectReminderLastSentSettingKey(userId),
+        ],
+      },
+    },
+  });
+
+  const valueByKey = new Map(settings.map((item) => [item.key, item.value]));
+
+  return {
+    enabled: parseBooleanSetting(valueByKey.get(getProjectReminderEnabledSettingKey(userId)), PROJECT_REMINDER_DEFAULT_ENABLED),
+    frequency: parseProjectReminderFrequency(
+      valueByKey.get(getProjectReminderFrequencySettingKey(userId)),
+      PROJECT_REMINDER_DEFAULT_FREQUENCY,
+    ),
+    quietHoursStart: parseIntegerSetting(
+      valueByKey.get(getProjectReminderQuietHoursStartSettingKey(userId)),
+      PROJECT_REMINDER_DEFAULT_QUIET_HOURS_START,
+      0,
+      23,
+    ),
+    quietHoursEnd: parseIntegerSetting(
+      valueByKey.get(getProjectReminderQuietHoursEndSettingKey(userId)),
+      PROJECT_REMINDER_DEFAULT_QUIET_HOURS_END,
+      0,
+      23,
+    ),
+    lastSentAt: valueByKey.get(getProjectReminderLastSentSettingKey(userId)) || null,
+  };
+};
+
+const setProjectReminderEnabled = async (userId: string, enabled: boolean): Promise<void> => {
+  if (shouldUseOfflineProjectReminderSettings(userId)) {
+    offlineProjectReminderEnabled.set(userId, enabled);
+    return;
+  }
+
+  await prismaDynamic.platformSetting.upsert({
+    where: { key: getProjectReminderEnabledSettingKey(userId) },
+    update: { value: enabled ? "true" : "false" },
+    create: {
+      key: getProjectReminderEnabledSettingKey(userId),
+      value: enabled ? "true" : "false",
+    },
+  });
+};
+
+const setProjectReminderFrequency = async (
+  userId: string,
+  frequency: ProjectReminderFrequency,
+): Promise<void> => {
+  if (shouldUseOfflineProjectReminderSettings(userId)) {
+    offlineProjectReminderFrequency.set(userId, frequency);
+    return;
+  }
+
+  await prismaDynamic.platformSetting.upsert({
+    where: { key: getProjectReminderFrequencySettingKey(userId) },
+    update: { value: frequency },
+    create: {
+      key: getProjectReminderFrequencySettingKey(userId),
+      value: frequency,
+    },
+  });
+};
+
+const setProjectReminderQuietHours = async (
+  userId: string,
+  quietHoursStart: number,
+  quietHoursEnd: number,
+): Promise<void> => {
+  if (shouldUseOfflineProjectReminderSettings(userId)) {
+    offlineProjectReminderQuietHoursStart.set(userId, quietHoursStart);
+    offlineProjectReminderQuietHoursEnd.set(userId, quietHoursEnd);
+    return;
+  }
+
+  await prismaDynamic.platformSetting.upsert({
+    where: { key: getProjectReminderQuietHoursStartSettingKey(userId) },
+    update: { value: String(quietHoursStart) },
+    create: {
+      key: getProjectReminderQuietHoursStartSettingKey(userId),
+      value: String(quietHoursStart),
+    },
+  });
+
+  await prismaDynamic.platformSetting.upsert({
+    where: { key: getProjectReminderQuietHoursEndSettingKey(userId) },
+    update: { value: String(quietHoursEnd) },
+    create: {
+      key: getProjectReminderQuietHoursEndSettingKey(userId),
+      value: String(quietHoursEnd),
+    },
+  });
+};
+
+const setProjectReminderLastSent = async (userId: string, isoDate: string): Promise<void> => {
+  if (shouldUseOfflineProjectReminderSettings(userId)) {
+    offlineProjectReminderLastSent.set(userId, isoDate);
+    return;
+  }
+
+  await prismaDynamic.platformSetting.upsert({
+    where: { key: getProjectReminderLastSentSettingKey(userId) },
+    update: { value: isoDate },
+    create: {
+      key: getProjectReminderLastSentSettingKey(userId),
+      value: isoDate,
+    },
+  });
+};
+
+type ProjectReminderCandidate = {
+  id?: string | number;
+  name?: string;
+  progress?: number;
+  status?: string;
+};
+
+const projectNeedsAttention = (project: ProjectReminderCandidate): boolean => {
+  const progress = Number(project.progress ?? Number.NaN);
+  if (!Number.isNaN(progress) && progress < 50) return true;
+  const status = String(project.status || "").toLowerCase();
+  if (status.includes("attention") || status.includes("at-risk") || status.includes("risk")) return true;
+  return false;
+};
+
+const formatProjectReminderMessage = (projects: ProjectReminderCandidate[]): string => {
+  const lines = projects.slice(0, 8).map((project) => {
+    const name = project.name || "Unnamed project";
+    const progress = Number.isFinite(Number(project.progress)) ? `${Number(project.progress)}%` : "n/a";
+    return `• ${name} (progress: ${progress})`;
+  });
+
+  return [
+    "The following projects currently need attention:",
+    "",
+    ...lines,
+    "",
+    "Please review blockers, schedule risks, and recovery actions in your project dashboard.",
+  ].join("\n");
+};
+
+const resolveReminderRecipient = async (
+  userId: string,
+  auth: JwtPayload
+): Promise<{ email: string; name: string }> => {
+  if (DEV_AUTH_BYPASS && userId === "dev-engineer") {
+    return { email: DEV_ENGINEER_EMAIL, name: DEV_ENGINEER_NAME };
+  }
+
+  if (!dbAvailable) {
+    const match = findInMemoryUser(userId, true);
+    if (match) {
+      return { email: match.profile.email, name: match.profile.name };
+    }
+    return { email: auth.email, name: auth.email.split("@")[0] || "User" };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, name: true },
+  });
+
+  if (!user) {
+    return { email: auth.email, name: auth.email.split("@")[0] || "User" };
+  }
+
+  return { email: user.email, name: user.name || user.email.split("@")[0] || "User" };
+};
 
 const getInitialsFromName = (name: string): string => {
   const trimmed = name.trim();
@@ -1897,6 +3133,56 @@ const seedDefaultProfiles = async () => {
         emailVerificationToken: null,
         emailVerificationExpiry: null,
       },
+    });
+  }
+};
+
+const seedCommunityContent = async () => {
+  const [postCount, updateCount, adCount] = await Promise.all([
+    prismaDynamic.communityPost.count(),
+    prismaDynamic.communityUpdate.count(),
+    prismaDynamic.communityAd.count(),
+  ]);
+
+  if (postCount === 0) {
+    await prismaDynamic.communityPost.createMany({
+      data: FALLBACK_COMMUNITY_POSTS.map((post) => ({
+        title: post.title,
+        summary: post.summary,
+        content: post.content,
+        postType: post.postType,
+        authorName: post.authorName,
+        field: post.field,
+        interests: post.interests,
+        isPublished: post.isPublished,
+      })),
+    });
+  }
+
+  if (updateCount === 0) {
+    await prismaDynamic.communityUpdate.createMany({
+      data: FALLBACK_COMMUNITY_UPDATES.map((update) => ({
+        title: update.title,
+        body: update.body,
+        isPinned: update.isPinned,
+        isPublished: update.isPublished,
+        pinnedAt: update.pinnedAt,
+      })),
+    });
+  }
+
+  if (adCount === 0) {
+    await prismaDynamic.communityAd.createMany({
+      data: FALLBACK_COMMUNITY_ADS.map((ad) => ({
+        title: ad.title,
+        copy: ad.copy,
+        ctaUrl: ad.ctaUrl,
+        targetFields: ad.targetFields,
+        targetRoles: ad.targetRoles,
+        isApproved: ad.isApproved,
+        approvedAt: ad.approvedAt,
+        approvedById: ad.approvedById,
+      })),
     });
   }
 };
@@ -2534,6 +3820,1362 @@ app.post("/api/auth/logout", (_req, res) => {
   res.json({ message: "Logout successful" });
 });
 
+app.get("/api/community/feed", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  const authRole = req.auth?.role;
+
+  if (!userId || !authRole) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const q = String(req.query.q || "").trim().toLowerCase();
+  const requestedField = String(req.query.field || "all").trim();
+
+  try {
+    const state = await loadCommunityState(userId);
+    const analytics = await loadCommunityAnalyticsState(userId);
+    const behavior = deriveCommunityBehaviorSignals(analytics);
+    const profile = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        role: true,
+        industry: true,
+        bio: true,
+        company: true,
+      },
+    });
+
+    const userProfile = profile || {
+      role: authRole,
+      industry: null,
+      bio: null,
+      company: null,
+    };
+
+    const { inferredField, interestTokens } = buildPersonalizationContext({
+      role: userProfile.role as AppUserRole,
+      industry: userProfile.industry,
+      bio: userProfile.bio,
+      company: userProfile.company,
+      dominantField: behavior.dominantField,
+      behaviorTokens: behavior.behaviorTokens,
+    });
+
+    const postsRaw = await prismaDynamic.communityPost.findMany({
+      where: {
+        isPublished: true,
+        ...(requestedField !== "all"
+          ? {
+              field: {
+                equals: requestedField,
+                mode: "insensitive",
+              },
+            }
+          : {}),
+      },
+      orderBy: { createdAt: "desc" },
+      take: 24,
+    });
+
+    const updatesRaw = await prismaDynamic.communityUpdate.findMany({
+      where: { isPublished: true },
+      orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
+      take: 12,
+    });
+
+    const adsRaw = await prismaDynamic.communityAd.findMany({
+      where: { isApproved: true },
+      orderBy: { createdAt: "desc" },
+      take: 12,
+    });
+
+    const posts = (postsRaw as CommunityPostRecord[])
+      .filter((post) => {
+        if (!q) return true;
+        const decoded = decodePostContent(post.content);
+        const haystack = `${post.title} ${post.summary} ${decoded.body} ${post.interests.join(" ")}`.toLowerCase();
+        return haystack.includes(q);
+      })
+      .map((post) => {
+        const decoded = decodePostContent(post.content);
+        return {
+          id: post.id,
+          type: post.postType,
+          title: post.title,
+          summary: post.summary,
+          author: post.authorName,
+          field: post.field,
+          interests: post.interests,
+          stats: decoded.liveSession ? "Live session" : "Live discussion",
+          media: decoded.media,
+          liveSession: decoded.liveSession,
+          createdAt: post.createdAt,
+        };
+      });
+
+    const updates = (updatesRaw as CommunityUpdateRecord[]).map((update) => ({
+      id: update.id,
+      title: update.title,
+      body: update.body,
+      isPinned: update.isPinned,
+      createdAt: update.createdAt,
+    }));
+
+    const ads = (adsRaw as CommunityAdRecord[])
+      .filter((ad) => {
+        const roleMatch = ad.targetRoles.length === 0 || ad.targetRoles.includes(userProfile.role as AppUserRole);
+        const fieldMatch =
+          ad.targetFields.length === 0 ||
+          ad.targetFields.some((field) => field.toLowerCase() === inferredField.toLowerCase());
+        return roleMatch || fieldMatch;
+      })
+      .map((ad) => ({
+        id: ad.id,
+        title: ad.title,
+        copy: ad.copy,
+        ctaUrl: ad.ctaUrl,
+        approvedAt: ad.approvedAt,
+      }));
+
+    const recommendations = FALLBACK_COMMUNITY_RECOMMENDATIONS
+      .map((recommendation) => ({
+        ...recommendation,
+        score: scoreRecommendation(recommendation, requestedField === "all" ? inferredField : requestedField, interestTokens),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6)
+      .map(({ score: _score, ...rest }) => rest);
+
+    return res.status(200).json({
+      posts,
+      updates,
+      ads,
+      state,
+      recommendations,
+      personalization: {
+        role: userProfile.role,
+        inferredField,
+        interestTokens,
+      },
+      moderation: {
+        canPinUpdates: isModeratorRole(userProfile.role as AppUserRole),
+        canApproveAds: (userProfile.role as AppUserRole) === "ADMIN",
+      },
+      analytics: {
+        totalInteractions: analytics.totalInteractions,
+        lastInteractionAt: analytics.lastInteractionAt,
+        topFields: Object.entries(analytics.interactionsByField)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 4)
+          .map(([field, count]) => ({ field, count })),
+        topTokens: Object.entries(analytics.interactionsByToken)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 6)
+          .map(([token, count]) => ({ token, count })),
+      },
+    });
+  } catch (error) {
+    console.warn("Community feed fallback activated:", error);
+
+    const inferredField = ROLE_FIELD_MAP[authRole] || "Engineering";
+    const posts = FALLBACK_COMMUNITY_POSTS
+      .filter((post) => {
+        if (requestedField !== "all" && post.field.toLowerCase() !== requestedField.toLowerCase()) {
+          return false;
+        }
+        if (!q) return true;
+        const decoded = decodePostContent(post.content);
+        const haystack = `${post.title} ${post.summary} ${decoded.body} ${post.interests.join(" ")}`.toLowerCase();
+        return haystack.includes(q);
+      })
+      .map((post) => {
+        const decoded = decodePostContent(post.content);
+        return {
+          id: post.id,
+          type: post.postType,
+          title: post.title,
+          summary: post.summary,
+          author: post.authorName,
+          field: post.field,
+          interests: post.interests,
+          stats: decoded.liveSession ? "Live session" : "Live discussion",
+          media: decoded.media,
+          liveSession: decoded.liveSession,
+          createdAt: post.createdAt,
+        };
+      });
+
+    const recommendations = FALLBACK_COMMUNITY_RECOMMENDATIONS
+      .map((recommendation) => ({
+        ...recommendation,
+        score: scoreRecommendation(recommendation, inferredField, []),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6)
+      .map(({ score: _score, ...rest }) => rest);
+
+    return res.status(200).json({
+      posts,
+      updates: FALLBACK_COMMUNITY_UPDATES,
+      ads: FALLBACK_COMMUNITY_ADS,
+      state: createDefaultCommunityState(),
+      recommendations,
+      personalization: {
+        role: authRole,
+        inferredField,
+        interestTokens: [],
+      },
+      moderation: {
+        canPinUpdates: isModeratorRole(authRole),
+        canApproveAds: authRole === "ADMIN",
+      },
+      mode: "fallback",
+    });
+  }
+});
+
+app.get("/api/community/state", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const state = await loadCommunityState(userId);
+  return res.status(200).json(state);
+});
+
+app.get("/api/community/analytics/me", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const analytics = await loadCommunityAnalyticsState(userId);
+  return res.status(200).json({ analytics });
+});
+
+app.put("/api/community/bookmarks/:itemId", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const itemId = String(req.params.itemId || "").trim();
+  if (!itemId) {
+    return res.status(400).json({ error: "Item id is required." });
+  }
+
+  const bookmarkedInput = typeof req.body?.bookmarked === "boolean" ? req.body.bookmarked : undefined;
+  const state = await updateCommunityState(userId, (current) => {
+    const bookmarks = new Set(current.bookmarks);
+
+    if (bookmarkedInput === undefined) {
+      if (bookmarks.has(itemId)) {
+        bookmarks.delete(itemId);
+      } else {
+        bookmarks.add(itemId);
+      }
+    } else if (bookmarkedInput) {
+      bookmarks.add(itemId);
+    } else {
+      bookmarks.delete(itemId);
+    }
+
+    return { ...current, bookmarks: Array.from(bookmarks) };
+  });
+
+  const isBookmarked = state.bookmarks.includes(itemId);
+  const context = await resolveCommunityInteractionContext(itemId);
+  await recordCommunityInteraction(userId, {
+    action: isBookmarked ? "bookmark_add" : "bookmark_remove",
+    itemId,
+    field: context.field ?? undefined,
+    tokens: context.tokens,
+  });
+
+  return res.status(200).json({ itemId, bookmarked: isBookmarked, state });
+});
+
+app.put("/api/community/follows/:itemId", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const itemId = String(req.params.itemId || "").trim();
+  if (!itemId) {
+    return res.status(400).json({ error: "Item id is required." });
+  }
+
+  const followingInput = typeof req.body?.following === "boolean" ? req.body.following : undefined;
+  const state = await updateCommunityState(userId, (current) => {
+    const follows = new Set(current.follows);
+
+    if (followingInput === undefined) {
+      if (follows.has(itemId)) {
+        follows.delete(itemId);
+      } else {
+        follows.add(itemId);
+      }
+    } else if (followingInput) {
+      follows.add(itemId);
+    } else {
+      follows.delete(itemId);
+    }
+
+    return { ...current, follows: Array.from(follows) };
+  });
+
+  const isFollowing = state.follows.includes(itemId);
+  const context = await resolveCommunityInteractionContext(itemId);
+  await recordCommunityInteraction(userId, {
+    action: isFollowing ? "follow_add" : "follow_remove",
+    itemId,
+    field: context.field ?? undefined,
+    tokens: context.tokens,
+  });
+
+  return res.status(200).json({ itemId, following: isFollowing, state });
+});
+
+app.put("/api/community/votes/:itemId", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const itemId = String(req.params.itemId || "").trim();
+  if (!itemId) {
+    return res.status(400).json({ error: "Item id is required." });
+  }
+
+  const vote = req.body?.vote === "up" || req.body?.vote === "down" ? req.body.vote : null;
+  const state = await updateCommunityState(userId, (current) => {
+    const votes = { ...current.votes };
+
+    if (vote) {
+      votes[itemId] = vote;
+    } else {
+      delete votes[itemId];
+    }
+
+    return { ...current, votes };
+  });
+
+  const context = await resolveCommunityInteractionContext(itemId);
+  await recordCommunityInteraction(userId, {
+    action: vote === "up" ? "vote_up" : vote === "down" ? "vote_down" : "vote_clear",
+    itemId,
+    field: context.field ?? undefined,
+    tokens: context.tokens,
+  });
+
+  return res.status(200).json({ itemId, vote: state.votes[itemId] || null, state });
+});
+
+app.put("/api/community/polls/:itemId/vote", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const itemId = String(req.params.itemId || "").trim();
+  if (!itemId) {
+    return res.status(400).json({ error: "Item id is required." });
+  }
+
+  const choice = typeof req.body?.choice === "string" ? req.body.choice.trim() : "";
+  const state = await updateCommunityState(userId, (current) => {
+    const pollVotes = { ...current.pollVotes };
+
+    if (choice) {
+      pollVotes[itemId] = choice;
+    } else {
+      delete pollVotes[itemId];
+    }
+
+    return { ...current, pollVotes };
+  });
+
+  await recordCommunityInteraction(userId, {
+    action: choice ? "poll_vote" : "poll_clear",
+    itemId,
+    tokens: tokenizeInterestText(choice || itemId),
+  });
+
+  return res.status(200).json({ itemId, choice: state.pollVotes[itemId] || null, state });
+});
+
+app.get("/api/community/chat", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const state = await loadCommunityState(userId);
+  return res.status(200).json({ messages: state.chatMessages });
+});
+
+app.post("/api/community/chat/messages", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+  if (!message) {
+    return res.status(400).json({ error: "Message is required." });
+  }
+
+  const chatMessage = {
+    id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    author: authUserDisplayName(req.auth),
+    message,
+    createdAt: new Date().toISOString(),
+  };
+
+  const state = await updateCommunityState(userId, (current) => ({
+    ...current,
+    chatMessages: [chatMessage, ...current.chatMessages].slice(0, 25),
+  }));
+
+  await recordCommunityInteraction(userId, {
+    action: "chat_message",
+    itemId: chatMessage.id,
+    tokens: tokenizeInterestText(message),
+  });
+
+  return res.status(201).json({ message: chatMessage, state });
+});
+
+app.post(
+  "/api/community/posts",
+  authMiddleware,
+  communityUpload.array("media", 6),
+  async (req: AuthenticatedRequest, res) => {
+    const userId = req.auth?.userId;
+    const userRole = req.auth?.role;
+
+    if (!userId || !userRole) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const title = String(req.body?.title || "").trim();
+    const content = String(req.body?.content || "").trim();
+    const scheduledAtRaw = String(req.body?.scheduledAt || "").trim();
+    const liveTitle = String(req.body?.liveTitle || "").trim();
+    const liveStartsAtRaw = String(req.body?.liveStartsAt || "").trim();
+    const liveRoomUrlRaw = String(req.body?.liveRoomUrl || "").trim();
+    const liveDescription = String(req.body?.liveDescription || "").trim();
+
+    if (!title || !content) {
+      return res.status(400).json({ error: "Title and content are required." });
+    }
+
+    const files = (Array.isArray(req.files) ? req.files : []) as Express.Multer.File[];
+    let contentTypes: string[] = [];
+    const contentTypesInput = req.body?.contentTypes;
+
+    if (Array.isArray(contentTypesInput)) {
+      contentTypes = contentTypesInput.map((value) => String(value).trim().toLowerCase()).filter(Boolean);
+    } else if (typeof contentTypesInput === "string") {
+      const normalized = contentTypesInput.trim();
+      if (normalized.startsWith("[")) {
+        try {
+          const parsed = JSON.parse(normalized) as string[];
+          if (Array.isArray(parsed)) {
+            contentTypes = parsed.map((value) => String(value).trim().toLowerCase()).filter(Boolean);
+          }
+        } catch {
+          contentTypes = [normalized.toLowerCase()];
+        }
+      } else if (normalized) {
+        contentTypes = [normalized.toLowerCase()];
+      }
+    }
+
+    const mediaAssets: CommunityMediaAsset[] = files.map((file) => ({
+      url: `/uploads/${file.filename}`,
+      mediaType: file.mimetype.startsWith("video/") ? "video" : "image",
+      fileName: file.originalname,
+    }));
+
+    const hasLiveSessionInput = req.body?.isLiveSession === "true" || req.body?.isLiveSession === true;
+    const inferredRoomId = liveRoomUrlRaw ? extractRoomIdFromUrl(liveRoomUrlRaw) : null;
+    const generatedRoomId = `room-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const roomId = hasLiveSessionInput ? normalizeRoomId(inferredRoomId || generatedRoomId) : null;
+
+    if (roomId) {
+      ensureLiveRoom(roomId, liveTitle || title, userId);
+    }
+
+    const liveSession = hasLiveSessionInput
+      ? {
+          title: liveTitle || `${title} - Live session`,
+          startsAt: liveStartsAtRaw || new Date().toISOString(),
+          roomUrl: liveRoomUrlRaw || `/community/live/${roomId}`,
+          roomId: roomId || undefined,
+          description: liveDescription || undefined,
+        }
+      : null;
+
+    const encodedContent: EncodedCommunityPostContent = {
+      kind: "community-post-v1",
+      body: content,
+      media: mediaAssets,
+      liveSession,
+    };
+
+    const summary = toPostSummary(content);
+    const roleField = ROLE_FIELD_MAP[userRole] || "Engineering";
+    const allInterests = Array.from(new Set([...contentTypes, ...tokenizeInterestText(title, content, roleField)]));
+    const interests = allInterests.length > 0 ? allInterests.slice(0, 6) : ["community"];
+    const postType = liveSession
+      ? "Live Session"
+      : mediaAssets.some((asset) => asset.mediaType === "video")
+        ? "Video"
+        : mediaAssets.some((asset) => asset.mediaType === "image")
+          ? "Image"
+          : "Discussion";
+
+    try {
+      const created = (await prismaDynamic.communityPost.create({
+        data: {
+          title,
+          summary,
+          content: JSON.stringify(encodedContent),
+          postType,
+          authorName: authUserDisplayName(req.auth),
+          field: roleField,
+          interests,
+          isPublished: true,
+        },
+      })) as CommunityPostRecord;
+
+      return res.status(201).json({
+        post: {
+          id: created.id,
+          type: created.postType,
+          title: created.title,
+          summary: created.summary,
+          author: created.authorName,
+          field: created.field,
+          interests: created.interests,
+          stats: liveSession ? "Live session" : "Live discussion",
+          media: mediaAssets,
+          liveSession,
+          scheduledAt: scheduledAtRaw || null,
+          createdAt: created.createdAt,
+        },
+      });
+    } catch (error) {
+      console.error("Create community post error:", error);
+      return res.status(500).json({ error: "Unable to create post right now." });
+    }
+  }
+);
+
+app.get("/api/community/live-sessions", authMiddleware, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const postsRaw = (await prismaDynamic.communityPost.findMany({
+      where: { isPublished: true },
+      orderBy: { createdAt: "desc" },
+      take: 40,
+    })) as CommunityPostRecord[];
+
+    const sessions = postsRaw
+      .map((post) => {
+        const decoded = decodePostContent(post.content);
+        if (!decoded.liveSession) return null;
+        return {
+          postId: post.id,
+          title: decoded.liveSession.title,
+          startsAt: decoded.liveSession.startsAt,
+          roomUrl: decoded.liveSession.roomUrl,
+          roomId: decoded.liveSession.roomId || null,
+          description: decoded.liveSession.description || "",
+          author: post.authorName,
+          field: post.field,
+          createdAt: post.createdAt,
+        };
+      })
+      .filter((session): session is NonNullable<typeof session> => Boolean(session))
+      .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+
+    return res.status(200).json({ sessions });
+  } catch (error) {
+    console.error("Get live sessions error:", error);
+    return res.status(500).json({ error: "Unable to fetch live sessions right now." });
+  }
+});
+
+app.get("/api/community/live-rooms/ice-config", authMiddleware, (_req: AuthenticatedRequest, res) => {
+  const iceServers = resolveLiveRoomIceServers();
+  return res.status(200).json({
+    iceServers,
+    hasTurn: iceServers.some((server) => String(server.urls).startsWith("turn:")),
+  });
+});
+
+app.post("/api/community/live-rooms/:roomId/join", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  const role = req.auth?.role;
+  if (!userId || !role) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  pruneLiveRooms();
+  const roomId = normalizeRoomId(String(req.params.roomId || ""));
+  if (!roomId) {
+    return res.status(400).json({ error: "Room id is required." });
+  }
+
+  const displayNameInput = String(req.body?.displayName || "").trim();
+  const room = ensureLiveRoom(roomId);
+  if (!canJoinLiveRoom(room, userId, role)) {
+    return res.status(403).json({ error: "This room is locked by the host." });
+  }
+
+  const participantId = `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const participant: LiveRoomParticipant = {
+    participantId,
+    userId,
+    role,
+    displayName: displayNameInput || authUserDisplayName(req.auth),
+    joinedAt: new Date().toISOString(),
+    lastSeenAt: new Date().toISOString(),
+  };
+
+  if (!room.hostUserId) {
+    room.hostUserId = userId;
+    room.moderatorUserIds.add(userId);
+  }
+
+  room.participants.set(participantId, participant);
+  pushLiveRoomSignal(room, {
+    fromParticipantId: participantId,
+    toParticipantId: null,
+    type: "participant-joined",
+    payload: {
+      participantId,
+      displayName: participant.displayName,
+    },
+  });
+
+  const participants = Array.from(room.participants.values()).map((item) => ({
+    participantId: item.participantId,
+    displayName: item.displayName,
+    joinedAt: item.joinedAt,
+  }));
+
+  return res.status(200).json({
+    roomId,
+    participantId,
+    participants,
+    roomLocked: room.isLocked,
+    canModerate: isLiveRoomModerator(room, userId, role),
+    isHost: room.hostUserId === userId,
+    recording: room.recording,
+  });
+});
+
+app.post("/api/community/live-rooms/:roomId/leave", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  pruneLiveRooms();
+  const roomId = normalizeRoomId(String(req.params.roomId || ""));
+  const participantId = String(req.body?.participantId || "").trim();
+  const room = communityLiveRooms.get(roomId);
+  if (!room || !participantId) {
+    return res.status(200).json({ ok: true });
+  }
+
+  const participant = room.participants.get(participantId);
+  if (!participant || participant.userId !== userId) {
+    return res.status(403).json({ error: "Participant not found for this user." });
+  }
+
+  room.participants.delete(participantId);
+  pushLiveRoomSignal(room, {
+    fromParticipantId: participantId,
+    toParticipantId: null,
+    type: "participant-left",
+    payload: { participantId },
+  });
+
+  return res.status(200).json({ ok: true });
+});
+
+app.get("/api/community/live-rooms/:roomId/presence", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  const role = req.auth?.role;
+  if (!userId || !role) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  pruneLiveRooms();
+  const roomId = normalizeRoomId(String(req.params.roomId || ""));
+  const participantId = String(req.query.participantId || "").trim();
+  const room = ensureLiveRoom(roomId);
+
+  if (participantId && room.participants.has(participantId)) {
+    const participant = room.participants.get(participantId)!;
+    if (participant.userId === userId) {
+      participant.lastSeenAt = new Date().toISOString();
+      room.participants.set(participantId, participant);
+    }
+  }
+
+  const participants = Array.from(room.participants.values()).map((item) => ({
+    participantId: item.participantId,
+    displayName: item.displayName,
+    joinedAt: item.joinedAt,
+  }));
+
+  return res.status(200).json({
+    roomId,
+    participantCount: participants.length,
+    participants,
+    roomLocked: room.isLocked,
+    canModerate: isLiveRoomModerator(room, userId, role),
+    isHost: room.hostUserId === userId,
+    recording: room.recording,
+  });
+});
+
+app.patch("/api/community/live-rooms/:roomId/access", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  const role = req.auth?.role;
+  if (!userId || !role) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  pruneLiveRooms();
+  const roomId = normalizeRoomId(String(req.params.roomId || ""));
+  const room = ensureLiveRoom(roomId);
+
+  if (!isLiveRoomModerator(room, userId, role)) {
+    return res.status(403).json({ error: "Host/moderator access required." });
+  }
+
+  const lock = typeof req.body?.lock === "boolean" ? req.body.lock : undefined;
+  const allowGuestJoin = typeof req.body?.allowGuestJoin === "boolean" ? req.body.allowGuestJoin : undefined;
+  const moderatorUserId = typeof req.body?.moderatorUserId === "string" ? req.body.moderatorUserId.trim() : "";
+  const action = typeof req.body?.action === "string" ? req.body.action.trim().toLowerCase() : "";
+
+  if (typeof lock === "boolean") room.isLocked = lock;
+  if (typeof allowGuestJoin === "boolean") room.allowGuestJoin = allowGuestJoin;
+
+  if (moderatorUserId && action === "add-moderator") {
+    room.moderatorUserIds.add(moderatorUserId);
+  }
+
+  if (moderatorUserId && action === "remove-moderator") {
+    if (room.hostUserId !== moderatorUserId) {
+      room.moderatorUserIds.delete(moderatorUserId);
+    }
+  }
+
+  return res.status(200).json({
+    roomId,
+    roomLocked: room.isLocked,
+    allowGuestJoin: room.allowGuestJoin,
+    hostUserId: room.hostUserId,
+    moderatorUserIds: Array.from(room.moderatorUserIds),
+  });
+});
+
+app.post("/api/community/live-rooms/:roomId/recording/start", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  const role = req.auth?.role;
+  if (!userId || !role) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const roomId = normalizeRoomId(String(req.params.roomId || ""));
+  const room = ensureLiveRoom(roomId);
+  if (!isLiveRoomModerator(room, userId, role)) {
+    return res.status(403).json({ error: "Host/moderator access required." });
+  }
+
+  const participantId = String(req.body?.participantId || "").trim() || null;
+  room.recording = {
+    isRecording: true,
+    startedAt: new Date().toISOString(),
+    startedByParticipantId: participantId,
+    stoppedAt: null,
+  };
+
+  return res.status(200).json({ recording: room.recording });
+});
+
+app.post("/api/community/live-rooms/:roomId/recording/stop", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  const role = req.auth?.role;
+  if (!userId || !role) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const roomId = normalizeRoomId(String(req.params.roomId || ""));
+  const room = ensureLiveRoom(roomId);
+  if (!isLiveRoomModerator(room, userId, role)) {
+    return res.status(403).json({ error: "Host/moderator access required." });
+  }
+
+  room.recording = {
+    ...room.recording,
+    isRecording: false,
+    stoppedAt: new Date().toISOString(),
+  };
+
+  return res.status(200).json({ recording: room.recording });
+});
+
+app.post("/api/community/live-rooms/:roomId/transcript", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const roomId = normalizeRoomId(String(req.params.roomId || ""));
+  const room = ensureLiveRoom(roomId);
+  const participantId = String(req.body?.participantId || "").trim();
+  const text = String(req.body?.text || "").trim();
+
+  if (!participantId || !text) {
+    return res.status(400).json({ error: "participantId and text are required." });
+  }
+
+  const participant = room.participants.get(participantId);
+  if (!participant || participant.userId !== userId) {
+    return res.status(403).json({ error: "Participant not found for this room." });
+  }
+
+  const entry: LiveRoomTranscriptEntry = {
+    id: `tx-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    participantId,
+    author: participant.displayName,
+    text,
+    createdAt: new Date().toISOString(),
+  };
+
+  room.transcript.push(entry);
+  if (room.transcript.length > LIVE_ROOM_MAX_TRANSCRIPT_ENTRIES) {
+    room.transcript.splice(0, room.transcript.length - LIVE_ROOM_MAX_TRANSCRIPT_ENTRIES);
+  }
+
+  return res.status(201).json({ entry });
+});
+
+const resolveRecordingExtension = (fileName: string, mimeType: string): string => {
+  const byName = path.extname(fileName || "").toLowerCase();
+  if (byName) return byName;
+
+  const normalized = (mimeType || "").toLowerCase();
+  if (normalized.includes("mp4")) return ".mp4";
+  if (normalized.includes("wav")) return ".wav";
+  if (normalized.includes("ogg")) return ".ogg";
+  return ".webm";
+};
+
+const pushLiveRoomRecordingAsset = (
+  room: LiveRoomState,
+  participantId: string,
+  author: string,
+  fileUrl: string,
+  fileName: string,
+  mimeType: string,
+  fileSize: number,
+  durationMs: number | null
+): LiveRoomRecordingAsset => {
+  const recordingAsset: LiveRoomRecordingAsset = {
+    id: `rec-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    participantId,
+    author,
+    fileUrl,
+    fileName,
+    mimeType,
+    fileSize,
+    durationMs,
+    uploadedAt: new Date().toISOString(),
+  };
+
+  room.recordings.push(recordingAsset);
+  if (room.recordings.length > LIVE_ROOM_MAX_RECORDINGS) {
+    room.recordings.splice(0, room.recordings.length - LIVE_ROOM_MAX_RECORDINGS);
+  }
+
+  return recordingAsset;
+};
+
+app.post(
+  "/api/community/live-rooms/:roomId/recordings/chunk",
+  authMiddleware,
+  liveRecordingChunkUpload.single("chunk"),
+  async (req: AuthenticatedRequest, res) => {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    pruneLiveRoomRecordingUploads();
+
+    const roomId = normalizeRoomId(String(req.params.roomId || ""));
+    const room = ensureLiveRoom(roomId);
+    const file = req.file;
+
+    const participantId = String(req.body?.participantId || "").trim();
+    const uploadIdRaw = String(req.body?.uploadId || "").trim();
+    const chunkIndex = Number(req.body?.chunkIndex);
+    const totalChunks = Number(req.body?.totalChunks);
+    const fileName = String(req.body?.fileName || "recording.webm").trim() || "recording.webm";
+    const mimeType = String(req.body?.mimeType || file?.mimetype || "video/webm").trim() || "video/webm";
+    const durationMsRaw = Number(req.body?.durationMs || 0);
+    const durationMs = Number.isFinite(durationMsRaw) && durationMsRaw > 0 ? Math.round(durationMsRaw) : null;
+
+    if (!file || !participantId) {
+      return res.status(400).json({ error: "participantId and chunk file are required." });
+    }
+
+    if (!Number.isInteger(chunkIndex) || chunkIndex < 0 || !Number.isInteger(totalChunks) || totalChunks < 1 || chunkIndex >= totalChunks) {
+      return res.status(400).json({ error: "Invalid chunk metadata." });
+    }
+
+    const participant = room.participants.get(participantId);
+    if (!participant || participant.userId !== userId) {
+      return res.status(403).json({ error: "Participant not found for this room." });
+    }
+
+    let session: LiveRoomRecordingUploadSession | undefined;
+    if (uploadIdRaw) {
+      session = liveRoomRecordingUploads.get(uploadIdRaw);
+      if (!session) {
+        return res.status(404).json({ error: "Upload session not found." });
+      }
+
+      if (session.roomId !== roomId || session.participantId !== participantId || session.userId !== userId) {
+        return res.status(403).json({ error: "Upload session does not belong to this participant." });
+      }
+
+      if (session.totalChunks !== totalChunks) {
+        return res.status(400).json({ error: "totalChunks does not match existing upload session." });
+      }
+    } else {
+      const uploadId = `upl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      const tempPath = path.join(uploadsDir, `live-recording-upload-${uploadId}.part`);
+      session = {
+        uploadId,
+        roomId,
+        participantId,
+        userId,
+        author: participant.displayName,
+        fileName,
+        mimeType,
+        totalChunks,
+        durationMs,
+        tempPath,
+        receivedChunks: new Set<number>(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      liveRoomRecordingUploads.set(uploadId, session);
+    }
+
+    const expectedChunkIndex = session.receivedChunks.size;
+    if (session.receivedChunks.has(chunkIndex)) {
+      session.updatedAt = Date.now();
+      return res.status(200).json({
+        uploadId: session.uploadId,
+        receivedChunks: session.receivedChunks.size,
+        totalChunks: session.totalChunks,
+        complete: session.receivedChunks.size === session.totalChunks,
+      });
+    }
+
+    if (chunkIndex !== expectedChunkIndex) {
+      return res.status(409).json({
+        error: `Unexpected chunk index. Expected ${expectedChunkIndex}.`,
+        uploadId: session.uploadId,
+        expectedChunkIndex,
+      });
+    }
+
+    fs.appendFileSync(session.tempPath, file.buffer);
+    session.receivedChunks.add(chunkIndex);
+    session.updatedAt = Date.now();
+    if (durationMs && durationMs > 0) {
+      session.durationMs = durationMs;
+    }
+
+    return res.status(202).json({
+      uploadId: session.uploadId,
+      receivedChunks: session.receivedChunks.size,
+      totalChunks: session.totalChunks,
+      complete: session.receivedChunks.size === session.totalChunks,
+    });
+  }
+);
+
+app.get("/api/community/live-rooms/:roomId/recordings/upload/:uploadId", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  pruneLiveRoomRecordingUploads();
+
+  const roomId = normalizeRoomId(String(req.params.roomId || ""));
+  const participantId = String(req.query.participantId || "").trim();
+  const uploadId = String(req.params.uploadId || "").trim();
+  if (!participantId || !uploadId) {
+    return res.status(400).json({ error: "participantId and uploadId are required." });
+  }
+
+  const room = ensureLiveRoom(roomId);
+  const participant = room.participants.get(participantId);
+  if (!participant || participant.userId !== userId) {
+    return res.status(403).json({ error: "Participant not found for this room." });
+  }
+
+  const session = liveRoomRecordingUploads.get(uploadId);
+  if (!session) {
+    return res.status(404).json({ error: "Upload session not found." });
+  }
+
+  if (session.roomId !== roomId || session.participantId !== participantId || session.userId !== userId) {
+    return res.status(403).json({ error: "Upload session does not belong to this participant." });
+  }
+
+  session.updatedAt = Date.now();
+  return res.status(200).json({
+    uploadId: session.uploadId,
+    participantId: session.participantId,
+    receivedChunks: session.receivedChunks.size,
+    totalChunks: session.totalChunks,
+    expectedChunkIndex: session.receivedChunks.size,
+    complete: session.receivedChunks.size === session.totalChunks,
+  });
+});
+
+app.post("/api/community/live-rooms/:roomId/recordings/finalize", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  pruneLiveRoomRecordingUploads();
+
+  const roomId = normalizeRoomId(String(req.params.roomId || ""));
+  const room = ensureLiveRoom(roomId);
+
+  const participantId = String(req.body?.participantId || "").trim();
+  const uploadId = String(req.body?.uploadId || "").trim();
+  if (!participantId || !uploadId) {
+    return res.status(400).json({ error: "participantId and uploadId are required." });
+  }
+
+  const participant = room.participants.get(participantId);
+  if (!participant || participant.userId !== userId) {
+    return res.status(403).json({ error: "Participant not found for this room." });
+  }
+
+  const session = liveRoomRecordingUploads.get(uploadId);
+  if (!session) {
+    return res.status(404).json({ error: "Upload session not found." });
+  }
+
+  if (session.roomId !== roomId || session.participantId !== participantId || session.userId !== userId) {
+    return res.status(403).json({ error: "Upload session does not belong to this participant." });
+  }
+
+  if (session.receivedChunks.size !== session.totalChunks) {
+    return res.status(400).json({ error: "Upload is incomplete." });
+  }
+
+  if (!fs.existsSync(session.tempPath)) {
+    liveRoomRecordingUploads.delete(uploadId);
+    return res.status(404).json({ error: "Upload file not found. Please re-upload." });
+  }
+
+  const ext = resolveRecordingExtension(session.fileName, session.mimeType);
+  const finalFileName = `recording-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+  const finalPath = path.join(uploadsDir, finalFileName);
+
+  fs.renameSync(session.tempPath, finalPath);
+  const stats = fs.statSync(finalPath);
+
+  const recording = pushLiveRoomRecordingAsset(
+    room,
+    participantId,
+    session.author,
+    `/uploads/${finalFileName}`,
+    session.fileName,
+    session.mimeType,
+    stats.size,
+    session.durationMs
+  );
+
+  liveRoomRecordingUploads.delete(uploadId);
+  return res.status(201).json({ recording });
+});
+
+app.post(
+  "/api/community/live-rooms/:roomId/recordings",
+  authMiddleware,
+  liveRecordingUpload.single("recording"),
+  async (req: AuthenticatedRequest, res) => {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const roomId = normalizeRoomId(String(req.params.roomId || ""));
+    const room = ensureLiveRoom(roomId);
+    pruneLiveRoomRecordingUploads();
+
+    const participantId = String(req.body?.participantId || "").trim();
+    const durationMsRaw = Number(req.body?.durationMs || 0);
+    const durationMs = Number.isFinite(durationMsRaw) && durationMsRaw > 0 ? Math.round(durationMsRaw) : null;
+    const file = req.file;
+
+    if (!participantId || !file) {
+      return res.status(400).json({ error: "participantId and recording file are required." });
+    }
+
+    const participant = room.participants.get(participantId);
+    if (!participant || participant.userId !== userId) {
+      return res.status(403).json({ error: "Participant not found for this room." });
+    }
+
+    const recordingAsset = pushLiveRoomRecordingAsset(
+      room,
+      participantId,
+      participant.displayName,
+      `/uploads/${file.filename}`,
+      file.originalname,
+      file.mimetype,
+      file.size,
+      durationMs
+    );
+
+    return res.status(201).json({ recording: recordingAsset });
+  }
+);
+
+app.get("/api/community/live-rooms/:roomId/archive", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  const role = req.auth?.role;
+  if (!userId || !role) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const roomId = normalizeRoomId(String(req.params.roomId || ""));
+  const room = ensureLiveRoom(roomId);
+  const isParticipant = Array.from(room.participants.values()).some((participant) => participant.userId === userId);
+
+  if (!isParticipant && !isLiveRoomModerator(room, userId, role)) {
+    return res.status(403).json({ error: "Participant or moderator access required." });
+  }
+
+  return res.status(200).json({
+    roomId,
+    title: room.title,
+    hostUserId: room.hostUserId,
+    roomLocked: room.isLocked,
+    recording: room.recording,
+    transcript: room.transcript,
+    recordings: room.recordings,
+  });
+});
+
+app.post("/api/community/live-rooms/:roomId/signal", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  pruneLiveRooms();
+  const roomId = normalizeRoomId(String(req.params.roomId || ""));
+  const room = ensureLiveRoom(roomId);
+
+  const fromParticipantId = String(req.body?.fromParticipantId || "").trim();
+  const toParticipantIdRaw = req.body?.toParticipantId;
+  const toParticipantId = typeof toParticipantIdRaw === "string" && toParticipantIdRaw.trim().length > 0 ? toParticipantIdRaw.trim() : null;
+  const typeRaw = String(req.body?.type || "").trim();
+  const payload = req.body?.payload && typeof req.body.payload === "object" ? (req.body.payload as Record<string, unknown>) : {};
+
+  if (!fromParticipantId || !["offer", "answer", "ice-candidate", "participant-joined", "participant-left"].includes(typeRaw)) {
+    return res.status(400).json({ error: "Invalid signal payload." });
+  }
+
+  const sender = room.participants.get(fromParticipantId);
+  if (!sender || sender.userId !== userId) {
+    return res.status(403).json({ error: "Sender does not belong to this room." });
+  }
+
+  sender.lastSeenAt = new Date().toISOString();
+  room.participants.set(fromParticipantId, sender);
+
+  const signal = pushLiveRoomSignal(room, {
+    fromParticipantId,
+    toParticipantId,
+    type: typeRaw as LiveRoomSignal["type"],
+    payload,
+  });
+
+  return res.status(201).json({ signal });
+});
+
+app.get("/api/community/live-rooms/:roomId/signals", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  pruneLiveRooms();
+  const roomId = normalizeRoomId(String(req.params.roomId || ""));
+  const room = ensureLiveRoom(roomId);
+
+  const participantId = String(req.query.participantId || "").trim();
+  const since = Number(req.query.since || 0);
+  if (!participantId || Number.isNaN(since)) {
+    return res.status(400).json({ error: "participantId and valid since are required." });
+  }
+
+  const participant = room.participants.get(participantId);
+  if (!participant || participant.userId !== userId) {
+    return res.status(403).json({ error: "Participant not found for this room." });
+  }
+
+  participant.lastSeenAt = new Date().toISOString();
+  room.participants.set(participantId, participant);
+
+  const signals = room.signals.filter((signal) => {
+    if (signal.seq <= since) return false;
+    if (signal.fromParticipantId === participantId) return false;
+    return !signal.toParticipantId || signal.toParticipantId === participantId;
+  });
+
+  return res.status(200).json({
+    roomId,
+    signals,
+    latestSeq: room.signalSeq,
+  });
+});
+
+app.post("/api/community/posts/:id/report", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const reporterId = req.auth?.userId;
+  if (!reporterId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const reason = String(req.body?.reason || "").trim();
+  if (reason.length < 6) {
+    return res.status(400).json({ error: "Please provide a report reason with at least 6 characters." });
+  }
+
+  const postId = req.params.id;
+
+  try {
+    const existing = await prismaDynamic.communityPostReport.findFirst({
+      where: {
+        postId,
+        reporterId,
+      },
+    });
+
+    if (existing) {
+      return res.status(409).json({ error: "You have already reported this post." });
+    }
+
+    await prismaDynamic.communityPostReport.create({
+      data: {
+        postId,
+        reporterId,
+        reason,
+        status: "OPEN",
+      },
+    });
+
+    const context = await resolveCommunityInteractionContext(postId);
+    await recordCommunityInteraction(reporterId, {
+      action: "post_report",
+      itemId: postId,
+      field: context.field ?? undefined,
+      tokens: Array.from(new Set([...context.tokens, ...tokenizeInterestText(reason)])),
+    });
+
+    return res.status(201).json({ ok: true, message: "Report submitted for moderation review." });
+  } catch (error) {
+    console.error("Report community post error:", error);
+    return res.status(500).json({ error: "Unable to report this post right now." });
+  }
+});
+
+app.patch("/api/community/updates/:id/pin", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userRole = req.auth?.role;
+  if (!userRole) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (!isModeratorRole(userRole)) {
+    return res.status(403).json({ error: "Moderator access required" });
+  }
+
+  const isPinned = Boolean(req.body?.isPinned);
+
+  try {
+    const updated = await prismaDynamic.communityUpdate.update({
+      where: { id: req.params.id },
+      data: {
+        isPinned,
+        pinnedAt: isPinned ? new Date() : null,
+      },
+    });
+
+    return res.status(200).json({
+      id: updated.id,
+      isPinned: updated.isPinned,
+      pinnedAt: updated.pinnedAt,
+    });
+  } catch (error) {
+    console.error("Pin community update error:", error);
+    return res.status(500).json({ error: "Unable to pin this update right now." });
+  }
+});
+
+app.patch("/api/community/ads/:id/approve", authMiddleware, adminOnlyMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const isApproved = Boolean(req.body?.isApproved);
+
+  try {
+    const updated = await prismaDynamic.communityAd.update({
+      where: { id: req.params.id },
+      data: {
+        isApproved,
+        approvedAt: isApproved ? new Date() : null,
+        approvedById: isApproved ? userId : null,
+      },
+    });
+
+    return res.status(200).json({
+      id: updated.id,
+      isApproved: updated.isApproved,
+      approvedAt: updated.approvedAt,
+    });
+  } catch (error) {
+    console.error("Approve community ad error:", error);
+    return res.status(500).json({ error: "Unable to update ad approval right now." });
+  }
+});
+
 app.get("/api/team-members", authMiddleware, async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.auth?.userId;
@@ -2808,11 +5450,184 @@ app.put("/api/auth/profile", authMiddleware, async (req: AuthenticatedRequest, r
   }
 });
 
+// Project email reminder settings
+app.get("/api/notifications/project-reminders/settings", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const settings = await getProjectReminderSettings(userId);
+    return res.status(200).json(settings);
+  } catch (error) {
+    console.error("Project reminder settings fetch error:", error);
+    return res.status(500).json({ error: "Failed to load project reminder settings" });
+  }
+});
+
+app.put("/api/notifications/project-reminders/settings", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const { enabled, frequency, quietHoursStart, quietHoursEnd } = req.body as {
+    enabled?: unknown;
+    frequency?: unknown;
+    quietHoursStart?: unknown;
+    quietHoursEnd?: unknown;
+  };
+
+  const hasEnabled = typeof enabled === "boolean";
+  const hasFrequency = typeof frequency === "string";
+  const hasQuietHoursStart = typeof quietHoursStart === "number";
+  const hasQuietHoursEnd = typeof quietHoursEnd === "number";
+
+  if (!hasEnabled && !hasFrequency && !hasQuietHoursStart && !hasQuietHoursEnd) {
+    return res.status(400).json({
+      error: "Provide at least one setting: enabled, frequency, quietHoursStart, or quietHoursEnd",
+    });
+  }
+
+  if (hasFrequency && frequency !== "daily" && frequency !== "weekly") {
+    return res.status(400).json({ error: "frequency must be either daily or weekly" });
+  }
+
+  if (hasQuietHoursStart && (!Number.isInteger(quietHoursStart) || quietHoursStart < 0 || quietHoursStart > 23)) {
+    return res.status(400).json({ error: "quietHoursStart must be an integer from 0 to 23" });
+  }
+
+  if (hasQuietHoursEnd && (!Number.isInteger(quietHoursEnd) || quietHoursEnd < 0 || quietHoursEnd > 23)) {
+    return res.status(400).json({ error: "quietHoursEnd must be an integer from 0 to 23" });
+  }
+
+  try {
+    if (hasEnabled) {
+      await setProjectReminderEnabled(userId, enabled as boolean);
+    }
+
+    if (hasFrequency) {
+      await setProjectReminderFrequency(userId, frequency as ProjectReminderFrequency);
+    }
+
+    if (hasQuietHoursStart || hasQuietHoursEnd) {
+      const current = await getProjectReminderSettings(userId);
+      await setProjectReminderQuietHours(
+        userId,
+        hasQuietHoursStart ? (quietHoursStart as number) : current.quietHoursStart,
+        hasQuietHoursEnd ? (quietHoursEnd as number) : current.quietHoursEnd,
+      );
+    }
+
+    const settings = await getProjectReminderSettings(userId);
+    return res.status(200).json(settings);
+  } catch (error) {
+    console.error("Project reminder settings update error:", error);
+    return res.status(500).json({ error: "Failed to update project reminder settings" });
+  }
+});
+
+app.post("/api/notifications/project-reminders/dispatch", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  const auth = req.auth;
+
+  if (!userId || !auth) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const { projects, clientLocalHour } = req.body as {
+    projects?: ProjectReminderCandidate[];
+    clientLocalHour?: unknown;
+  };
+  if (!Array.isArray(projects)) {
+    return res.status(400).json({ error: "projects must be an array" });
+  }
+
+  let parsedClientLocalHour: number | undefined;
+  if (clientLocalHour != null) {
+    const candidateHour = Number(clientLocalHour);
+    if (!Number.isInteger(candidateHour) || candidateHour < 0 || candidateHour > 23) {
+      return res.status(400).json({ error: "clientLocalHour must be an integer from 0 to 23" });
+    }
+    parsedClientLocalHour = candidateHour;
+  }
+
+  try {
+    const settings = await getProjectReminderSettings(userId);
+    if (!settings.enabled) {
+      return res.status(200).json({ sent: false, reason: "disabled", attentionCount: 0 });
+    }
+
+    const hourToEvaluate = parsedClientLocalHour ?? new Date().getHours();
+    if (isWithinQuietHours(hourToEvaluate, settings.quietHoursStart, settings.quietHoursEnd)) {
+      return res.status(200).json({
+        sent: false,
+        reason: "quiet_hours",
+        attentionCount: 0,
+        quietHoursStart: settings.quietHoursStart,
+        quietHoursEnd: settings.quietHoursEnd,
+      });
+    }
+
+    if (settings.lastSentAt) {
+      const previousSentAtMs = Date.parse(settings.lastSentAt);
+      if (!Number.isNaN(previousSentAtMs)) {
+        const minIntervalMs = getProjectReminderMinIntervalMs(settings.frequency);
+        if (Date.now() - previousSentAtMs < minIntervalMs) {
+          return res.status(200).json({
+            sent: false,
+            reason: "throttled",
+            attentionCount: 0,
+            frequency: settings.frequency,
+            lastSentAt: settings.lastSentAt,
+          });
+        }
+      }
+    }
+
+    const attentionProjects = projects.filter(projectNeedsAttention);
+    if (attentionProjects.length === 0) {
+      return res.status(200).json({ sent: false, reason: "no_attention_projects", attentionCount: 0 });
+    }
+
+    const recipient = await resolveReminderRecipient(userId, auth);
+    const message = formatProjectReminderMessage(attentionProjects);
+    const dashboardUrl = process.env.FRONTEND_URL || process.env.APP_URL || "http://localhost:5173";
+
+    const sent = await sendReminderEmail(
+      recipient.email,
+      "Project Attention Reminder",
+      recipient.name,
+      message,
+      `${dashboardUrl.replace(/\/$/, "")}/dashboard/projects`
+    );
+
+    if (!sent) {
+      return res.status(502).json({ sent: false, reason: "email_failed", attentionCount: attentionProjects.length });
+    }
+
+    const nowIso = new Date().toISOString();
+    await setProjectReminderLastSent(userId, nowIso);
+
+    return res.status(200).json({
+      sent: true,
+      attentionCount: attentionProjects.length,
+      lastSentAt: nowIso,
+      frequency: settings.frequency,
+      projects: attentionProjects.map((project) => ({ name: project.name || "Unnamed project", progress: project.progress ?? null })),
+    });
+  } catch (error) {
+    console.error("Project reminder dispatch error:", error);
+    return res.status(500).json({ error: "Failed to dispatch project reminder email" });
+  }
+});
+
 // Upload profile picture endpoint
 app.post(
   "/api/auth/profile/picture",
   authMiddleware,
-  upload.single("profilePicture"),
+  profileUpload.single("profilePicture"),
   async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.auth?.userId;
@@ -4640,6 +7455,7 @@ const start = async () => {
     dbConnected = true;
     dbAvailable = true;
     await seedDefaultProfiles();
+    await seedCommunityContent();
   } catch (error) {
     console.warn("⚠ Database connection failed. Starting API in degraded mode:", error);
     console.warn("⚠ Endpoints that require database access may fail until DB is reachable.");

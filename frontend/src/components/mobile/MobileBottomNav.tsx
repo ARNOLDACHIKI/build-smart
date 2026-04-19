@@ -121,7 +121,10 @@ const MobileBottomNav = ({
         </div>
       )}
 
-      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75 md:hidden">
+      <nav
+        data-mobile-bottom-nav="true"
+        className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75 md:hidden"
+      >
       <div className="mx-auto grid h-16 max-w-xl grid-cols-5 px-1.5">
         {tabs.map((tab) => (
           tab.label === 'Explore' ? (

@@ -16,6 +16,30 @@ import { getRoleLabel, resolveHomeRoute } from '@/lib/roles';
 import { toast } from 'sonner';
 import { Loader2, Save } from 'lucide-react';
 
+type ProjectReminderFrequency = 'daily' | 'weekly';
+
+type ProjectReminderSettings = {
+  enabled: boolean;
+  frequency: ProjectReminderFrequency;
+  quietHoursStart: number;
+  quietHoursEnd: number;
+};
+
+const DEFAULT_PROJECT_REMINDER_SETTINGS: ProjectReminderSettings = {
+  enabled: true,
+  frequency: 'daily',
+  quietHoursStart: 22,
+  quietHoursEnd: 7,
+};
+
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => hour);
+
+const formatHourLabel = (hour: number): string => {
+  const suffix = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${hour12}:00 ${suffix}`;
+};
+
 const SettingsPage = () => {
   const { t, language, setLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
@@ -24,6 +48,9 @@ const SettingsPage = () => {
   const baseRoute = resolveHomeRoute(user?.role);
   const [isUpdatingTwoFactor, setIsUpdatingTwoFactor] = useState(false);
   const [isSavingCompany, setIsSavingCompany] = useState(false);
+  const [projectReminderSettings, setProjectReminderSettings] = useState<ProjectReminderSettings>(DEFAULT_PROJECT_REMINDER_SETTINGS);
+  const [isLoadingProjectReminderSetting, setIsLoadingProjectReminderSetting] = useState(false);
+  const [isUpdatingProjectReminderSetting, setIsUpdatingProjectReminderSetting] = useState(false);
 
   const [companyFormData, setCompanyFormData] = useState({
     companyName: user?.company || '',
@@ -42,6 +69,45 @@ const SettingsPage = () => {
       industry: user?.industry || 'Construction & Engineering',
     });
   }, [user?.company, user?.registrationNo, user?.location, user?.industry]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const loadProjectReminderSettings = async () => {
+      setIsLoadingProjectReminderSetting(true);
+      try {
+        const response = await fetch(apiUrl('/api/notifications/project-reminders/settings'), {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load project reminder settings');
+        }
+
+        const data = await response.json();
+        setProjectReminderSettings({
+          enabled: Boolean(data?.enabled),
+          frequency: data?.frequency === 'weekly' ? 'weekly' : 'daily',
+          quietHoursStart:
+            Number.isInteger(data?.quietHoursStart) && data.quietHoursStart >= 0 && data.quietHoursStart <= 23
+              ? data.quietHoursStart
+              : DEFAULT_PROJECT_REMINDER_SETTINGS.quietHoursStart,
+          quietHoursEnd:
+            Number.isInteger(data?.quietHoursEnd) && data.quietHoursEnd >= 0 && data.quietHoursEnd <= 23
+              ? data.quietHoursEnd
+              : DEFAULT_PROJECT_REMINDER_SETTINGS.quietHoursEnd,
+        });
+      } catch (error) {
+        console.error('Failed to load project reminder settings', error);
+      } finally {
+        setIsLoadingProjectReminderSetting(false);
+      }
+    };
+
+    void loadProjectReminderSettings();
+  }, [token]);
 
   const handleCompanyFieldChange = (field: keyof typeof companyFormData, value: string) => {
     setCompanyFormData((prev) => ({ ...prev, [field]: value }));
@@ -140,6 +206,78 @@ const SettingsPage = () => {
     } finally {
       setIsUpdatingTwoFactor(false);
     }
+  };
+
+  const updateProjectReminderSettings = async (patch: Partial<ProjectReminderSettings>) => {
+    if (!token) {
+      toast.error('You need to be signed in to update reminder settings');
+      return;
+    }
+
+    const previousSettings = projectReminderSettings;
+    const nextSettings = { ...projectReminderSettings, ...patch };
+
+    setProjectReminderSettings(nextSettings);
+    setIsUpdatingProjectReminderSetting(true);
+
+    try {
+      const response = await fetch(apiUrl('/api/notifications/project-reminders/settings'), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(patch),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update project reminder setting');
+      }
+
+      const data = await response.json();
+      setProjectReminderSettings({
+        enabled: Boolean(data?.enabled),
+        frequency: data?.frequency === 'weekly' ? 'weekly' : 'daily',
+        quietHoursStart:
+          Number.isInteger(data?.quietHoursStart) && data.quietHoursStart >= 0 && data.quietHoursStart <= 23
+            ? data.quietHoursStart
+            : nextSettings.quietHoursStart,
+        quietHoursEnd:
+          Number.isInteger(data?.quietHoursEnd) && data.quietHoursEnd >= 0 && data.quietHoursEnd <= 23
+            ? data.quietHoursEnd
+            : nextSettings.quietHoursEnd,
+      });
+
+      if (typeof patch.enabled === 'boolean') {
+        toast.success(patch.enabled ? 'Project reminder emails enabled' : 'Project reminder emails disabled');
+      }
+    } catch (error) {
+      console.error('Project reminder update error:', error);
+      setProjectReminderSettings(previousSettings);
+      toast.error('Failed to update project reminder setting');
+    } finally {
+      setIsUpdatingProjectReminderSetting(false);
+    }
+  };
+
+  const handleProjectReminderToggle = async (enabled: boolean) => {
+    await updateProjectReminderSettings({ enabled });
+  };
+
+  const handleProjectReminderFrequencyChange = async (frequency: ProjectReminderFrequency) => {
+    await updateProjectReminderSettings({ frequency });
+  };
+
+  const handleProjectReminderQuietStartChange = async (value: string) => {
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 0 || parsed > 23) return;
+    await updateProjectReminderSettings({ quietHoursStart: parsed });
+  };
+
+  const handleProjectReminderQuietEndChange = async (value: string) => {
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 0 || parsed > 23) return;
+    await updateProjectReminderSettings({ quietHoursEnd: parsed });
   };
 
   const getInitials = (name: string | undefined, email: string | undefined) => {
@@ -309,6 +447,70 @@ const SettingsPage = () => {
                     <SelectItem value="usd">USD (Dollar)</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">Project Attention Email Reminders</h3>
+                  <p className="text-sm text-muted-foreground">Get email alerts when your projects fall into attention-needed status.</p>
+                </div>
+                <Switch
+                  checked={projectReminderSettings.enabled}
+                  onCheckedChange={(checked) => void handleProjectReminderToggle(checked)}
+                  disabled={isLoadingProjectReminderSetting || isUpdatingProjectReminderSetting}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">Reminder Frequency</h3>
+                  <p className="text-sm text-muted-foreground">Choose how often reminder emails can be sent.</p>
+                </div>
+                <Select
+                  value={projectReminderSettings.frequency}
+                  onValueChange={(value) => void handleProjectReminderFrequencyChange(value as ProjectReminderFrequency)}
+                  disabled={isLoadingProjectReminderSetting || isUpdatingProjectReminderSetting || !projectReminderSettings.enabled}
+                >
+                  <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Quiet Hours Start</Label>
+                  <Select
+                    value={String(projectReminderSettings.quietHoursStart)}
+                    onValueChange={(value) => void handleProjectReminderQuietStartChange(value)}
+                    disabled={isLoadingProjectReminderSetting || isUpdatingProjectReminderSetting || !projectReminderSettings.enabled}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {HOUR_OPTIONS.map((hour) => (
+                        <SelectItem key={`quiet-start-${hour}`} value={String(hour)}>
+                          {formatHourLabel(hour)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Quiet Hours End</Label>
+                  <Select
+                    value={String(projectReminderSettings.quietHoursEnd)}
+                    onValueChange={(value) => void handleProjectReminderQuietEndChange(value)}
+                    disabled={isLoadingProjectReminderSetting || isUpdatingProjectReminderSetting || !projectReminderSettings.enabled}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {HOUR_OPTIONS.map((hour) => (
+                        <SelectItem key={`quiet-end-${hour}`} value={String(hour)}>
+                          {formatHourLabel(hour)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>

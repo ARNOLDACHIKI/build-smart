@@ -1,31 +1,52 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Download, FileText, Calendar, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { useSearchParams } from 'react-router-dom';
+
+const projectNames = [
+  'Nairobi Logistics Hub',
+  'Mombasa Waterfront Residences',
+  'Kisumu Innovation Campus',
+] as const;
+
+type ProjectName = (typeof projectNames)[number];
 
 const initialReports = [
-  { name: 'Q1 Financial Report', type: 'Financial', date: '2026-03-01', status: 'ready' },
-  { name: 'February Timeline Report', type: 'Timeline', date: '2026-02-28', status: 'ready' },
-  { name: 'Risk Assessment - All Projects', type: 'Risk', date: '2026-02-25', status: 'ready' },
-  { name: 'Compliance Report - Nairobi Tower', type: 'Compliance', date: '2026-02-20', status: 'ready' },
-  { name: 'March Forecast Report', type: 'Financial', date: '2026-03-15', status: 'scheduled' },
+  { name: 'Q1 Financial Snapshot', type: 'Financial', date: '2026-03-01', status: 'ready', project: 'Nairobi Logistics Hub' },
+  { name: 'Concrete Procurement Variance', type: 'Financial', date: '2026-03-08', status: 'ready', project: 'Nairobi Logistics Hub' },
+  { name: 'Structural Package Risk Memo', type: 'Risk', date: '2026-03-15', status: 'ready', project: 'Mombasa Waterfront Residences' },
+  { name: 'Block B Delay Recovery Plan', type: 'Timeline', date: '2026-03-20', status: 'ready', project: 'Mombasa Waterfront Residences' },
+  { name: 'QA Certification Sprint Report', type: 'Compliance', date: '2026-03-22', status: 'ready', project: 'Kisumu Innovation Campus' },
+  { name: 'Labor Optimization Forecast', type: 'Timeline', date: '2026-03-25', status: 'scheduled', project: 'Kisumu Innovation Campus' },
 ];
 
 const Reports = () => {
   const { t } = useLanguage();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedProject = searchParams.get('project');
+
+  const activeProject: ProjectName = useMemo(() => {
+    const matched = projectNames.find((project) => project === selectedProject);
+    return matched ?? projectNames[0];
+  }, [selectedProject]);
+
   const [reports, setReports] = useState(initialReports);
   const [selectedType, setSelectedType] = useState('Risk');
+
+  const scopedReports = useMemo(() => reports.filter((report) => report.project === activeProject), [reports, activeProject]);
 
   const generateReport = (type: string) => {
     const today = new Date().toISOString().slice(0, 10);
     const entry = {
-      name: `${today.replace(/-/g, '/')} ${type} Report`,
+      name: `${today.replace(/-/g, '/')} ${type} Report - ${activeProject}`,
       type,
       date: today,
       status: 'ready' as const,
+      project: activeProject,
     };
     setReports((prev) => [entry, ...prev]);
     setSelectedType(type);
@@ -50,8 +71,25 @@ const Reports = () => {
         <h1 className="text-2xl font-bold font-['Space_Grotesk']">{t('sidebar.reports')}</h1>
         <div className="flex gap-2">
           <Button size="sm" className="gradient-primary text-primary-foreground" onClick={() => generateReport(selectedType)}>{t('dashboard.generateReport')}</Button>
-          <Button size="sm" variant="outline" onClick={() => toast.success(`Scheduled ${selectedType} report for tomorrow`)}><Clock className="w-4 h-4 mr-1" /> Schedule</Button>
+          <Button size="sm" variant="outline" onClick={() => toast.success(`Scheduled ${selectedType} report for ${activeProject}`)}><Clock className="w-4 h-4 mr-1" /> Schedule</Button>
         </div>
+      </div>
+
+      <div className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-sm">
+        Showing report context for: <span className="font-semibold">{activeProject}</span>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {projectNames.map((project) => (
+          <Button
+            key={project}
+            size="sm"
+            variant={project === activeProject ? 'default' : 'outline'}
+            onClick={() => setSearchParams({ project })}
+          >
+            {project}
+          </Button>
+        ))}
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -70,7 +108,7 @@ const Reports = () => {
         <CardContent className="p-4">
           <h3 className="font-semibold mb-4">Report History</h3>
           <div className="space-y-3">
-            {reports.map((r, i) => (
+            {scopedReports.map((r, i) => (
               <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
                 <FileText className="w-4 h-4 text-primary" />
                 <div className="flex-1">

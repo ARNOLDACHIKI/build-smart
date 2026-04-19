@@ -1,13 +1,11 @@
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, FolderKanban, BarChart3, FileText, CheckSquare,
-  FileArchive, Users, Bell, Settings, HelpCircle, Sun, Moon, Globe,
-  LogOut, Award, Map, Search, User, MessageSquare
+  LayoutDashboard, Users, Settings, Sun, Moon, Globe,
+  LogOut, User
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -31,26 +29,10 @@ import { assetUrl } from '@/lib/api';
 
 const menuItems = [
   { key: 'sidebar.dashboard', icon: LayoutDashboard, url: '/dashboard' },
-  { key: 'sidebar.projects', icon: FolderKanban, url: '/dashboard/projects' },
-  { key: 'sidebar.analytics', icon: BarChart3, url: '/dashboard/analytics' },
-  { key: 'sidebar.reports', icon: FileText, url: '/dashboard/reports' },
-  { key: 'sidebar.tasks', icon: CheckSquare, url: '/dashboard/tasks' },
-  { key: 'sidebar.documents', icon: FileArchive, url: '/dashboard/documents' },
-  { key: 'sidebar.team', icon: Users, url: '/dashboard/team' },
-  { key: 'sidebar.search', icon: Search, url: '/dashboard/search' },
-  { key: 'sidebar.messages', icon: MessageSquare, url: '/dashboard/messages' },
-  { key: 'sidebar.credits', icon: Award, url: '/dashboard/credits' },
-  { key: 'sidebar.journey', icon: Map, url: '/dashboard/journey' },
-  { key: 'sidebar.notifications', icon: Bell, url: '/dashboard/notifications' },
-  { key: 'sidebar.settings', icon: Settings, url: '/dashboard/settings' },
-  { key: 'sidebar.support', icon: HelpCircle, url: '/dashboard/support' },
+  { key: 'sidebar.community', icon: Users, url: '/community' },
 ];
 
-type AppSidebarProps = {
-  unreadRepliesCount?: number;
-};
-
-const AppSidebar = ({ unreadRepliesCount = 0 }: AppSidebarProps) => {
+const AppSidebar = () => {
   const { t, language, setLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const { logout, user } = useAuth();
@@ -143,22 +125,8 @@ const AppSidebar = ({ unreadRepliesCount = 0 }: AppSidebarProps) => {
                 <SidebarMenuItem key={item.key}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end={item.url === '/dashboard'} className="hover:bg-muted/50" activeClassName="bg-primary/10 text-primary font-medium">
-                      <div className="relative mr-2">
-                        <item.icon className="h-4 w-4" />
-                        {collapsed && item.url === '/dashboard/messages' && unreadRepliesCount > 0 && (
-                          <span className="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 rounded-full bg-primary" />
-                        )}
-                      </div>
-                      {!collapsed && (
-                        <div className="flex w-full items-center justify-between gap-2">
-                          <span>{t(item.key)}</span>
-                          {item.url === '/dashboard/messages' && unreadRepliesCount > 0 && (
-                            <Badge variant="default" className="h-5 min-w-5 px-1.5 text-[10px]">
-                              {unreadRepliesCount}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
+                      <item.icon className="mr-2 h-4 w-4" />
+                      {!collapsed && <span>{t(item.key)}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

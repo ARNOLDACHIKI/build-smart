@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Build Buddy AI - Full Stack Application",
   "private": true,
+  "packageManager": "pnpm@10.15.1",
   "scripts": {
     "dev": "concurrently \"npm run dev -w frontend\" \"npm run dev -w backend\"",
     "build": "npm run build -w frontend && npm run build -w backend",

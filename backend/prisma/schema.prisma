@@ -144,6 +144,68 @@ model AssistantMeeting {
   @@map("assistant_meetings")
 }
 
+model CommunityPost {
+  id         String   @id @default(cuid())
+  title      String
+  summary    String
+  content    String
+  postType   String
+  authorName String
+  field      String
+  interests  String[]
+  isPublished Boolean @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([isPublished, createdAt])
+  @@map("community_posts")
+}
+
+model CommunityUpdate {
+  id          String   @id @default(cuid())
+  title       String
+  body        String
+  isPinned    Boolean  @default(false)
+  isPublished Boolean  @default(true)
+  pinnedAt    DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isPublished, isPinned, createdAt])
+  @@map("community_updates")
+}
+
+model CommunityAd {
+  id           String     @id @default(cuid())
+  title        String
+  copy         String
+  ctaUrl       String
+  targetFields String[]
+  targetRoles  UserRole[]
+  isApproved   Boolean    @default(false)
+  approvedAt   DateTime?
+  approvedById String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([isApproved, createdAt])
+  @@map("community_ads")
+}
+
+model CommunityPostReport {
+  id         String   @id @default(cuid())
+  postId     String
+  reporterId String
+  reason     String
+  status     String   @default("OPEN")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([postId, status])
+  @@index([reporterId, createdAt])
+  @@map("community_post_reports")
+}
+
 enum UserRole {
   USER
   ADMIN

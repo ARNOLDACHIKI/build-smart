@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Copy, Archive } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,14 +33,32 @@ type Project = {
   progress: number;
 };
 
+const DASHBOARD_PROJECTS_STORAGE_KEY = 'dashboardProjects';
+
 const initialProjects: Project[] = [
-  { id: 1, name: 'Nairobi Tower Complex', status: 'active', budget: 'KES 120M', spent: 'KES 87M', deadline: '2026-08-15', progress: 72 },
-  { id: 2, name: 'Mombasa Road Expansion', status: 'at-risk', budget: 'KES 85M', spent: 'KES 78M', deadline: '2026-06-30', progress: 88 },
-  { id: 3, name: 'Kisumu Lakefront Bridge', status: 'active', budget: 'KES 200M', spent: 'KES 95M', deadline: '2027-01-20', progress: 45 },
+  { id: 1, name: 'Nairobi Logistics Hub', status: 'active', budget: 'KES 120M', spent: 'KES 87M', deadline: '2026-08-15', progress: 72 },
+  { id: 2, name: 'Mombasa Waterfront Residences', status: 'at-risk', budget: 'KES 85M', spent: 'KES 41M', deadline: '2026-11-30', progress: 48 },
+  { id: 3, name: 'Kisumu Innovation Campus', status: 'active', budget: 'KES 200M', spent: 'KES 173M', deadline: '2026-07-20', progress: 87 },
   { id: 4, name: 'Thika Highway Overpass', status: 'completed', budget: 'KES 65M', spent: 'KES 62M', deadline: '2026-02-01', progress: 100 },
   { id: 5, name: 'Nakuru Residential Complex', status: 'planning', budget: 'KES 150M', spent: 'KES 5M', deadline: '2027-06-30', progress: 8 },
   { id: 6, name: 'Eldoret Industrial Park', status: 'active', budget: 'KES 300M', spent: 'KES 120M', deadline: '2027-12-15', progress: 35 },
 ];
+
+const getStoredProjects = (): Project[] => {
+  if (typeof window === 'undefined') return initialProjects;
+
+  try {
+    const raw = window.localStorage.getItem(DASHBOARD_PROJECTS_STORAGE_KEY);
+    if (!raw) return initialProjects;
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return initialProjects;
+
+    return parsed as Project[];
+  } catch {
+    return initialProjects;
+  }
+};
 
 const statusColors: Record<string, string> = {
   active: 'bg-primary/10 text-primary',
@@ -52,7 +70,7 @@ const statusColors: Record<string, string> = {
 
 const Projects = () => {
   const { t } = useLanguage();
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
+  const [projects, setProjects] = useState<Project[]>(getStoredProjects);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | Project['status']>('all');
   const [editorOpen, setEditorOpen] = useState(false);
@@ -62,6 +80,11 @@ const Projects = () => {
     | { kind: 'archive' | 'delete'; project: Project }
     | null
   >(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(DASHBOARD_PROJECTS_STORAGE_KEY, JSON.stringify(projects));
+  }, [projects]);
 
   const filteredProjects = useMemo(() => {
     return projects.filter((project) => {
@@ -85,7 +108,7 @@ const Projects = () => {
       spent: project.spent,
       deadline: project.deadline,
       progress: project.progress,
-      status: project.status,
+      status: project.status === 'archived' ? 'planning' : project.status,
     });
     setEditorOpen(true);
   };

@@ -200,7 +200,7 @@ const ICDBOAssistantWidget = () => {
 
   if (!isOpen) {
     return createPortal(
-      <div className="fixed bottom-4 right-4 z-[1000]">
+      <div className="fixed bottom-24 right-3 z-[1000] sm:right-4 md:bottom-4 md:right-4">
         <Button onClick={() => setIsOpen(true)} className="rounded-full h-12 px-4 gradient-primary text-primary-foreground">
           <MessageCircle className="h-4 w-4 mr-2" />
           Open AI Assistant
@@ -211,7 +211,7 @@ const ICDBOAssistantWidget = () => {
   }
 
   return createPortal(
-    <div className="fixed bottom-4 right-4 z-[1000] w-[860px] max-w-[calc(100vw-2rem)]">
+    <div className="fixed bottom-24 right-3 z-[1000] w-[860px] max-w-[calc(100vw-1.5rem)] sm:right-4 sm:max-w-[calc(100vw-2rem)] md:bottom-4 md:right-4">
       <Card className="shadow-xl border-border/60 bg-background/95 backdrop-blur overflow-hidden">
         <CardHeader className="py-3 px-4 border-b flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">

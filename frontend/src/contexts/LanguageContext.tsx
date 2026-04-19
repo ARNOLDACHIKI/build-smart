@@ -119,6 +119,7 @@ const translations: Translations = {
 
   // Dashboard sidebar
   'sidebar.dashboard': { en: 'Dashboard', sw: 'Dashibodi' },
+  'sidebar.community': { en: 'Community', sw: 'Jamii' },
   'sidebar.projects': { en: 'Projects', sw: 'Miradi' },
   'sidebar.analytics': { en: 'Analytics', sw: 'Uchambuzi' },
   'sidebar.reports': { en: 'Reports', sw: 'Ripoti' },

@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -37,6 +38,7 @@ import CustomerJourney from "./pages/dashboard/CustomerJourney";
 import ProfessionalSearch from "./pages/dashboard/ProfessionalSearch";
 import Profile from "./pages/dashboard/Profile";
 import MyMessages from "./pages/dashboard/MyMessages";
+const CommunityHub = lazy(() => import("./pages/dashboard/CommunityHubV3"));
 
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminOverview from "./pages/admin/AdminOverview";
@@ -111,6 +113,32 @@ const App = () => (
                   <Route path="search" element={<ProfessionalSearch />} />
                   <Route path="messages" element={<MyMessages />} />
                   <Route path="profile" element={<Profile />} />
+                  <Route
+                    path="community"
+                    element={
+                      <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading community...</div>}>
+                        <CommunityHub />
+                      </Suspense>
+                    }
+                  />
+                </Route>
+
+                <Route
+                  path="/community"
+                  element={
+                    <ProtectedRoute allowedRoles={["USER"]}>
+                      <DashboardLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route
+                    index
+                    element={
+                      <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading community...</div>}>
+                        <CommunityHub />
+                      </Suspense>
+                    }
+                  />
                 </Route>
 
                 {/* Admin Panel */}
