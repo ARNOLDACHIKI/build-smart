@@ -246,6 +246,7 @@ const CommunityHubV2 = () => {
       setIsMutating(true);
       const result = await createCommunityPost(payload);
       setFeed((current) => ({ ...current, posts: [result.post, ...current.posts] }));
+      setSearch('');
       toast({ title: 'Post published' });
     } catch (error) {
       toast({

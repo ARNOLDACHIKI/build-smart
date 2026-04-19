@@ -275,7 +275,7 @@ type CommunityPostRecord = {
 
 type CommunityMediaAsset = {
   url: string;
-  mediaType: "image" | "video";
+  mediaType: "image" | "video" | "audio" | "document";
   fileName: string;
 };
 
@@ -508,7 +508,14 @@ const normalizeMediaAssets = (value: unknown): CommunityMediaAsset[] => {
       if (!item || typeof item !== "object") return null;
       const candidate = item as Partial<CommunityMediaAsset>;
       if (!candidate.url || !candidate.fileName) return null;
-      if (candidate.mediaType !== "image" && candidate.mediaType !== "video") return null;
+      if (
+        candidate.mediaType !== "image" &&
+        candidate.mediaType !== "video" &&
+        candidate.mediaType !== "audio" &&
+        candidate.mediaType !== "document"
+      ) {
+        return null;
+      }
       return {
         url: String(candidate.url),
         mediaType: candidate.mediaType,
@@ -2536,16 +2543,22 @@ const communityUpload = multer({
   limits: { fileSize: 25 * 1024 * 1024, files: 6 },
   fileFilter: (_req, file, cb) => {
     const imageTypes = /jpeg|jpg|png|gif|webp/;
-    const videoTypes = /mp4|webm|quicktime|x-matroska/;
+    const videoTypes = /mp4|webm|quicktime|x-matroska|mpeg/;
+    const audioTypes = /mpeg|mp3|wav|ogg|x-m4a|aac|webm/;
+    const documentTypes = /pdf|msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document|vnd\.ms-powerpoint|vnd\.openxmlformats-officedocument\.presentationml\.presentation|plain/;
+    const documentExtTypes = /pdf|doc|docx|ppt|pptx|txt/;
     const ext = path.extname(file.originalname).toLowerCase();
-    const isImage = imageTypes.test(ext) && imageTypes.test(file.mimetype);
-    const isVideo = videoTypes.test(ext) && videoTypes.test(file.mimetype);
+    const normalizedMime = file.mimetype.toLowerCase();
+    const isImage = imageTypes.test(ext) || imageTypes.test(normalizedMime);
+    const isVideo = videoTypes.test(ext) || videoTypes.test(normalizedMime);
+    const isAudio = audioTypes.test(ext) || audioTypes.test(normalizedMime);
+    const isDocument = documentExtTypes.test(ext) || documentTypes.test(normalizedMime);
 
-    if (isImage || isVideo) {
+    if (isImage || isVideo || isAudio || isDocument) {
       return cb(null, true);
     }
 
-    cb(new Error("Only image and video files are allowed for community posts."));
+    cb(new Error("Only image, video, audio, and document files are allowed for community posts."));
   },
 });
 
@@ -4294,11 +4307,28 @@ app.post(
       }
     }
 
-    const mediaAssets: CommunityMediaAsset[] = files.map((file) => ({
-      url: `/uploads/${file.filename}`,
-      mediaType: file.mimetype.startsWith("video/") ? "video" : "image",
-      fileName: file.originalname,
-    }));
+    const mediaAssets: CommunityMediaAsset[] = files.map((file) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      const mime = file.mimetype.toLowerCase();
+      const isVideo = mime.startsWith("video/") || /mp4|webm|mov|mkv/.test(ext);
+      const isAudio = mime.startsWith("audio/") || /mp3|wav|ogg|m4a|aac/.test(ext);
+      const isDocument = /pdf|doc|docx|ppt|pptx|txt/.test(ext) || /application\//.test(mime) || mime === "text/plain";
+
+      let mediaType: CommunityMediaAsset["mediaType"] = "image";
+      if (isVideo) {
+        mediaType = "video";
+      } else if (isAudio) {
+        mediaType = "audio";
+      } else if (isDocument) {
+        mediaType = "document";
+      }
+
+      return {
+        url: `/uploads/${file.filename}`,
+        mediaType,
+        fileName: file.originalname,
+      };
+    });
 
     const hasLiveSessionInput = req.body?.isLiveSession === "true" || req.body?.isLiveSession === true;
     const inferredRoomId = liveRoomUrlRaw ? extractRoomIdFromUrl(liveRoomUrlRaw) : null;
