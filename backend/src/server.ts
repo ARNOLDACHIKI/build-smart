@@ -418,6 +418,8 @@ type CommunityInteractionState = {
 };
 
 type CommunityInteractionAction =
+  | "post_create"
+  | "post_delete"
   | "bookmark_add"
   | "bookmark_remove"
   | "follow_add"
@@ -3911,6 +3913,7 @@ app.get("/api/community/feed", authMiddleware, async (req: AuthenticatedRequest,
       })
       .map((post) => {
         const decoded = decodePostContent(post.content);
+        const canDelete = post.authorName === authUserDisplayName(req.auth) || authRole === "ADMIN" || isModeratorRole(authRole);
         return {
           id: post.id,
           type: post.postType,
@@ -3922,6 +3925,7 @@ app.get("/api/community/feed", authMiddleware, async (req: AuthenticatedRequest,
           stats: decoded.liveSession ? "Live session" : "Live discussion",
           media: decoded.media,
           liveSession: decoded.liveSession,
+          canDelete,
           createdAt: post.createdAt,
         };
       });
@@ -4003,6 +4007,7 @@ app.get("/api/community/feed", authMiddleware, async (req: AuthenticatedRequest,
       })
       .map((post) => {
         const decoded = decodePostContent(post.content);
+        const canDelete = post.authorName === authUserDisplayName(req.auth) || authRole === "ADMIN" || isModeratorRole(authRole);
         return {
           id: post.id,
           type: post.postType,
@@ -4014,6 +4019,7 @@ app.get("/api/community/feed", authMiddleware, async (req: AuthenticatedRequest,
           stats: decoded.liveSession ? "Live session" : "Live discussion",
           media: decoded.media,
           liveSession: decoded.liveSession,
+          canDelete,
           createdAt: post.createdAt,
         };
       });
@@ -4382,6 +4388,13 @@ app.post(
         },
       })) as CommunityPostRecord;
 
+      await recordCommunityInteraction(userId, {
+        action: "post_create",
+        itemId: created.id,
+        field: created.field,
+        tokens: Array.from(new Set([...created.interests, ...tokenizeInterestText(created.title, content, created.field)])),
+      });
+
       return res.status(201).json({
         post: {
           id: created.id,
@@ -4394,6 +4407,7 @@ app.post(
           stats: liveSession ? "Live session" : "Live discussion",
           media: mediaAssets,
           liveSession,
+          canDelete: true,
           scheduledAt: scheduledAtRaw || null,
           createdAt: created.createdAt,
         },
@@ -5142,6 +5156,50 @@ app.post("/api/community/posts/:id/report", authMiddleware, async (req: Authenti
   } catch (error) {
     console.error("Report community post error:", error);
     return res.status(500).json({ error: "Unable to report this post right now." });
+  }
+});
+
+app.delete("/api/community/posts/:id", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  const userRole = req.auth?.role;
+  if (!userId || !userRole) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const postId = String(req.params.id || "").trim();
+  if (!postId) {
+    return res.status(400).json({ error: "Post id is required." });
+  }
+
+  try {
+    const existing = (await prismaDynamic.communityPost.findUnique({
+      where: { id: postId },
+    })) as CommunityPostRecord | null;
+
+    if (!existing) {
+      return res.status(404).json({ error: "Post not found." });
+    }
+
+    const canModerate = userRole === "ADMIN" || isModeratorRole(userRole);
+    const isAuthor = existing.authorName === authUserDisplayName(req.auth);
+    if (!canModerate && !isAuthor) {
+      return res.status(403).json({ error: "You can only delete your own posts." });
+    }
+
+    await prismaDynamic.communityPost.delete({ where: { id: postId } });
+
+    const context = await resolveCommunityInteractionContext(postId);
+    await recordCommunityInteraction(userId, {
+      action: "post_delete",
+      itemId: postId,
+      field: context.field ?? existing.field,
+      tokens: Array.from(new Set([...existing.interests, ...context.tokens])),
+    });
+
+    return res.status(200).json({ ok: true, id: postId });
+  } catch (error) {
+    console.error("Delete community post error:", error);
+    return res.status(500).json({ error: "Unable to delete this post right now." });
   }
 });
 

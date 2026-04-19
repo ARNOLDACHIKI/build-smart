@@ -3,8 +3,10 @@ import { useToast } from '@/hooks/use-toast';
 import {
   castCommunityVote,
   createCommunityPost,
+  deleteCommunityPost,
   getCommunityFeed,
   reportCommunityPost,
+  toggleCommunityFollow,
   toggleCommunityBookmark,
   type CommunityFeedResponse,
 } from '@/lib/community';
@@ -70,6 +72,7 @@ const CommunityHubV2 = () => {
   const [activeLiveRoom, setActiveLiveRoom] = useState<{ roomId: string; title: string } | null>(null);
 
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>({});
+  const [follows, setFollows] = useState<Record<string, boolean>>({});
   const [votes, setVotes] = useState<Record<string, 'up' | 'down' | null>>({});
   const [highlightedPostId, setHighlightedPostId] = useState<string | null>(null);
 
@@ -77,6 +80,7 @@ const CommunityHubV2 = () => {
 
   const hydrateUiState = (data: CommunityFeedResponse) => {
     setBookmarks(Object.fromEntries(data.state.bookmarks.map((id) => [id, true])));
+    setFollows(Object.fromEntries(data.state.follows.map((id) => [id, true])));
     setVotes(
       Object.fromEntries(Object.entries(data.state.votes).map(([itemId, vote]) => [itemId, vote])) as Record<
         string,
@@ -152,6 +156,7 @@ const CommunityHubV2 = () => {
       verified: true,
       media: post.media,
       liveSession: post.liveSession,
+      canDelete: Boolean(post.canDelete),
       source: 'api',
     }));
   }, [feed]);
@@ -211,6 +216,41 @@ const CommunityHubV2 = () => {
     } catch (error) {
       toast({
         title: 'Unable to update like',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const toggleFollow = async (id: string) => {
+    try {
+      setIsMutating(true);
+      const result = await toggleCommunityFollow(id, !follows[id]);
+      setFeed((current) => ({ ...current, state: result.state }));
+      hydrateUiState({ ...feed, state: result.state });
+    } catch (error) {
+      toast({
+        title: 'Unable to update follow',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const removePost = async (id: string) => {
+    try {
+      setIsMutating(true);
+      await deleteCommunityPost(id);
+      setFeed((current) => ({ ...current, posts: current.posts.filter((post) => post.id !== id) }));
+      setHighlightedPostId((current) => (current === id ? null : current));
+      toast({ title: 'Post deleted' });
+    } catch (error) {
+      toast({
+        title: 'Unable to delete post',
         description: error instanceof Error ? error.message : 'Please try again.',
         variant: 'destructive',
       });
@@ -305,9 +345,12 @@ const CommunityHubV2 = () => {
             isLoading={isLoading}
             isMutating={isMutating}
             bookmarks={bookmarks}
+            follows={follows}
             votes={votes}
             onBookmark={toggleBookmark}
+            onFollow={toggleFollow}
             onVote={castVote}
+            onDelete={removePost}
             onReport={reportPost}
             onShare={sharePost}
             onViewDiscussion={openComments}

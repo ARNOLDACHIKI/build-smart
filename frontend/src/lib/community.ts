@@ -26,6 +26,7 @@ export type CommunityPost = {
     roomId?: string;
     description?: string;
   } | null;
+  canDelete?: boolean;
   createdAt: string;
 };
 
@@ -499,6 +500,12 @@ export const createCommunityPost = async (
   return authorizedRequest<{ post: CommunityPost; scheduledAt: string | null }>("/api/community/posts", {
     method: "POST",
     body: formData,
+  });
+};
+
+export const deleteCommunityPost = async (postId: string): Promise<{ ok: boolean; id: string }> => {
+  return authorizedRequest<{ ok: boolean; id: string }>(`/api/community/posts/${postId}`, {
+    method: "DELETE",
   });
 };
 

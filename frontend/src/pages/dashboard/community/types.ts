@@ -38,6 +38,7 @@ export type LocalItem = {
     roomId?: string;
     description?: string;
   } | null;
+  canDelete?: boolean;
 };
 
 export type FeedItem = LocalItem & {

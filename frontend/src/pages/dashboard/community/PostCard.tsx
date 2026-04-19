@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { MessageCircle, MoreHorizontal, Share2, ThumbsUp } from 'lucide-react';
+import { MessageCircle, MoreHorizontal, Share2, ThumbsUp, Trash2, UserCheck, UserPlus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -19,8 +19,11 @@ type PostCardProps = {
   isHighlighted: boolean;
   isLiked: boolean;
   isSaved: boolean;
+  isFollowing: boolean;
   onLike: (id: string) => Promise<void>;
   onSave: (id: string) => Promise<void>;
+  onFollow: (id: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
   onReport: (id: string) => Promise<void>;
   onShare: (id: string) => void;
   onViewDiscussion: (id: string) => void;
@@ -53,8 +56,11 @@ const PostCard = ({
   isHighlighted,
   isLiked,
   isSaved,
+  isFollowing,
   onLike,
   onSave,
+  onFollow,
+  onDelete,
   onReport,
   onShare,
   onViewDiscussion,
@@ -115,9 +121,17 @@ const PostCard = ({
             <DropdownMenuItem onClick={() => void onSave(post.id)} className="focus:bg-[#121420] focus:text-slate-100">
               {isSaved ? 'Saved' : 'Save post'}
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void onFollow(post.id)} className="focus:bg-[#121420] focus:text-slate-100">
+              {isFollowing ? 'Following' : 'Follow'}
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onShare(post.id)} className="focus:bg-[#121420] focus:text-slate-100">
               Share post
             </DropdownMenuItem>
+            {post.canDelete && (
+              <DropdownMenuItem onClick={() => void onDelete(post.id)} className="text-red-300 focus:bg-[#121420] focus:text-red-300">
+                Delete post
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => void onReport(post.id)} className="focus:bg-[#121420] focus:text-slate-100">
               Report post
             </DropdownMenuItem>
@@ -164,12 +178,35 @@ const PostCard = ({
 
         <Button
           size="sm"
+          variant={isFollowing ? 'secondary' : 'ghost'}
+          onClick={() => void onFollow(post.id)}
+          disabled={isMutating}
+          className="h-8 rounded-full px-3 text-xs font-medium text-slate-400 transition hover:bg-[#1A1D2B] hover:text-slate-200 disabled:opacity-50"
+        >
+          {isFollowing ? <UserCheck className="mr-1.5 h-3.5 w-3.5" /> : <UserPlus className="mr-1.5 h-3.5 w-3.5" />}
+          {isFollowing ? 'Following' : 'Follow'}
+        </Button>
+
+        <Button
+          size="sm"
           variant="ghost"
           onClick={() => onViewDiscussion(post.id)}
           className="h-8 rounded-full px-3 text-xs font-medium text-slate-400 transition hover:bg-[#1A1D2B] hover:text-slate-200"
         >
           <MessageCircle className="mr-1.5 h-3.5 w-3.5" /> Comment
         </Button>
+
+        {post.canDelete && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => void onDelete(post.id)}
+            disabled={isMutating}
+            className="h-8 rounded-full px-3 text-xs font-medium text-red-300 transition hover:bg-[#1A1D2B] hover:text-red-200 disabled:opacity-50"
+          >
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
+          </Button>
+        )}
 
         <Button
           size="sm"

@@ -9,9 +9,12 @@ type FeedProps = {
   isMutating: boolean;
   highlightedPostId: string | null;
   bookmarks: Record<string, boolean>;
+  follows: Record<string, boolean>;
   votes: Record<string, 'up' | 'down' | null>;
   onBookmark: (id: string) => Promise<void>;
+  onFollow: (id: string) => Promise<void>;
   onVote: (id: string, vote: 'up' | 'down') => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
   onReport: (id: string) => Promise<void>;
   onShare: (id: string) => void;
   onViewDiscussion: (id: string) => void;
@@ -53,9 +56,12 @@ const Feed = ({
   isMutating,
   highlightedPostId,
   bookmarks,
+  follows,
   votes,
   onBookmark,
+  onFollow,
   onVote,
+  onDelete,
   onReport,
   onShare,
   onViewDiscussion,
@@ -140,8 +146,11 @@ const Feed = ({
                 isHighlighted={highlightedPostId === post.id}
                 isLiked={votes[post.id] === 'up'}
                 isSaved={Boolean(bookmarks[post.id])}
+                isFollowing={Boolean(follows[post.id])}
                 onLike={(id) => onVote(id, 'up')}
                 onSave={onBookmark}
+                onFollow={onFollow}
+                onDelete={onDelete}
                 onReport={onReport}
                 onShare={onShare}
                 onViewDiscussion={onViewDiscussion}
@@ -160,8 +169,11 @@ const Feed = ({
           isHighlighted={highlightedPostId === post.id}
           isLiked={votes[post.id] === 'up'}
           isSaved={Boolean(bookmarks[post.id])}
+          isFollowing={Boolean(follows[post.id])}
           onLike={(id) => onVote(id, 'up')}
           onSave={onBookmark}
+          onFollow={onFollow}
+          onDelete={onDelete}
           onReport={onReport}
           onShare={onShare}
           onViewDiscussion={onViewDiscussion}
