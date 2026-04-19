@@ -122,11 +122,11 @@ const DashboardHome = () => {
           <div>
             <h1 className="text-2xl font-bold font-['Space_Grotesk']">Project Dashboard</h1>
             <p className="text-sm text-muted-foreground">
-              Welcome back, {user?.name || user?.email?.split('@')[0] || 'Builder'}. This view is focused on project execution only.
+              Welcome back, {user?.name || user?.email?.split('@')[0] || 'Builder'}. Orchestrate execution with live momentum, clear priorities, and faster delivery decisions.
             </p>
           </div>
           <Badge variant="secondary" className="gap-1">
-            <TrendingUp className="h-3 w-3" /> Modular overview
+            <TrendingUp className="h-3 w-3" /> Strategic pulse
           </Badge>
         </div>
       </motion.div>
@@ -135,16 +135,16 @@ const DashboardHome = () => {
         <Card className="border border-border/70 overflow-hidden">
           <CardContent className="p-0">
             <div className="gradient-primary p-5 text-primary-foreground">
-              <p className="text-lg font-semibold">Monitor projects with one modular workspace</p>
+              <p className="text-lg font-semibold">Transform plans into delivery velocity</p>
               <p className="mt-1.5 max-w-3xl text-sm opacity-90">
-                Use project previews to jump directly into detailed reports, analytics, and delivery progress.
+                Turn project signals into action: track milestones, surface risks early, and align teams from one high-impact workspace.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button asChild size="sm" variant="secondary">
-                  <Link to="/dashboard/projects">Open Projects</Link>
+                  <Link to="/dashboard/projects">Enter Projects</Link>
                 </Button>
                 <Button asChild size="sm" variant="outline" className="border-white/40 bg-black/30 text-white hover:bg-black/45">
-                  <Link to="/community">Open Community</Link>
+                  <Link to="/community">Explore Community Intel</Link>
                 </Button>
               </div>
             </div>
