@@ -247,7 +247,10 @@ const CommunityHubV2 = () => {
       const result = await createCommunityPost(payload);
       setFeed((current) => ({ ...current, posts: [result.post, ...current.posts] }));
       setSearch('');
-      toast({ title: 'Post published' });
+      toast({
+        title: 'Post published',
+        description: `"${result.post.title}" is now live in your community feed.`,
+      });
     } catch (error) {
       toast({
         title: 'Unable to publish post',
