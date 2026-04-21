@@ -43,6 +43,9 @@ export function ReelsPage() {
   );
 
   const [reels, setReels] = useState<ReelPost[]>(() => createReels(reelPosts));
+  const [reelLikes, setReelLikes] = useState<Record<string, number>>({});
+  const [reelComments, setReelComments] = useState<Record<string, number>>({});
+  const [likedByMe, setLikedByMe] = useState<Record<string, boolean>>({});
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -51,6 +54,23 @@ export function ReelsPage() {
   useEffect(() => {
     setReels(createReels(reelPosts));
     setCurrentIndex(0);
+    const parseCount = (stats: string, keyword: string): number => {
+      const match = stats.toLowerCase().match(new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(k)?\\s*${keyword}`));
+      if (!match) return 0;
+      const base = Number(match[1]);
+      if (!Number.isFinite(base)) return 0;
+      return match[2] ? Math.round(base * 1000) : Math.round(base);
+    };
+
+    const nextLikes: Record<string, number> = {};
+    const nextComments: Record<string, number> = {};
+    for (const post of reelPosts) {
+      nextLikes[post.id] = Math.max(0, Math.round(post.engagement?.likes || parseCount(post.stats || '', 'likes?')));
+      nextComments[post.id] = Math.max(0, Math.round(post.engagement?.comments || parseCount(post.stats || '', 'comments?')));
+    }
+    setReelLikes(nextLikes);
+    setReelComments(nextComments);
+    setLikedByMe({});
   }, [reelPosts]);
 
   useEffect(() => {
@@ -75,7 +95,7 @@ export function ReelsPage() {
     } else {
       activeVideo.pause();
     }
-  }, [currentIndex, reels]);
+  }, [currentIndex, likedByMe, reels]);
 
   if (reels.length === 0) {
     return (
@@ -114,6 +134,22 @@ export function ReelsPage() {
       })
     );
   }, [currentIndex]);
+
+  const toggleReelLike = useCallback(() => {
+    const postId = reels[currentIndex]?.post.id;
+    if (!postId) return;
+
+    const currentlyLiked = Boolean(likedByMe[postId]);
+    const nextLiked = !currentlyLiked;
+    setLikedByMe((current) => ({ ...current, [postId]: nextLiked }));
+    setReelLikes((likes) => {
+      const currentLikes = likes[postId] || 0;
+      return {
+        ...likes,
+        [postId]: nextLiked ? currentLikes + 1 : Math.max(0, currentLikes - 1),
+      };
+    });
+  }, [currentIndex, reels]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -353,12 +389,12 @@ export function ReelsPage() {
               {/* Right Side Controls */}
               <div className="absolute right-4 bottom-24 flex flex-col gap-6 pointer-events-auto z-10">
                 {/* Like Button */}
-                <button className="flex flex-col items-center gap-1 group">
+                <button onClick={toggleReelLike} className="flex flex-col items-center gap-1 group">
                   <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-all group-hover:scale-110">
-                    <Heart className="w-6 h-6 text-white" />
+                    <Heart className={cn('w-6 h-6', likedByMe[currentPost.id] ? 'fill-red-400 text-red-400' : 'text-white')} />
                   </div>
                   <span className="text-white text-xs font-medium group-hover:text-red-400 transition-colors">
-                    {Math.floor(Math.random() * 1000)}
+                    {reelLikes[currentPost.id] ?? 0}
                   </span>
                 </button>
 
@@ -368,7 +404,7 @@ export function ReelsPage() {
                     <MessageCircle className="w-6 h-6 text-white" />
                   </div>
                   <span className="text-white text-xs font-medium">
-                    {Math.floor(Math.random() * 300)}
+                    {reelComments[currentPost.id] ?? 0}
                   </span>
                 </button>
 

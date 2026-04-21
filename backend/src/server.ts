@@ -95,6 +95,7 @@ const DEV_ENGINEER_EMAIL = process.env.DEV_ENGINEER_EMAIL || "engineer@local.tes
 const DEV_ENGINEER_PASSWORD = process.env.DEV_ENGINEER_PASSWORD || "Engineer1234";
 const DEV_ENGINEER_NAME = process.env.DEV_ENGINEER_NAME || "Mock Engineer";
 let devEngineerTwoFactorEnabled = false;
+const offlineTwoFactorOverrides = new Map<string, boolean>();
 
 // Offline-mode state — set true only after a successful DB connection at startup
 let dbAvailable = false;
@@ -417,6 +418,36 @@ type CommunityInteractionState = {
   }>;
 };
 
+type CommunityPostComment = {
+  id: string;
+  postId: string;
+  author: string;
+  message: string;
+  replyToCommentId: string | null;
+  createdAt: string;
+};
+
+type CommunityActivityNotification = {
+  id: string;
+  type: "post_like" | "post_follow" | "post_comment" | "comment_reply";
+  title: string;
+  body: string;
+  postId: string | null;
+  postTitle: string | null;
+  actorName: string | null;
+  createdAt: string;
+  readAt: string | null;
+};
+
+type CommunityPostEngagement = {
+  likes: number;
+  comments: number;
+  follows: number;
+  showLikes: boolean;
+  showComments: boolean;
+  showFollows: boolean;
+};
+
 type CommunityInteractionAction =
   | "post_create"
   | "post_delete"
@@ -430,7 +461,9 @@ type CommunityInteractionAction =
   | "poll_vote"
   | "poll_clear"
   | "post_report"
-  | "chat_message";
+  | "chat_message"
+  | "comment_create"
+  | "comment_reply";
 
 type CommunityInteractionEvent = {
   action: CommunityInteractionAction;
@@ -457,8 +490,15 @@ type CommunityAnalyticsState = {
 const COMMUNITY_MODERATOR_ROLES: AppUserRole[] = ["ADMIN", "PROJECT_MANAGER", "REGULATOR"];
 const COMMUNITY_STATE_PREFIX = "community.state";
 const COMMUNITY_ANALYTICS_PREFIX = "community.analytics";
+const COMMUNITY_COMMENTS_PREFIX = "community.comments";
+const COMMUNITY_POST_ENGAGEMENT_PREFIX = "community.post.engagement";
+const COMMUNITY_ACTIVITY_PREFIX = "community.activity";
 const communityStateCache = new Map<string, CommunityInteractionState>();
 const communityAnalyticsCache = new Map<string, CommunityAnalyticsState>();
+const communityPostCache = new Map<string, CommunityPostRecord>();
+const communityCommentsCache = new Map<string, CommunityPostComment[]>();
+const communityPostEngagementCache = new Map<string, CommunityPostEngagement>();
+const communityActivityCache = new Map<string, CommunityActivityNotification[]>();
 const communityLiveRooms = new Map<string, LiveRoomState>();
 const LIVE_ROOM_STALE_MS = 5 * 60 * 1000;
 const LIVE_ROOM_EMPTY_ROOM_TTL_MS = 60 * 60 * 1000;
@@ -712,6 +752,440 @@ const decodePostContent = (rawContent: string): {
 
 const getCommunityStateKey = (userId: string) => `${COMMUNITY_STATE_PREFIX}.${userId}`;
 const getCommunityAnalyticsKey = (userId: string) => `${COMMUNITY_ANALYTICS_PREFIX}.${userId}`;
+const getCommunityCommentsKey = (postId: string) => `${COMMUNITY_COMMENTS_PREFIX}.${postId}`;
+const getCommunityPostEngagementKey = (postId: string) => `${COMMUNITY_POST_ENGAGEMENT_PREFIX}.${postId}`;
+const getCommunityActivityKey = (userId: string) => `${COMMUNITY_ACTIVITY_PREFIX}.${userId}`;
+
+const createDefaultCommunityPostEngagement = (): CommunityPostEngagement => ({
+  likes: 0,
+  comments: 0,
+  follows: 0,
+  showLikes: true,
+  showComments: true,
+  showFollows: true,
+});
+
+const normalizeCommunityPostEngagement = (value?: Partial<CommunityPostEngagement> | null): CommunityPostEngagement => ({
+  likes: Math.max(0, Math.round(Number(value?.likes || 0))),
+  comments: Math.max(0, Math.round(Number(value?.comments || 0))),
+  follows: Math.max(0, Math.round(Number(value?.follows || 0))),
+  showLikes: typeof value?.showLikes === "boolean" ? value.showLikes : true,
+  showComments: typeof value?.showComments === "boolean" ? value.showComments : true,
+  showFollows: typeof value?.showFollows === "boolean" ? value.showFollows : true,
+});
+
+const parseCommunityPostEngagement = (raw: string | null | undefined): CommunityPostEngagement => {
+  if (!raw) return createDefaultCommunityPostEngagement();
+
+  try {
+    return normalizeCommunityPostEngagement(JSON.parse(raw) as Partial<CommunityPostEngagement>);
+  } catch {
+    return createDefaultCommunityPostEngagement();
+  }
+};
+
+const loadCommunityPostEngagement = async (postId: string): Promise<CommunityPostEngagement> => {
+  if (!dbAvailable) {
+    return communityPostEngagementCache.get(postId) || createDefaultCommunityPostEngagement();
+  }
+
+  const rows = await prismaDynamic.platformSetting.findMany({
+    where: { key: getCommunityPostEngagementKey(postId) },
+    take: 1,
+  });
+
+  return parseCommunityPostEngagement(rows[0]?.value);
+};
+
+const loadCommunityPostEngagementMap = async (
+  postIds: string[]
+): Promise<Record<string, CommunityPostEngagement>> => {
+  const uniquePostIds = Array.from(new Set(postIds.map((id) => id.trim()).filter(Boolean)));
+  const map: Record<string, CommunityPostEngagement> = {};
+
+  if (uniquePostIds.length === 0) {
+    return map;
+  }
+
+  if (!dbAvailable) {
+    for (const postId of uniquePostIds) {
+      map[postId] = communityPostEngagementCache.get(postId) || createDefaultCommunityPostEngagement();
+    }
+    return map;
+  }
+
+  const keys = uniquePostIds.map((postId) => getCommunityPostEngagementKey(postId));
+  const rows = await prismaDynamic.platformSetting.findMany({
+    where: { key: { in: keys } },
+  });
+
+  const parsedByPostId = new Map<string, CommunityPostEngagement>();
+  for (const row of rows) {
+    const key = String(row.key || "");
+    const postId = key.startsWith(`${COMMUNITY_POST_ENGAGEMENT_PREFIX}.`)
+      ? key.slice(`${COMMUNITY_POST_ENGAGEMENT_PREFIX}.`.length)
+      : "";
+    if (!postId) continue;
+    parsedByPostId.set(postId, parseCommunityPostEngagement(row.value));
+  }
+
+  for (const postId of uniquePostIds) {
+    map[postId] = parsedByPostId.get(postId) || createDefaultCommunityPostEngagement();
+  }
+
+  return map;
+};
+
+const saveCommunityPostEngagement = async (
+  postId: string,
+  value: CommunityPostEngagement
+): Promise<CommunityPostEngagement> => {
+  const normalized = normalizeCommunityPostEngagement(value);
+
+  if (!dbAvailable) {
+    communityPostEngagementCache.set(postId, normalized);
+    return normalized;
+  }
+
+  await prismaDynamic.platformSetting.upsert({
+    where: { key: getCommunityPostEngagementKey(postId) },
+    update: { value: JSON.stringify(normalized) },
+    create: { key: getCommunityPostEngagementKey(postId), value: JSON.stringify(normalized) },
+  });
+
+  communityPostEngagementCache.set(postId, normalized);
+  return normalized;
+};
+
+const updateCommunityPostEngagement = async (
+  postId: string,
+  updater: (current: CommunityPostEngagement) => CommunityPostEngagement
+): Promise<CommunityPostEngagement> => {
+  const current = await loadCommunityPostEngagement(postId);
+  const next = normalizeCommunityPostEngagement(updater(current));
+  return saveCommunityPostEngagement(postId, next);
+};
+
+const normalizeCommunityPostComments = (value: unknown): CommunityPostComment[] => {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const candidate = entry as Partial<CommunityPostComment>;
+      const id = typeof candidate.id === "string" ? candidate.id.trim() : "";
+      const postId = typeof candidate.postId === "string" ? candidate.postId.trim() : "";
+      const author = typeof candidate.author === "string" ? candidate.author.trim() : "";
+      const message = typeof candidate.message === "string" ? candidate.message.trim() : "";
+      const replyToCommentId =
+        typeof candidate.replyToCommentId === "string" && candidate.replyToCommentId.trim().length > 0
+          ? candidate.replyToCommentId.trim()
+          : null;
+      const createdAt = typeof candidate.createdAt === "string" ? candidate.createdAt.trim() : "";
+
+      if (!id || !postId || !author || !message || !createdAt) {
+        return null;
+      }
+
+      return {
+        id,
+        postId,
+        author,
+        message,
+        replyToCommentId,
+        createdAt,
+      };
+    })
+    .filter((entry): entry is CommunityPostComment => Boolean(entry))
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    .slice(-100);
+};
+
+const loadCommunityPostComments = async (postId: string): Promise<CommunityPostComment[]> => {
+  if (!dbAvailable) {
+    return communityCommentsCache.get(postId) || [];
+  }
+
+  const rows = await prismaDynamic.platformSetting.findMany({
+    where: { key: getCommunityCommentsKey(postId) },
+    take: 1,
+  });
+
+  const rawValue = rows[0]?.value;
+  if (!rawValue) return [];
+
+  try {
+    return normalizeCommunityPostComments(JSON.parse(rawValue));
+  } catch {
+    return [];
+  }
+};
+
+const saveCommunityPostComments = async (
+  postId: string,
+  comments: CommunityPostComment[]
+): Promise<CommunityPostComment[]> => {
+  const normalized = normalizeCommunityPostComments(comments);
+
+  if (!dbAvailable) {
+    communityCommentsCache.set(postId, normalized);
+    return normalized;
+  }
+
+  await prismaDynamic.platformSetting.upsert({
+    where: { key: getCommunityCommentsKey(postId) },
+    update: { value: JSON.stringify(normalized) },
+    create: { key: getCommunityCommentsKey(postId), value: JSON.stringify(normalized) },
+  });
+
+  return normalized;
+};
+
+const normalizeCommunityActivityNotifications = (value?: unknown): CommunityActivityNotification[] => {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const candidate = entry as Partial<CommunityActivityNotification>;
+      const id = typeof candidate.id === "string" ? candidate.id.trim() : "";
+      const type = candidate.type;
+      const title = typeof candidate.title === "string" ? candidate.title.trim() : "";
+      const body = typeof candidate.body === "string" ? candidate.body.trim() : "";
+      const postId = typeof candidate.postId === "string" ? candidate.postId.trim() : null;
+      const postTitle = typeof candidate.postTitle === "string" ? candidate.postTitle.trim() : null;
+      const actorName = typeof candidate.actorName === "string" ? candidate.actorName.trim() : null;
+      const createdAt = typeof candidate.createdAt === "string" ? candidate.createdAt.trim() : "";
+      const readAt = typeof candidate.readAt === "string" ? candidate.readAt.trim() : null;
+
+      if (!id || !type || !title || !body || !createdAt) {
+        return null;
+      }
+
+      if (!["post_like", "post_follow", "post_comment", "comment_reply"].includes(type)) {
+        return null;
+      }
+
+      return { id, type, title, body, postId, postTitle, actorName, createdAt, readAt };
+    })
+    .filter((entry): entry is CommunityActivityNotification => Boolean(entry))
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 50);
+};
+
+const loadCommunityActivity = async (userId: string): Promise<CommunityActivityNotification[]> => {
+  if (!dbAvailable) {
+    return communityActivityCache.get(userId) || [];
+  }
+
+  const rows = await prismaDynamic.platformSetting.findMany({
+    where: { key: getCommunityActivityKey(userId) },
+    take: 1,
+  });
+
+  try {
+    return normalizeCommunityActivityNotifications(JSON.parse(rows[0]?.value || "[]"));
+  } catch {
+    return [];
+  }
+};
+
+const saveCommunityActivity = async (
+  userId: string,
+  notifications: CommunityActivityNotification[]
+): Promise<CommunityActivityNotification[]> => {
+  const normalized = normalizeCommunityActivityNotifications(notifications);
+
+  if (!dbAvailable) {
+    communityActivityCache.set(userId, normalized);
+    return normalized;
+  }
+
+  await prismaDynamic.platformSetting.upsert({
+    where: { key: getCommunityActivityKey(userId) },
+    update: { value: JSON.stringify(normalized) },
+    create: { key: getCommunityActivityKey(userId), value: JSON.stringify(normalized) },
+  });
+
+  communityActivityCache.set(userId, normalized);
+  return normalized;
+};
+
+const pushCommunityActivity = async (userId: string, notification: CommunityActivityNotification): Promise<void> => {
+  const current = await loadCommunityActivity(userId);
+  const next = normalizeCommunityActivityNotifications([notification, ...current]);
+  await saveCommunityActivity(userId, next);
+};
+
+const markCommunityActivityRead = async (userId: string, notificationId: string): Promise<CommunityActivityNotification | null> => {
+  const current = await loadCommunityActivity(userId);
+  let updatedNotification: CommunityActivityNotification | null = null;
+
+  const next = current.map((item) => {
+    if (item.id !== notificationId) return item;
+    updatedNotification = { ...item, readAt: item.readAt || new Date().toISOString() };
+    return updatedNotification;
+  });
+
+  if (!updatedNotification) return null;
+
+  await saveCommunityActivity(userId, next);
+  return updatedNotification;
+};
+
+const markAllCommunityActivityRead = async (userId: string): Promise<CommunityActivityNotification[]> => {
+  const current = await loadCommunityActivity(userId);
+  const now = new Date().toISOString();
+  const next = current.map((item) => ({ ...item, readAt: item.readAt || now }));
+  return saveCommunityActivity(userId, next);
+};
+
+const resolveUserIdFromDisplayName = async (displayName: string): Promise<string | null> => {
+  const normalized = displayName.trim().toLowerCase();
+  if (!normalized || !dbAvailable) return null;
+
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { name: { equals: displayName, mode: "insensitive" } },
+        { email: { startsWith: `${normalized}@`, mode: "insensitive" } },
+        { email: { startsWith: `${normalized}`, mode: "insensitive" } },
+      ],
+    },
+    select: { id: true },
+  });
+
+  return user?.id || null;
+};
+
+const resolveCommunityPostSnapshot = async (
+  itemId: string
+): Promise<{ field: string | null; tokens: string[]; title: string | null; authorName: string | null; authorUserId: string | null }> => {
+  const normalizedItemId = itemId.trim();
+  if (!normalizedItemId) return { field: null, tokens: [], title: null, authorName: null, authorUserId: null };
+
+  if (!dbAvailable) {
+    const fallback = FALLBACK_COMMUNITY_POSTS.find((post) => post.id === normalizedItemId);
+    if (!fallback) return { field: null, tokens: [], title: null, authorName: null, authorUserId: null };
+    const decoded = decodePostContent(fallback.content);
+    const tokens = Array.from(
+      new Set([...fallback.interests, ...tokenizeInterestText(fallback.title, decoded.body, fallback.field)])
+    );
+    return { field: fallback.field, tokens, title: fallback.title, authorName: fallback.authorName, authorUserId: null };
+  }
+
+  try {
+    const post = (await prismaDynamic.communityPost.findUnique({
+      where: { id: normalizedItemId },
+    })) as CommunityPostRecord | null;
+
+    if (!post) return { field: null, tokens: [], title: null, authorName: null, authorUserId: null };
+
+    const decoded = decodePostContent(post.content);
+    const tokens = Array.from(new Set([...post.interests, ...tokenizeInterestText(post.title, decoded.body, post.field)]));
+    const authorUserId = await resolveUserIdFromDisplayName(post.authorName);
+    return { field: post.field, tokens, title: post.title, authorName: post.authorName, authorUserId };
+  } catch {
+    return { field: null, tokens: [], title: null, authorName: null, authorUserId: null };
+  }
+};
+
+const queueCommunityPostActivity = async (args: {
+  itemId: string;
+  actorUserId: string;
+  actorName: string;
+  kind: "post_like" | "post_follow" | "post_comment" | "comment_reply";
+  commentMessage?: string;
+  replyToCommentId?: string | null;
+}): Promise<void> => {
+  const snapshot = await resolveCommunityPostSnapshot(args.itemId);
+  const recipientUserId = snapshot.authorUserId;
+  const postTitle = snapshot.title || "your post";
+
+  if (recipientUserId && recipientUserId !== args.actorUserId) {
+    const baseBody =
+      args.kind === "post_like"
+        ? `${args.actorName} liked your post "${postTitle}".`
+        : args.kind === "post_follow"
+          ? `${args.actorName} followed your post "${postTitle}".`
+          : args.kind === "comment_reply"
+            ? `${args.actorName} replied on your post "${postTitle}".`
+          : `${args.actorName} commented on your post "${postTitle}".`;
+
+    await pushCommunityActivity(recipientUserId, {
+      id: `activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      type: args.kind === "comment_reply" ? "comment_reply" : args.kind,
+      title:
+        args.kind === "post_like"
+          ? "New like"
+          : args.kind === "post_follow"
+            ? "New follow"
+            : args.kind === "comment_reply"
+              ? "New reply"
+              : "New comment",
+      body: baseBody,
+      postId: args.itemId,
+      postTitle,
+      actorName: args.actorName,
+      createdAt: new Date().toISOString(),
+      readAt: null,
+    });
+  }
+
+  if (args.kind === "comment_reply") {
+    const targetCommentId = typeof args.replyToCommentId === "string" ? args.replyToCommentId.trim() : "";
+    if (!targetCommentId) return;
+
+    const comments = await loadCommunityPostComments(args.itemId);
+    const targetComment = comments.find((comment) => comment.id === targetCommentId);
+    if (!targetComment) return;
+
+    const targetUserId = await resolveUserIdFromDisplayName(targetComment.author);
+    if (!targetUserId || targetUserId === args.actorUserId || targetUserId === recipientUserId) {
+      return;
+    }
+
+    await pushCommunityActivity(targetUserId, {
+      id: `activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      type: "comment_reply",
+      title: "New reply",
+      body: `${args.actorName} replied to your comment on "${postTitle}".`,
+      postId: args.itemId,
+      postTitle,
+      actorName: args.actorName,
+      createdAt: new Date().toISOString(),
+      readAt: null,
+    });
+
+    return;
+  }
+
+  if (args.kind !== "post_comment") return;
+
+  const comments = await loadCommunityPostComments(args.itemId);
+  const previousCommenterNames = Array.from(
+    new Set(comments.slice(0, -1).map((comment) => comment.author).filter(Boolean))
+  );
+
+  for (const commenterName of previousCommenterNames) {
+    const commenterUserId = await resolveUserIdFromDisplayName(commenterName);
+    if (!commenterUserId || commenterUserId === args.actorUserId || commenterUserId === recipientUserId) {
+      continue;
+    }
+
+    await pushCommunityActivity(commenterUserId, {
+      id: `activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      type: "comment_reply",
+      title: "Reply in a thread",
+      body: `${args.actorName} replied in a discussion you participated in on "${postTitle}".`,
+      postId: args.itemId,
+      postTitle,
+      actorName: args.actorName,
+      createdAt: new Date().toISOString(),
+      readAt: null,
+    });
+  }
+};
 
 const createDefaultCommunityAnalyticsState = (): CommunityAnalyticsState => ({
   interactionsByAction: {},
@@ -930,6 +1404,55 @@ const deriveCommunityBehaviorSignals = (
     .map(([token]) => token);
 
   return { dominantField, behaviorTokens };
+};
+
+const buildCommunityPostResponse = (
+  post: CommunityPostRecord,
+  auth: JwtPayload | undefined,
+  decoded?: EncodedCommunityPostContent,
+  engagement?: CommunityPostEngagement
+) => {
+  const resolvedContent = decoded || decodePostContent(post.content);
+  const canDelete = post.authorName === authUserDisplayName(auth) || auth?.role === "ADMIN" || isModeratorRole(auth?.role || "USER");
+  const resolvedEngagement = engagement || createDefaultCommunityPostEngagement();
+
+  return {
+    id: post.id,
+    type: post.postType,
+    title: post.title,
+    summary: post.summary,
+    author: post.authorName,
+    field: post.field,
+    interests: post.interests,
+    stats: resolvedContent.liveSession ? "Live session" : "Live discussion",
+    media: resolvedContent.media,
+    liveSession: resolvedContent.liveSession,
+    engagement: resolvedEngagement,
+    canDelete,
+    createdAt: post.createdAt,
+  };
+};
+
+const storeCommunityPostFallback = (post: CommunityPostRecord): void => {
+  communityPostCache.set(post.id, post);
+};
+
+const getCommunityFallbackPosts = (): CommunityPostRecord[] => {
+  return [...communityPostCache.values(), ...FALLBACK_COMMUNITY_POSTS].sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+  );
+};
+
+const dedupeCommunityPosts = (posts: CommunityPostRecord[]): CommunityPostRecord[] => {
+  const byId = new Map<string, CommunityPostRecord>();
+
+  for (const post of posts) {
+    if (!byId.has(post.id)) {
+      byId.set(post.id, post);
+    }
+  }
+
+  return Array.from(byId.values());
 };
 
 const FALLBACK_COMMUNITY_POSTS: CommunityPostRecord[] = [
@@ -3087,6 +3610,7 @@ const buildInMemorySafeUser = (
   id: string
 ): SafeUser => {
   const now = new Date("2026-01-01T00:00:00Z");
+  const twoFactorEnabled = offlineTwoFactorOverrides.get(id) ?? false;
   return {
     id,
     email: profile.email,
@@ -3100,7 +3624,7 @@ const buildInMemorySafeUser = (
     location: profile.location,
     role: profile.role,
     emailVerified: true,
-    twoFactorEnabled: false,
+    twoFactorEnabled,
     createdAt: now,
     updatedAt: now,
   };
@@ -3904,31 +4428,18 @@ app.get("/api/community/feed", authMiddleware, async (req: AuthenticatedRequest,
       take: 12,
     });
 
-    const posts = (postsRaw as CommunityPostRecord[])
+    const feedPosts = dedupeCommunityPosts([...(postsRaw as CommunityPostRecord[]), ...communityPostCache.values()])
       .filter((post) => {
         if (!q) return true;
         const decoded = decodePostContent(post.content);
         const haystack = `${post.title} ${post.summary} ${decoded.body} ${post.interests.join(" ")}`.toLowerCase();
         return haystack.includes(q);
       })
-      .map((post) => {
-        const decoded = decodePostContent(post.content);
-        const canDelete = post.authorName === authUserDisplayName(req.auth) || authRole === "ADMIN" || isModeratorRole(authRole);
-        return {
-          id: post.id,
-          type: post.postType,
-          title: post.title,
-          summary: post.summary,
-          author: post.authorName,
-          field: post.field,
-          interests: post.interests,
-          stats: decoded.liveSession ? "Live session" : "Live discussion",
-          media: decoded.media,
-          liveSession: decoded.liveSession,
-          canDelete,
-          createdAt: post.createdAt,
-        };
-      });
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, 24);
+
+    const engagementByPostId = await loadCommunityPostEngagementMap(feedPosts.map((post) => post.id));
+    const posts = feedPosts.map((post) => buildCommunityPostResponse(post, req.auth, undefined, engagementByPostId[post.id]));
 
     const updates = (updatesRaw as CommunityUpdateRecord[]).map((update) => ({
       id: update.id,
@@ -3995,7 +4506,7 @@ app.get("/api/community/feed", authMiddleware, async (req: AuthenticatedRequest,
     console.warn("Community feed fallback activated:", error);
 
     const inferredField = ROLE_FIELD_MAP[authRole] || "Engineering";
-    const posts = FALLBACK_COMMUNITY_POSTS
+    const fallbackPosts = getCommunityFallbackPosts()
       .filter((post) => {
         if (requestedField !== "all" && post.field.toLowerCase() !== requestedField.toLowerCase()) {
           return false;
@@ -4005,24 +4516,13 @@ app.get("/api/community/feed", authMiddleware, async (req: AuthenticatedRequest,
         const haystack = `${post.title} ${post.summary} ${decoded.body} ${post.interests.join(" ")}`.toLowerCase();
         return haystack.includes(q);
       })
-      .map((post) => {
-        const decoded = decodePostContent(post.content);
-        const canDelete = post.authorName === authUserDisplayName(req.auth) || authRole === "ADMIN" || isModeratorRole(authRole);
-        return {
-          id: post.id,
-          type: post.postType,
-          title: post.title,
-          summary: post.summary,
-          author: post.authorName,
-          field: post.field,
-          interests: post.interests,
-          stats: decoded.liveSession ? "Live session" : "Live discussion",
-          media: decoded.media,
-          liveSession: decoded.liveSession,
-          canDelete,
-          createdAt: post.createdAt,
-        };
-      });
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, 24);
+
+    const fallbackEngagementByPostId = await loadCommunityPostEngagementMap(fallbackPosts.map((post) => post.id));
+    const posts = fallbackPosts.map((post) =>
+      buildCommunityPostResponse(post, req.auth, undefined, fallbackEngagementByPostId[post.id])
+    );
 
     const recommendations = FALLBACK_COMMUNITY_RECOMMENDATIONS
       .map((recommendation) => ({
@@ -4127,6 +4627,8 @@ app.put("/api/community/follows/:itemId", authMiddleware, async (req: Authentica
   }
 
   const followingInput = typeof req.body?.following === "boolean" ? req.body.following : undefined;
+  const previousState = await loadCommunityState(userId);
+  const wasFollowing = previousState.follows.includes(itemId);
   const state = await updateCommunityState(userId, (current) => {
     const follows = new Set(current.follows);
 
@@ -4146,6 +4648,13 @@ app.put("/api/community/follows/:itemId", authMiddleware, async (req: Authentica
   });
 
   const isFollowing = state.follows.includes(itemId);
+  let engagement = await loadCommunityPostEngagement(itemId);
+  if (wasFollowing !== isFollowing) {
+    engagement = await updateCommunityPostEngagement(itemId, (current) => ({
+      ...current,
+      follows: isFollowing ? current.follows + 1 : Math.max(0, current.follows - 1),
+    }));
+  }
   const context = await resolveCommunityInteractionContext(itemId);
   await recordCommunityInteraction(userId, {
     action: isFollowing ? "follow_add" : "follow_remove",
@@ -4154,7 +4663,16 @@ app.put("/api/community/follows/:itemId", authMiddleware, async (req: Authentica
     tokens: context.tokens,
   });
 
-  return res.status(200).json({ itemId, following: isFollowing, state });
+  if (isFollowing) {
+    await queueCommunityPostActivity({
+      itemId,
+      actorUserId: userId,
+      actorName: authUserDisplayName(req.auth),
+      kind: "post_follow",
+    });
+  }
+
+  return res.status(200).json({ itemId, following: isFollowing, state, engagement });
 });
 
 app.put("/api/community/votes/:itemId", authMiddleware, async (req: AuthenticatedRequest, res) => {
@@ -4169,6 +4687,8 @@ app.put("/api/community/votes/:itemId", authMiddleware, async (req: Authenticate
   }
 
   const vote = req.body?.vote === "up" || req.body?.vote === "down" ? req.body.vote : null;
+  const previousState = await loadCommunityState(userId);
+  const previousVote = previousState.votes[itemId] || null;
   const state = await updateCommunityState(userId, (current) => {
     const votes = { ...current.votes };
 
@@ -4181,6 +4701,16 @@ app.put("/api/community/votes/:itemId", authMiddleware, async (req: Authenticate
     return { ...current, votes };
   });
 
+  const resolvedVote = state.votes[itemId] || null;
+  let engagement = await loadCommunityPostEngagement(itemId);
+  const likeDelta = (previousVote === "up" ? -1 : 0) + (resolvedVote === "up" ? 1 : 0);
+  if (likeDelta !== 0) {
+    engagement = await updateCommunityPostEngagement(itemId, (current) => ({
+      ...current,
+      likes: Math.max(0, current.likes + likeDelta),
+    }));
+  }
+
   const context = await resolveCommunityInteractionContext(itemId);
   await recordCommunityInteraction(userId, {
     action: vote === "up" ? "vote_up" : vote === "down" ? "vote_down" : "vote_clear",
@@ -4189,7 +4719,16 @@ app.put("/api/community/votes/:itemId", authMiddleware, async (req: Authenticate
     tokens: context.tokens,
   });
 
-  return res.status(200).json({ itemId, vote: state.votes[itemId] || null, state });
+  if (resolvedVote === "up" && previousVote !== "up") {
+    await queueCommunityPostActivity({
+      itemId,
+      actorUserId: userId,
+      actorName: authUserDisplayName(req.auth),
+      kind: "post_like",
+    });
+  }
+
+  return res.status(200).json({ itemId, vote: resolvedVote, state, engagement });
 });
 
 app.put("/api/community/polls/:itemId/vote", authMiddleware, async (req: AuthenticatedRequest, res) => {
@@ -4265,6 +4804,197 @@ app.post("/api/community/chat/messages", authMiddleware, async (req: Authenticat
   });
 
   return res.status(201).json({ message: chatMessage, state });
+});
+
+app.get("/api/community/posts/:id/comments", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const postId = String(req.params.id || "").trim();
+  if (!postId) {
+    return res.status(400).json({ error: "Post id is required." });
+  }
+
+  try {
+    const comments = await loadCommunityPostComments(postId);
+    return res.status(200).json({ postId, comments });
+  } catch (error) {
+    console.error("Get community comments error:", error);
+    return res.status(500).json({ error: "Unable to fetch comments right now." });
+  }
+});
+
+app.post("/api/community/posts/:id/comments", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  const postId = String(req.params.id || "").trim();
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (!postId) {
+    return res.status(400).json({ error: "Post id is required." });
+  }
+
+  const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+  const replyToCommentId =
+    typeof req.body?.replyToCommentId === "string" && req.body.replyToCommentId.trim().length > 0
+      ? req.body.replyToCommentId.trim()
+      : null;
+  if (!message) {
+    return res.status(400).json({ error: "Comment message is required." });
+  }
+
+  if (message.length > 2000) {
+    return res.status(400).json({ error: "Comment is too long. Limit is 2000 characters." });
+  }
+
+  try {
+    const current = await loadCommunityPostComments(postId);
+    if (replyToCommentId && !current.some((entry) => entry.id === replyToCommentId)) {
+      return res.status(400).json({ error: "Reply target no longer exists." });
+    }
+
+    const comment: CommunityPostComment = {
+      id: `comment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      postId,
+      author: authUserDisplayName(req.auth),
+      message,
+      replyToCommentId,
+      createdAt: new Date().toISOString(),
+    };
+
+    const comments = await saveCommunityPostComments(postId, [...current, comment]);
+    const engagement = await updateCommunityPostEngagement(postId, (existing) => ({
+      ...existing,
+      comments: comments.length,
+    }));
+
+    await recordCommunityInteraction(userId, {
+      action: replyToCommentId ? "comment_reply" : "comment_create",
+      itemId: postId,
+      tokens: tokenizeInterestText(message),
+    });
+
+    await queueCommunityPostActivity({
+      itemId: postId,
+      actorUserId: userId,
+      actorName: authUserDisplayName(req.auth),
+      kind: replyToCommentId ? "comment_reply" : "post_comment",
+      commentMessage: message,
+      replyToCommentId,
+    });
+
+    return res.status(201).json({ postId, comment, comments, engagement });
+  } catch (error) {
+    console.error("Create community comment error:", error);
+    return res.status(500).json({ error: "Unable to add comment right now." });
+  }
+});
+
+app.get("/api/community/activity", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const notifications = await loadCommunityActivity(userId);
+    const unreadCount = notifications.filter((notification) => !notification.readAt).length;
+    return res.status(200).json({ notifications, unreadCount });
+  } catch (error) {
+    console.error("Load community activity error:", error);
+    return res.status(500).json({ error: "Unable to load activity right now." });
+  }
+});
+
+app.patch("/api/community/activity/read-all", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const notifications = await markAllCommunityActivityRead(userId);
+    const unreadCount = notifications.filter((notification) => !notification.readAt).length;
+    return res.status(200).json({ notifications, unreadCount });
+  } catch (error) {
+    console.error("Mark all community activity read error:", error);
+    return res.status(500).json({ error: "Unable to update activity right now." });
+  }
+});
+
+app.patch("/api/community/activity/:id/read", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const notificationId = String(req.params.id || "").trim();
+  if (!notificationId) {
+    return res.status(400).json({ error: "Notification id is required." });
+  }
+
+  try {
+    const notification = await markCommunityActivityRead(userId, notificationId);
+    if (!notification) {
+      return res.status(404).json({ error: "Notification not found." });
+    }
+
+    return res.status(200).json({ notification });
+  } catch (error) {
+    console.error("Mark community activity read error:", error);
+    return res.status(500).json({ error: "Unable to update activity right now." });
+  }
+});
+
+app.patch("/api/community/posts/:id/engagement", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const postId = String(req.params.id || "").trim();
+  const role = req.auth?.role;
+  if (!postId) {
+    return res.status(400).json({ error: "Post id is required." });
+  }
+
+  if (!role) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const showLikesInput = req.body?.showLikes;
+  const showCommentsInput = req.body?.showComments;
+  const showFollowsInput = req.body?.showFollows;
+
+  if (
+    typeof showLikesInput !== "boolean" &&
+    typeof showCommentsInput !== "boolean" &&
+    typeof showFollowsInput !== "boolean"
+  ) {
+    return res.status(400).json({ error: "At least one visibility flag must be provided." });
+  }
+
+  try {
+    const existing = (await prismaDynamic.communityPost.findUnique({
+      where: { id: postId },
+    })) as CommunityPostRecord | null;
+
+    const fallbackPost = communityPostCache.get(postId) || FALLBACK_COMMUNITY_POSTS.find((post) => post.id === postId) || null;
+    const candidatePost = existing || fallbackPost;
+    if (!candidatePost) {
+      return res.status(404).json({ error: "Post not found." });
+    }
+
+    const isAuthor = candidatePost.authorName === authUserDisplayName(req.auth);
+    if (!isAuthor) {
+      return res.status(403).json({ error: "Only the author can change engagement visibility." });
+    }
+
+    const engagement = await updateCommunityPostEngagement(postId, (current) => ({
+      ...current,
+      showLikes: typeof showLikesInput === "boolean" ? showLikesInput : current.showLikes,
+      showComments: typeof showCommentsInput === "boolean" ? showCommentsInput : current.showComments,
+      showFollows: typeof showFollowsInput === "boolean" ? showFollowsInput : current.showFollows,
+    }));
+
+    return res.status(200).json({ postId, engagement });
+  } catch (error) {
+    console.error("Update community engagement visibility error:", error);
+    return res.status(500).json({ error: "Unable to update engagement visibility right now." });
+  }
 });
 
 app.post(
@@ -4395,6 +5125,22 @@ app.post(
         tokens: Array.from(new Set([...created.interests, ...tokenizeInterestText(created.title, content, created.field)])),
       });
 
+      const engagement = await saveCommunityPostEngagement(created.id, createDefaultCommunityPostEngagement());
+
+      storeCommunityPostFallback({
+        id: created.id,
+        title: created.title,
+        summary: created.summary,
+        content: created.content,
+        postType: created.postType,
+        authorName: created.authorName,
+        field: created.field,
+        interests: created.interests,
+        isPublished: created.isPublished,
+        createdAt: created.createdAt,
+        updatedAt: created.updatedAt,
+      });
+
       return res.status(201).json({
         post: {
           id: created.id,
@@ -4407,6 +5153,7 @@ app.post(
           stats: liveSession ? "Live session" : "Live discussion",
           media: mediaAssets,
           liveSession,
+          engagement,
           canDelete: true,
           scheduledAt: scheduledAtRaw || null,
           createdAt: created.createdAt,
@@ -4414,6 +5161,39 @@ app.post(
       });
     } catch (error) {
       console.error("Create community post error:", error);
+
+      if (!dbAvailable) {
+        const fallbackId = `fallback-post-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const fallbackCreatedAt = new Date();
+        const fallbackPost: CommunityPostRecord = {
+          id: fallbackId,
+          title,
+          summary,
+          content: JSON.stringify(encodedContent),
+          postType,
+          authorName: authUserDisplayName(req.auth),
+          field: roleField,
+          interests,
+          isPublished: true,
+          createdAt: fallbackCreatedAt,
+          updatedAt: fallbackCreatedAt,
+        };
+
+        storeCommunityPostFallback(fallbackPost);
+        const engagement = await saveCommunityPostEngagement(fallbackPost.id, createDefaultCommunityPostEngagement());
+        await recordCommunityInteraction(userId, {
+          action: "post_create",
+          itemId: fallbackPost.id,
+          field: fallbackPost.field,
+          tokens: Array.from(new Set([...fallbackPost.interests, ...tokenizeInterestText(fallbackPost.title, content, fallbackPost.field)])),
+        });
+
+        return res.status(201).json({
+          post: buildCommunityPostResponse(fallbackPost, req.auth, encodedContent, engagement),
+          mode: "fallback",
+        });
+      }
+
       return res.status(500).json({ error: "Unable to create post right now." });
     }
   }
@@ -5187,6 +5967,9 @@ app.delete("/api/community/posts/:id", authMiddleware, async (req: Authenticated
     }
 
     await prismaDynamic.communityPost.delete({ where: { id: postId } });
+    communityPostCache.delete(postId);
+    communityCommentsCache.delete(postId);
+    communityPostEngagementCache.delete(postId);
 
     const context = await resolveCommunityInteractionContext(postId);
     await recordCommunityInteraction(userId, {
@@ -5512,9 +6295,20 @@ app.put("/api/auth/profile", authMiddleware, async (req: AuthenticatedRequest, r
       if (typeof location === "string") {
         match.profile.location = location || match.profile.location;
       }
+      if (typeof twoFactorEnabled === "boolean") {
+        offlineTwoFactorOverrides.set(match.id, twoFactorEnabled);
+      }
 
       return res.json({ user: buildInMemorySafeUser(match.profile, match.id), mode: "offline" });
     }
+
+    const twoFactorUpdate = typeof twoFactorEnabled === "boolean"
+      ? {
+          twoFactorEnabled,
+          emailVerificationToken: twoFactorEnabled ? undefined : null,
+          emailVerificationExpiry: twoFactorEnabled ? undefined : null,
+        }
+      : {};
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
@@ -5526,8 +6320,7 @@ app.put("/api/auth/profile", authMiddleware, async (req: AuthenticatedRequest, r
         registrationNo: registrationNo || undefined,
         industry: industry || undefined,
         location: location || undefined,
-        twoFactorEnabled:
-          typeof twoFactorEnabled === "boolean" ? twoFactorEnabled : undefined,
+        ...twoFactorUpdate,
       },
     });
 

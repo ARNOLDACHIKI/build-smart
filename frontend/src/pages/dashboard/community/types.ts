@@ -38,6 +38,14 @@ export type LocalItem = {
     roomId?: string;
     description?: string;
   } | null;
+  engagement?: {
+    likes: number;
+    comments: number;
+    follows: number;
+    showLikes: boolean;
+    showComments: boolean;
+    showFollows: boolean;
+  };
   canDelete?: boolean;
 };
 

@@ -1,4 +1,4 @@
-import { Plus, Search, Film } from 'lucide-react';
+import { Bell, Plus, Search, Film, SlidersHorizontal } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,8 +8,11 @@ type CommunityLayoutProps = {
   onSearchChange: (value: string) => void;
   onOpenCreatePost: () => void;
   onOpenProfile: () => void;
+  onOpenActivity?: () => void;
+  onOpenPostSettings?: () => void;
   onOpenReels?: () => void;
   followCount?: number;
+  activityCount?: number;
   children: React.ReactNode;
 };
 
@@ -18,14 +21,17 @@ const CommunityLayout = ({
   onSearchChange,
   onOpenCreatePost,
   onOpenProfile,
+  onOpenActivity,
+  onOpenPostSettings,
   onOpenReels,
   followCount = 0,
+  activityCount = 0,
   children,
 }: CommunityLayoutProps) => {
   return (
     <div className="min-h-screen bg-[#121420] text-slate-100">
       <header className="fixed inset-x-0 top-0 z-40 h-16 border-b border-[#2A2D3C] bg-[#121420]/95 backdrop-blur-xl">
-        <div className="mx-auto flex h-full w-full max-w-[720px] items-center gap-3 px-4">
+        <div className="mx-auto flex h-full w-full max-w-[1280px] items-center gap-3 px-3 sm:px-4">
           <div className="min-w-[120px]">
             <p className="text-base font-bold tracking-wide text-[#BED234]">Community</p>
             <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Following {followCount}</p>
@@ -42,6 +48,31 @@ const CommunityLayout = ({
           </div>
 
           <div className="flex items-center gap-1.5">
+            {onOpenActivity && (
+              <button
+                type="button"
+                onClick={onOpenActivity}
+                className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#2A2D3C] bg-[#1A1D2B] transition hover:border-[#BED234]"
+                aria-label="Open activity notifications"
+              >
+                <Bell className="h-4 w-4 text-slate-200" />
+                {activityCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 inline-flex min-w-5 items-center justify-center rounded-full bg-[#BED234] px-1 text-[10px] font-bold text-[#121420]">
+                    {activityCount > 9 ? '9+' : activityCount}
+                  </span>
+                )}
+              </button>
+            )}
+            {onOpenPostSettings && (
+              <button
+                type="button"
+                onClick={onOpenPostSettings}
+                className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#2A2D3C] bg-[#1A1D2B] transition hover:border-[#BED234]"
+                aria-label="Open post settings"
+              >
+                <SlidersHorizontal className="h-4 w-4 text-slate-200" />
+              </button>
+            )}
             {onOpenReels && (
               <Button
                 onClick={onOpenReels}
@@ -72,7 +103,7 @@ const CommunityLayout = ({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[720px] px-4 pb-28 pt-[80px]">{children}</main>
+      <main className="mx-auto w-full max-w-[1280px] px-3 pb-28 pt-[80px] sm:px-4">{children}</main>
 
       <Button
         onClick={onOpenCreatePost}

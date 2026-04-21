@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MessageCircle, MoreHorizontal, Share2, ThumbsUp, Trash2, UserCheck, UserPlus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -10,6 +10,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { getCommunityPostComments, type CommunityPostComment, type CommunityShareTarget } from '@/lib/community';
 import type { FeedItem } from './types';
 import MediaRenderer from './MediaRenderer';
 
@@ -25,9 +27,13 @@ type PostCardProps = {
   onFollow: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onReport: (id: string) => Promise<void>;
-  onShare: (id: string) => void;
+  onShare: (id: string, target?: CommunityShareTarget) => void;
   onViewDiscussion: (id: string) => void;
   onJoinLiveRoom: (payload: { roomId: string; title: string }) => void;
+  onToggleEngagementVisibility: (
+    id: string,
+    payload: { showLikes?: boolean; showComments?: boolean; showFollows?: boolean }
+  ) => Promise<void>;
 };
 
 const getInitials = (name: string) => {
@@ -50,6 +56,10 @@ const formatPublishedAt = (value: string) => {
   });
 };
 
+const formatCountNoun = (count: number, singular: string, plural: string): string => {
+  return `${count} ${count === 1 ? singular : plural}`;
+};
+
 const PostCard = ({
   post,
   isMutating,
@@ -65,14 +75,50 @@ const PostCard = ({
   onShare,
   onViewDiscussion,
   onJoinLiveRoom,
+  onToggleEngagementVisibility,
 }: PostCardProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [commentPreview, setCommentPreview] = useState<CommunityPostComment[]>([]);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [hasLoadedPreview, setHasLoadedPreview] = useState(false);
 
   const canExpand = post.summary.length > 150;
   const visibleSummary = useMemo(() => {
     if (isExpanded || !canExpand) return post.summary;
     return `${post.summary.slice(0, 150).trim()}...`;
   }, [canExpand, isExpanded, post.summary]);
+  const engagement = post.engagement || {
+    likes: 0,
+    comments: 0,
+    follows: 0,
+    showLikes: true,
+    showComments: true,
+    showFollows: true,
+  };
+  const followerCount = Math.max(engagement.follows, isFollowing ? 1 : 0);
+  const commentCount = Math.max(engagement.comments, commentPreview.length);
+  const followLabel = formatCountNoun(followerCount, 'follower', 'followers');
+
+  useEffect(() => {
+    if (!hasLoadedPreview) {
+      setCommentPreview([]);
+    }
+  }, [hasLoadedPreview, post.id]);
+
+  const loadCommentPreview = async () => {
+    if (hasLoadedPreview || isPreviewLoading) return;
+
+    try {
+      setIsPreviewLoading(true);
+      const result = await getCommunityPostComments(post.id);
+      setCommentPreview(result.comments.slice(0, 3));
+      setHasLoadedPreview(true);
+    } catch {
+      setCommentPreview([]);
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
 
   return (
     <motion.article
@@ -132,6 +178,28 @@ const PostCard = ({
                 Delete post
               </DropdownMenuItem>
             )}
+            {post.canDelete && (
+              <>
+                <DropdownMenuItem
+                  onClick={() => void onToggleEngagementVisibility(post.id, { showLikes: !engagement.showLikes })}
+                  className="focus:bg-[#121420] focus:text-slate-100"
+                >
+                  {engagement.showLikes ? 'Hide likes count' : 'Show likes count'}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => void onToggleEngagementVisibility(post.id, { showComments: !engagement.showComments })}
+                  className="focus:bg-[#121420] focus:text-slate-100"
+                >
+                  {engagement.showComments ? 'Hide comments count' : 'Show comments count'}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => void onToggleEngagementVisibility(post.id, { showFollows: !engagement.showFollows })}
+                  className="focus:bg-[#121420] focus:text-slate-100"
+                >
+                  {engagement.showFollows ? 'Hide followers count' : 'Show followers count'}
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuItem onClick={() => void onReport(post.id)} className="focus:bg-[#121420] focus:text-slate-100">
               Report post
             </DropdownMenuItem>
@@ -170,31 +238,73 @@ const PostCard = ({
           size="sm"
           variant={isLiked ? 'secondary' : 'ghost'}
           onClick={() => void onLike(post.id)}
-          disabled={isMutating}
-          className="h-8 rounded-full px-3 text-xs font-medium text-slate-400 transition hover:bg-[#1A1D2B] hover:text-slate-200 disabled:opacity-50"
+          className="h-8 rounded-full px-3 text-xs font-medium text-slate-400 transition hover:bg-[#1A1D2B] hover:text-slate-200"
         >
-          <ThumbsUp className="mr-1.5 h-3.5 w-3.5" /> Like
+          <ThumbsUp className="mr-1.5 h-3.5 w-3.5" />
+          {engagement.showLikes ? `Like (${engagement.likes})` : 'Like'}
         </Button>
 
         <Button
           size="sm"
           variant={isFollowing ? 'secondary' : 'ghost'}
           onClick={() => void onFollow(post.id)}
-          disabled={isMutating}
-          className="h-8 rounded-full px-3 text-xs font-medium text-slate-400 transition hover:bg-[#1A1D2B] hover:text-slate-200 disabled:opacity-50"
-        >
-          {isFollowing ? <UserCheck className="mr-1.5 h-3.5 w-3.5" /> : <UserPlus className="mr-1.5 h-3.5 w-3.5" />}
-          {isFollowing ? 'Following' : 'Follow'}
-        </Button>
-
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => onViewDiscussion(post.id)}
           className="h-8 rounded-full px-3 text-xs font-medium text-slate-400 transition hover:bg-[#1A1D2B] hover:text-slate-200"
         >
-          <MessageCircle className="mr-1.5 h-3.5 w-3.5" /> Comment
+          {isFollowing ? <UserCheck className="mr-1.5 h-3.5 w-3.5" /> : <UserPlus className="mr-1.5 h-3.5 w-3.5" />}
+          {engagement.showFollows
+            ? `${isFollowing ? 'Following' : 'Follow'} (${followLabel})`
+            : isFollowing
+              ? 'Following'
+              : 'Follow'}
         </Button>
+
+        <HoverCard openDelay={120} closeDelay={80}>
+          <HoverCardTrigger asChild>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onViewDiscussion(post.id)}
+              onMouseEnter={() => void loadCommentPreview()}
+              className="h-8 rounded-full px-3 text-xs font-medium text-slate-400 transition hover:bg-[#1A1D2B] hover:text-slate-200"
+            >
+              <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
+              {engagement.showComments ? `Comment (${commentCount})` : 'Comment'}
+            </Button>
+          </HoverCardTrigger>
+          <HoverCardContent className="w-80 border-[#2A2D3C] bg-[#121420] text-slate-100">
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-100">Recent comments</p>
+                <p className="text-xs text-slate-500">Hover preview for this thread</p>
+              </div>
+              {isPreviewLoading ? (
+                <p className="text-sm text-slate-400">Loading comments...</p>
+              ) : commentPreview.length > 0 ? (
+                <div className="space-y-2">
+                  {commentPreview.map((comment) => (
+                    <div key={comment.id} className="rounded-lg border border-[#2A2D3C] bg-[#1A1D2B] p-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-slate-200">{comment.author}</p>
+                        <p className="text-[10px] text-slate-500">{new Date(comment.createdAt).toLocaleDateString()}</p>
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-300">{comment.message}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-400">No comments yet.</p>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onViewDiscussion(post.id)}
+                className="w-full border-[#2A2D3C] bg-transparent text-slate-200 hover:bg-[#1A1D2B]"
+              >
+                Open discussion
+              </Button>
+            </div>
+          </HoverCardContent>
+        </HoverCard>
 
         {post.canDelete && (
           <Button
@@ -208,15 +318,38 @@ const PostCard = ({
           </Button>
         )}
 
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => onShare(post.id)}
-          className="ml-auto h-8 w-8 rounded-full p-0 text-slate-400 transition hover:bg-[#1A1D2B] hover:text-slate-200"
-          aria-label="Share post"
-        >
-          <Share2 className="h-3.5 w-3.5" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="ml-auto h-8 w-8 rounded-full p-0 text-slate-400 transition hover:bg-[#1A1D2B] hover:text-slate-200"
+              aria-label="Share post"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="border-[#2A2D3C] bg-[#1A1D2B] text-slate-100">
+            <DropdownMenuItem onClick={() => onShare(post.id, 'native')} className="focus:bg-[#121420] focus:text-slate-100">
+              Share from device
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onShare(post.id, 'copy')} className="focus:bg-[#121420] focus:text-slate-100">
+              Copy link
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onShare(post.id, 'whatsapp')} className="focus:bg-[#121420] focus:text-slate-100">
+              WhatsApp
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onShare(post.id, 'facebook')} className="focus:bg-[#121420] focus:text-slate-100">
+              Facebook
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onShare(post.id, 'linkedin')} className="focus:bg-[#121420] focus:text-slate-100">
+              LinkedIn
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onShare(post.id, 'instagram')} className="focus:bg-[#121420] focus:text-slate-100">
+              Instagram
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </motion.article>
   );

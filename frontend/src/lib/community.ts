@@ -26,8 +26,18 @@ export type CommunityPost = {
     roomId?: string;
     description?: string;
   } | null;
+  engagement?: CommunityPostEngagement;
   canDelete?: boolean;
   createdAt: string;
+};
+
+export type CommunityPostEngagement = {
+  likes: number;
+  comments: number;
+  follows: number;
+  showLikes: boolean;
+  showComments: boolean;
+  showFollows: boolean;
 };
 
 export type CommunityLiveSession = {
@@ -329,12 +339,14 @@ export type CommunityFollowResponse = {
   itemId: string;
   following: boolean;
   state: CommunityState;
+  engagement?: CommunityPostEngagement;
 };
 
 export type CommunityVoteResponse = {
   itemId: string;
   vote: "up" | "down" | null;
   state: CommunityState;
+  engagement?: CommunityPostEngagement;
 };
 
 export type CommunityPollVoteResponse = {
@@ -346,6 +358,29 @@ export type CommunityPollVoteResponse = {
 export type CommunityChatResponse = {
   messages: CommunityState["chatMessages"];
 };
+
+export type CommunityPostComment = {
+  id: string;
+  postId: string;
+  author: string;
+  message: string;
+  replyToCommentId: string | null;
+  createdAt: string;
+};
+
+export type CommunityActivityNotification = {
+  id: string;
+  type: "post_like" | "post_follow" | "post_comment" | "comment_reply";
+  title: string;
+  body: string;
+  postId: string | null;
+  postTitle: string | null;
+  actorName: string | null;
+  createdAt: string;
+  readAt: string | null;
+};
+
+export type CommunityShareTarget = "native" | "whatsapp" | "facebook" | "linkedin" | "instagram" | "copy";
 
 const authorizedRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const token = authStorage.getToken();
@@ -428,6 +463,74 @@ export const sendCommunityChatMessage = async (message: string): Promise<{ messa
     method: "POST",
     body: JSON.stringify({ message }),
   });
+};
+
+export const getCommunityPostComments = async (
+  postId: string
+): Promise<{ postId: string; comments: CommunityPostComment[] }> => {
+  return authorizedRequest<{ postId: string; comments: CommunityPostComment[] }>(`/api/community/posts/${postId}/comments`);
+};
+
+export const addCommunityPostComment = async (
+  postId: string,
+  message: string,
+  replyToCommentId?: string | null
+): Promise<{ postId: string; comment: CommunityPostComment; comments: CommunityPostComment[]; engagement?: CommunityPostEngagement }> => {
+  return authorizedRequest<{ postId: string; comment: CommunityPostComment; comments: CommunityPostComment[]; engagement?: CommunityPostEngagement }>(
+    `/api/community/posts/${postId}/comments`,
+    {
+      method: "POST",
+      body: JSON.stringify({ message, replyToCommentId: replyToCommentId || null }),
+    }
+  );
+};
+
+export const updateCommunityPostEngagementVisibility = async (
+  postId: string,
+  payload: Partial<Pick<CommunityPostEngagement, "showLikes" | "showComments" | "showFollows">>
+): Promise<{ postId: string; engagement: CommunityPostEngagement }> => {
+  return authorizedRequest<{ postId: string; engagement: CommunityPostEngagement }>(`/api/community/posts/${postId}/engagement`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const getCommunityActivity = async (): Promise<{ notifications: CommunityActivityNotification[]; unreadCount: number }> => {
+  return authorizedRequest<{ notifications: CommunityActivityNotification[]; unreadCount: number }>("/api/community/activity");
+};
+
+export const markCommunityActivityRead = async (notificationId: string): Promise<{ notification: CommunityActivityNotification }> => {
+  return authorizedRequest<{ notification: CommunityActivityNotification }>(`/api/community/activity/${notificationId}/read`, {
+    method: "PATCH",
+  });
+};
+
+export const markAllCommunityActivityRead = async (): Promise<{ notifications: CommunityActivityNotification[]; unreadCount: number }> => {
+  return authorizedRequest<{ notifications: CommunityActivityNotification[]; unreadCount: number }>("/api/community/activity/read-all", {
+    method: "PATCH",
+  });
+};
+
+export const buildCommunityShareUrl = (target: CommunityShareTarget, url: string, title: string): string | null => {
+  const encodedUrl = encodeURIComponent(url);
+  const encodedText = encodeURIComponent(`${title} ${url}`);
+
+  switch (target) {
+    case "native":
+      return null;
+    case "whatsapp":
+      return `https://wa.me/?text=${encodedText}`;
+    case "facebook":
+      return `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`;
+    case "linkedin":
+      return `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`;
+    case "instagram":
+      return `instagram://app`;
+    case "copy":
+      return null;
+    default:
+      return null;
+  }
 };
 
 export const reportCommunityPost = async (postId: string, reason: string): Promise<{ ok: boolean; message: string }> => {

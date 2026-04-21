@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
+import type { CommunityShareTarget } from '@/lib/community';
 import type { FeedItem } from './types';
 import PostCard from './PostCard';
 
@@ -16,9 +17,13 @@ type FeedProps = {
   onVote: (id: string, vote: 'up' | 'down') => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onReport: (id: string) => Promise<void>;
-  onShare: (id: string) => void;
+  onShare: (id: string, target?: CommunityShareTarget) => void;
   onViewDiscussion: (id: string) => void;
   onJoinLiveRoom: (payload: { roomId: string; title: string }) => void;
+  onToggleEngagementVisibility: (
+    id: string,
+    payload: { showLikes?: boolean; showComments?: boolean; showFollows?: boolean }
+  ) => Promise<void>;
 };
 
 const INITIAL_BATCH_SIZE = 8;
@@ -66,6 +71,7 @@ const Feed = ({
   onShare,
   onViewDiscussion,
   onJoinLiveRoom,
+  onToggleEngagementVisibility,
 }: FeedProps) => {
   const [visibleCount, setVisibleCount] = useState(INITIAL_BATCH_SIZE);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -132,7 +138,7 @@ const Feed = ({
   return (
     <div className="space-y-5">
       {spotlightPosts.length > 0 && (
-        <section className="overflow-hidden rounded-2xl border border-[#2A2D3C] bg-[#1A1D2B]/80 p-4">
+        <section className="overflow-hidden rounded-2xl border border-[#2A2D3C] bg-[#1A1D2B]/80 p-4 xl:ml-auto xl:w-[94%]">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#BED234]">Articles Spotlight</p>
             <p className="text-[11px] text-slate-500">Top reads from the construction community</p>
@@ -155,6 +161,7 @@ const Feed = ({
                 onShare={onShare}
                 onViewDiscussion={onViewDiscussion}
                 onJoinLiveRoom={onJoinLiveRoom}
+                onToggleEngagementVisibility={onToggleEngagementVisibility}
               />
             ))}
           </div>
@@ -178,6 +185,7 @@ const Feed = ({
           onShare={onShare}
           onViewDiscussion={onViewDiscussion}
           onJoinLiveRoom={onJoinLiveRoom}
+          onToggleEngagementVisibility={onToggleEngagementVisibility}
         />
       ))}
 

@@ -1,5 +1,5 @@
 import { Bell, BookmarkCheck, Clock3, ShieldAlert, Users } from 'lucide-react';
-import type { CommunityAd, CommunityUpdate } from '@/lib/community';
+import type { CommunityActivityNotification, CommunityAd, CommunityUpdate } from '@/lib/community';
 import { Button } from '@/components/ui/button';
 import type { LocalItem } from './types';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +14,7 @@ import {
 type ActivityDrawerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  notifications: Array<{ id: string; title: string; body: string }>;
+  notifications: CommunityActivityNotification[];
   followIds: string[];
   bookmarkIds: string[];
   moderationQueue: Array<{ id: string; title: string; body: string }>;
@@ -28,6 +28,8 @@ type ActivityDrawerProps = {
   ads: CommunityAd[];
   onPinUpdate: (id: string, isPinned: boolean) => Promise<void>;
   onApproveAd: (id: string, isApproved: boolean) => Promise<void>;
+  onMarkNotificationRead: (notificationId: string) => Promise<void>;
+  onMarkAllNotificationsRead: () => Promise<void>;
   isMutating: boolean;
 };
 
@@ -48,27 +50,64 @@ const ActivityDrawer = ({
   ads,
   onPinUpdate,
   onApproveAd,
+  onMarkNotificationRead,
+  onMarkAllNotificationsRead,
   isMutating,
 }: ActivityDrawerProps) => {
+  const unreadCount = notifications.filter((notification) => !notification.readAt).length;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="left" className="w-full overflow-y-auto border-r border-[#2A2D3C] bg-[#121420] text-slate-100 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] sm:w-[320px] sm:max-w-[320px]">
         <SheetHeader>
-          <SheetTitle className="text-slate-100">Activity</SheetTitle>
-          <SheetDescription className="text-slate-400">Notifications, follows, and recent interactions.</SheetDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <SheetTitle className="text-slate-100">Activity</SheetTitle>
+              <SheetDescription className="text-slate-400">Notifications, follows, and recent interactions.</SheetDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-[#2A2D3C] bg-transparent text-slate-200 hover:bg-[#1A1D2B]"
+              onClick={() => void onMarkAllNotificationsRead()}
+              disabled={unreadCount === 0 || isMutating}
+            >
+              Mark all read
+            </Button>
+          </div>
         </SheetHeader>
 
         <div className="mt-5 space-y-5">
           <section className="space-y-2">
             <h3 className="flex items-center gap-2 text-sm font-medium text-slate-200">
               <Bell className="h-4 w-4 text-primary" /> Notifications
+              {unreadCount > 0 && <Badge className="bg-[#BED234] text-[#121420]">{unreadCount}</Badge>}
             </h3>
-            {notifications.map((item) => (
-              <div key={item.id} className="rounded-lg border border-[#2A2D3C] bg-[#1A1D2B] px-3 py-3">
-                <p className="text-sm font-semibold text-slate-100">{item.title}</p>
-                <p className="text-xs text-slate-400">{item.body}</p>
+            {notifications.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-[#2A2D3C] px-3 py-3 text-sm text-slate-400">
+                No activity yet.
               </div>
-            ))}
+            ) : (
+              notifications.map((item) => {
+                const unread = !item.readAt;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => void onMarkNotificationRead(item.id)}
+                    className={`w-full rounded-lg border px-3 py-3 text-left transition ${
+                      unread ? 'border-[#BED234]/40 bg-[#1A1D2B]' : 'border-[#2A2D3C] bg-[#1A1D2B]/70'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-100">{item.title}</p>
+                      {unread && <span className="h-2 w-2 rounded-full bg-[#BED234]" />}
+                    </div>
+                    <p className="text-xs text-slate-400">{item.body}</p>
+                  </button>
+                );
+              })
+            )}
           </section>
 
           <section className="space-y-2">
