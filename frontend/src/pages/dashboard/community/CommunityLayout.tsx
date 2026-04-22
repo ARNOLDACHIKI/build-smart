@@ -2,6 +2,7 @@ import { Bell, Plus, Search, Film, SlidersHorizontal } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import DemoModeBadge from '@/components/community/DemoModeBadge';
 
 type CommunityLayoutProps = {
   search: string;
@@ -30,6 +31,7 @@ const CommunityLayout = ({
 }: CommunityLayoutProps) => {
   return (
     <div className="min-h-screen bg-[#121420] text-slate-100">
+      <DemoModeBadge />
       <header className="fixed inset-x-0 top-0 z-40 h-16 border-b border-[#2A2D3C] bg-[#121420]/95 backdrop-blur-xl">
         <div className="mx-auto flex h-full w-full max-w-[1280px] items-center gap-3 px-3 sm:px-4">
           <div className="min-w-[120px]">

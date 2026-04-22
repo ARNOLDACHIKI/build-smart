@@ -14,6 +14,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { getCommunityPostComments, type CommunityPostComment, type CommunityShareTarget } from '@/lib/community';
 import type { FeedItem } from './types';
 import MediaRenderer from './MediaRenderer';
+import DemoLabel from '@/components/community/DemoLabel';
 
 type PostCardProps = {
   post: FeedItem;
@@ -211,7 +212,10 @@ const PostCard = ({
       {post.media && post.media.length > 0 && <MediaRenderer media={post.media} />}
 
       <div className="space-y-2.5 px-4 py-4">
-        <p className="text-base font-semibold leading-snug text-slate-100">{post.title}</p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-base font-semibold leading-snug text-slate-100 flex-1">{post.title}</p>
+          {post.demoLabel && <DemoLabel variant="badge" demoLabel={post.demoLabel} />}
+        </div>
         <p className="text-sm leading-relaxed text-slate-300">{visibleSummary}</p>
         {canExpand && (
           <button

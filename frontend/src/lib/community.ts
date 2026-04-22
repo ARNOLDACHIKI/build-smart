@@ -16,19 +16,28 @@ export type CommunityPost = {
   author: string;
   field: string;
   interests: string[];
-  stats: string;
+  stats: string | { likes: number; comments: number; shares: number; follows: number };
   verified?: boolean;
   media?: MediaItem[];
   liveSession?: {
     title: string;
-    startsAt: string;
-    roomUrl: string;
+    startsAt?: string;
+    roomUrl?: string;
     roomId?: string;
     description?: string;
   } | null;
   engagement?: CommunityPostEngagement;
   canDelete?: boolean;
   createdAt: string;
+  demoLabel?: string;
+  demoAuthor?: {
+    id: string;
+    name: string;
+    role?: string;
+    avatar?: string;
+    verified?: boolean;
+    company?: string;
+  };
 };
 
 export type CommunityPostEngagement = {

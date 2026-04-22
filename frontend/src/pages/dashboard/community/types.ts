@@ -47,6 +47,15 @@ export type LocalItem = {
     showFollows: boolean;
   };
   canDelete?: boolean;
+  demoLabel?: string;
+  demoAuthor?: {
+    id: string;
+    name: string;
+    role?: string;
+    avatar?: string;
+    verified?: boolean;
+    company?: string;
+  };
 };
 
 export type FeedItem = LocalItem & {

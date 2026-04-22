@@ -8,6 +8,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ActivityProvider } from "@/contexts/ActivityContext";
+import { SimulationProvider } from "@/contexts/SimulationContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 import Index from "./pages/Index";
@@ -72,11 +73,12 @@ const App = () => (
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
-          <ActivityProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
+          <SimulationProvider>
+            <ActivityProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <BrowserRouter>
               <Routes>
                 {/* Public */}
                 <Route path="/" element={<Index />} />
@@ -210,6 +212,7 @@ const App = () => (
             </BrowserRouter>
           </TooltipProvider>
           </ActivityProvider>
+          </SimulationProvider>
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>

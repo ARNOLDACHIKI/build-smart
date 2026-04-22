@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivity } from '@/contexts/ActivityContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 import {
   castCommunityVote,
   buildCommunityShareUrl,
@@ -86,6 +87,9 @@ const CommunityHubV2 = () => {
     setBookmarkIds,
     setSavedPosts,
   } = useActivity();
+
+  // Simulation mode
+  const { isSimulationMode, simulationPosts } = useSimulation();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
@@ -213,6 +217,21 @@ const CommunityHubV2 = () => {
     setFollowIds(Object.keys(follows));
     setBookmarkIds(Object.keys(bookmarks));
   }, [activityNotifications, activityUnreadCount, follows, bookmarks, setContextActivityNotifications, setContextActivityUnreadCount, setFollowIds, setBookmarkIds]);
+
+  // Blend simulation posts into feed when simulation mode is enabled
+  useEffect(() => {
+    if (!isSimulationMode || simulationPosts.length === 0) {
+      return;
+    }
+    
+    setFeed((prevFeed) => {
+      const blendedPosts = [...simulationPosts, ...prevFeed.posts.filter(p => !p.id.startsWith('demo_post_'))];
+      return {
+        ...prevFeed,
+        posts: blendedPosts,
+      };
+    });
+  }, [isSimulationMode, simulationPosts]);
 
   useEffect(() => {
     if (!highlightedPostId) return;
