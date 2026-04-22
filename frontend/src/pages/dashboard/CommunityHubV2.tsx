@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { useActivity } from '@/contexts/ActivityContext';
 import {
   castCommunityVote,
   buildCommunityShareUrl,
@@ -75,12 +76,22 @@ const CommunityHubV2 = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
 
+  // Activity context for sidebar
+  const {
+    isActivityOpen,
+    setIsActivityOpen,
+    setActivityNotifications: setContextActivityNotifications,
+    setActivityUnreadCount: setContextActivityUnreadCount,
+    setFollowIds,
+    setBookmarkIds,
+    setSavedPosts,
+  } = useActivity();
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
   const [isLiveRoomOpen, setIsLiveRoomOpen] = useState(false);
   const [activeLiveRoom, setActiveLiveRoom] = useState<{ roomId: string; title: string } | null>(null);
-  const [isActivityOpen, setIsActivityOpen] = useState(false);
   const [isPostSettingsOpen, setIsPostSettingsOpen] = useState(false);
   const [activityNotifications, setActivityNotifications] = useState<CommunityActivityNotification[]>([]);
   const [activityUnreadCount, setActivityUnreadCount] = useState(0);
@@ -195,6 +206,14 @@ const CommunityHubV2 = () => {
     return () => window.clearInterval(timer);
   }, [loadActivity]);
 
+  // Sync activity data to context for sidebar
+  useEffect(() => {
+    setContextActivityNotifications(activityNotifications);
+    setContextActivityUnreadCount(activityUnreadCount);
+    setFollowIds(Object.keys(follows));
+    setBookmarkIds(Object.keys(bookmarks));
+  }, [activityNotifications, activityUnreadCount, follows, bookmarks, setContextActivityNotifications, setContextActivityUnreadCount, setFollowIds, setBookmarkIds]);
+
   useEffect(() => {
     if (!highlightedPostId) return;
 
@@ -239,6 +258,11 @@ const CommunityHubV2 = () => {
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, []);
+
+  // Sync saved posts to context
+  useEffect(() => {
+    setSavedPosts(savedPosts);
+  }, [savedPosts, setSavedPosts]);
 
   const visibleFeedItems = useMemo(() => {
     return filterBySearch(sortByPersona(feedItems, feed.personalization), search);
@@ -721,7 +745,8 @@ const CommunityHubV2 = () => {
         session={activeLiveRoom}
       />
 
-      <ActivityDrawer
+      {/* Activity is now rendered in the sidebar via context */}
+      {/* <ActivityDrawer
         open={isActivityOpen}
         onOpenChange={setIsActivityOpen}
         notifications={activityNotifications}
@@ -743,7 +768,7 @@ const CommunityHubV2 = () => {
         onMarkNotificationRead={markNotificationRead}
         onMarkAllNotificationsRead={markAllNotificationsRead}
         isMutating={isMutating}
-      />
+      /> */}
 
       <PostSettingsDrawer
         open={isPostSettingsOpen}

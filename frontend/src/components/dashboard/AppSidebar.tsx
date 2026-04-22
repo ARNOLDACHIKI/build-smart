@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useActivity } from '@/contexts/ActivityContext';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -22,6 +23,7 @@ import {
   SidebarHeader, useSidebar,
 } from '@/components/ui/sidebar';
 import { NavLink } from '@/components/NavLink';
+import ActivitySidebarSection from './ActivitySidebarSection';
 import logoDark from '@/assets/logo-dark.png';
 import logoLight from '@/assets/logo-light.png';
 import { useAuth } from '@/contexts/AuthContext';
@@ -39,6 +41,15 @@ const AppSidebar = () => {
   const navigate = useNavigate();
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
+  const {
+    isActivityOpen,
+    setIsActivityOpen,
+    activityNotifications,
+    activityUnreadCount,
+    followIds,
+    bookmarkIds,
+    savedPosts,
+  } = useActivity();
 
   const handleLogout = () => {
     logout();
@@ -134,6 +145,18 @@ const AppSidebar = () => {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {!collapsed && (
+          <ActivitySidebarSection
+            isOpen={isActivityOpen}
+            onClose={() => setIsActivityOpen(false)}
+            notifications={activityNotifications}
+            activityUnreadCount={activityUnreadCount}
+            followIds={followIds}
+            bookmarkIds={bookmarkIds}
+            savedPosts={savedPosts}
+          />
+        )}
       </SidebarContent>
 
       <SidebarFooter className="p-3 space-y-2">
