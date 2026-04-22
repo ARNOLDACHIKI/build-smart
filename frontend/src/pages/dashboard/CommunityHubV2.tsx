@@ -227,6 +227,19 @@ const CommunityHubV2 = () => {
     }));
   }, [feed]);
 
+  const savedPosts = useMemo(() => {
+    return feed.posts.filter((post) => bookmarks[post.id]);
+  }, [feed.posts, bookmarks]);
+
+  const openSavedPost = useCallback((postId: string) => {
+    setHighlightedPostId(postId);
+    setIsActivityOpen(false);
+    const element = document.querySelector(`[data-post-id="${postId}"]`) as HTMLElement | null;
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, []);
+
   const visibleFeedItems = useMemo(() => {
     return filterBySearch(sortByPersona(feedItems, feed.personalization), search);
   }, [feed.personalization, feedItems, search]);
@@ -344,6 +357,7 @@ const CommunityHubV2 = () => {
       const result = await toggleCommunityBookmark(id, nextBookmarked);
       setFeed((current) => ({ ...current, state: result.state }));
       hydrateUiState({ ...feed, state: result.state });
+      toast({ title: nextBookmarked ? 'Post saved' : 'Post removed from saved' });
     } catch (error) {
       setBookmarks((current) => {
         if (previousBookmarked) {
@@ -713,6 +727,8 @@ const CommunityHubV2 = () => {
         notifications={activityNotifications}
         followIds={Object.keys(follows)}
         bookmarkIds={Object.keys(bookmarks)}
+        savedPosts={savedPosts}
+        onOpenSavedPost={openSavedPost}
         moderationQueue={[]}
         canModerate={false}
         polls={[]}

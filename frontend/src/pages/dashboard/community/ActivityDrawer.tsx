@@ -17,6 +17,8 @@ type ActivityDrawerProps = {
   notifications: CommunityActivityNotification[];
   followIds: string[];
   bookmarkIds: string[];
+  savedPosts?: Array<{ id: string; title: string; author?: string }>;
+  onOpenSavedPost?: (postId: string) => void;
   moderationQueue: Array<{ id: string; title: string; body: string }>;
   canModerate: boolean;
   polls: LocalItem[];
@@ -39,6 +41,8 @@ const ActivityDrawer = ({
   notifications,
   followIds,
   bookmarkIds,
+  savedPosts,
+  onOpenSavedPost,
   moderationQueue,
   canModerate,
   polls,
@@ -130,15 +134,38 @@ const ActivityDrawer = ({
             <h3 className="flex items-center gap-2 text-sm font-medium text-slate-200">
               <Clock3 className="h-4 w-4 text-primary" /> Recent interactions
             </h3>
-            <div className="rounded-lg border border-[#2A2D3C] bg-[#1A1D2B] px-3 py-3 text-sm text-slate-400">
-              {bookmarkIds.length > 0 ? (
-                <span className="inline-flex items-center gap-1">
-                  <BookmarkCheck className="h-4 w-4" /> {bookmarkIds.length} saved items
-                </span>
-              ) : (
-                'No saved interactions yet.'
-              )}
-            </div>
+            {savedPosts && savedPosts.length > 0 ? (
+              <div className="space-y-2">
+                {savedPosts.map((post) => (
+                  <button
+                    key={post.id}
+                    onClick={() => onOpenSavedPost?.(post.id)}
+                    type="button"
+                    className="w-full rounded-lg border border-[#2A2D3C] bg-[#1A1D2B]/70 px-3 py-2 transition hover:border-[#BED234]/40 hover:bg-[#1A1D2B]"
+                  >
+                    <div className="flex items-start gap-2">
+                      <BookmarkCheck className="h-4 w-4 flex-shrink-0 text-primary mt-0.5" />
+                      <div className="flex-1 text-left">
+                        <p className="text-sm font-medium text-slate-100 line-clamp-2">{post.title}</p>
+                        {post.author && (
+                          <p className="text-xs text-slate-400 mt-1">by {post.author}</p>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-[#2A2D3C] bg-[#1A1D2B] px-3 py-3 text-sm text-slate-400">
+                {bookmarkIds.length > 0 ? (
+                  <span className="inline-flex items-center gap-1">
+                    <BookmarkCheck className="h-4 w-4" /> {bookmarkIds.length} saved items
+                  </span>
+                ) : (
+                  'No saved interactions yet.'
+                )}
+              </div>
+            )}
           </section>
 
           <section className="space-y-2">

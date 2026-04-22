@@ -421,7 +421,7 @@ export const toggleCommunityBookmark = async (
   itemId: string,
   bookmarked?: boolean
 ): Promise<CommunityBookmarkResponse> => {
-  return authorizedRequest<CommunityBookmarkResponse>(`/api/community/bookmarks/${itemId}`, {
+  return authorizedRequest<CommunityBookmarkResponse>(`/api/community/bookmarks/${encodeURIComponent(itemId)}`, {
     method: "PUT",
     body: JSON.stringify({ bookmarked }),
   });
@@ -431,7 +431,7 @@ export const toggleCommunityFollow = async (
   itemId: string,
   following?: boolean
 ): Promise<CommunityFollowResponse> => {
-  return authorizedRequest<CommunityFollowResponse>(`/api/community/follows/${itemId}`, {
+  return authorizedRequest<CommunityFollowResponse>(`/api/community/follows/${encodeURIComponent(itemId)}`, {
     method: "PUT",
     body: JSON.stringify({ following }),
   });
@@ -441,7 +441,7 @@ export const castCommunityVote = async (
   itemId: string,
   vote: "up" | "down" | null
 ): Promise<CommunityVoteResponse> => {
-  return authorizedRequest<CommunityVoteResponse>(`/api/community/votes/${itemId}`, {
+  return authorizedRequest<CommunityVoteResponse>(`/api/community/votes/${encodeURIComponent(itemId)}`, {
     method: "PUT",
     body: JSON.stringify({ vote }),
   });

@@ -4604,13 +4604,18 @@ app.put("/api/community/bookmarks/:itemId", authMiddleware, async (req: Authenti
   });
 
   const isBookmarked = state.bookmarks.includes(itemId);
-  const context = await resolveCommunityInteractionContext(itemId);
-  await recordCommunityInteraction(userId, {
-    action: isBookmarked ? "bookmark_add" : "bookmark_remove",
-    itemId,
-    field: context.field ?? undefined,
-    tokens: context.tokens,
-  });
+  try {
+    const context = await resolveCommunityInteractionContext(itemId);
+    await recordCommunityInteraction(userId, {
+      action: isBookmarked ? "bookmark_add" : "bookmark_remove",
+      itemId,
+      field: context.field ?? undefined,
+      tokens: context.tokens,
+    });
+  } catch (error) {
+    // Bookmark persistence should succeed even if analytics enrichment fails.
+    console.error("Bookmark analytics error:", error);
+  }
 
   return res.status(200).json({ itemId, bookmarked: isBookmarked, state });
 });

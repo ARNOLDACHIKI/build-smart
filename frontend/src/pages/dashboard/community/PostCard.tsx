@@ -137,6 +137,7 @@ const PostCard = ({
             }
       }
       transition={{ duration: isHighlighted ? 0.6 : 0.24, ease: 'easeOut' }}
+      data-post-id={post.id}
       className={`overflow-hidden rounded-2xl border bg-[#1A1D2B] shadow-[0_12px_28px_-24px_rgba(0,0,0,0.9)] transition-all hover:border-[#3A4156] ${
         isHighlighted
           ? 'border-[#BED234] shadow-[0_0_0_1px_rgba(190,210,52,0.25),0_14px_34px_-18px_rgba(190,210,52,0.45)]'
