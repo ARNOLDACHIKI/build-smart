@@ -8,6 +8,36 @@ const Footer = () => {
   const { t } = useLanguage();
   const { theme } = useTheme();
 
+  const footerColumns = [
+    {
+      title: t('footer.product'),
+      links: [
+        { label: 'Features', href: '/#features' },
+        { label: 'Plans', href: '/#pricing' },
+        { label: 'Request Matching', href: '/solutions' },
+        { label: 'Smart Insights', href: '/#dashboard' },
+      ],
+    },
+    {
+      title: t('footer.company'),
+      links: [
+        { label: 'About', href: '/#about' },
+        { label: 'Updates', href: '/community' },
+        { label: 'Partners', href: '/solutions' },
+        { label: 'Contact', href: '/support' },
+      ],
+    },
+    {
+      title: t('footer.support'),
+      links: [
+        { label: 'Support Center', href: '/support' },
+        { label: 'Documentation', href: '/documentation' },
+        { label: 'Service Status', href: '/support' },
+        { label: 'Community', href: '/community' },
+      ],
+    },
+  ];
+
   return (
     <footer className="border-t border-border py-12 bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -17,16 +47,12 @@ const Footer = () => {
             <p className="text-xs font-bold text-primary tracking-widest mb-2">{t('footer.tagline')}</p>
             <p className="text-sm text-muted-foreground">{t('footer.description')}</p>
           </div>
-          {[
-            { title: t('footer.product'), links: ['Features', 'Plans', 'Request Matching', 'Smart Insights'] },
-            { title: t('footer.company'), links: ['About', 'Updates', 'Partners', 'Contact'] },
-            { title: t('footer.support'), links: ['Support Center', 'Documentation', 'Service Status', 'Community'] },
-          ].map((col, i) => (
+          {footerColumns.map((col, i) => (
             <div key={i}>
               <h4 className="font-semibold text-sm mb-3">{col.title}</h4>
               <ul className="space-y-2">
                 {col.links.map((link, j) => (
-                  <li key={j}><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">{link}</a></li>
+                  <li key={j}><Link to={link.href} className="text-sm text-muted-foreground hover:text-primary transition-colors">{link.label}</Link></li>
                 ))}
               </ul>
             </div>

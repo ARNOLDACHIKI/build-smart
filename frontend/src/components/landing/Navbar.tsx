@@ -52,10 +52,10 @@ const Navbar = () => {
   ];
 
   const resourcesMenu = [
-    { icon: BookOpen, label: 'Documentation', href: '#' },
-    { icon: Mail, label: 'Support', href: '#' },
-    { icon: Zap, label: 'API Docs', href: '#' },
-    { icon: Users, label: 'Community', href: '#' },
+    { icon: BookOpen, label: 'Documentation', href: '/documentation' },
+    { icon: Mail, label: 'Support', href: '/support' },
+    { icon: Zap, label: 'API Docs', href: '/api-docs' },
+    { icon: Users, label: 'Community', href: '/community' },
   ];
 
   return (
@@ -129,10 +129,10 @@ const Navbar = () => {
               <DropdownMenuContent align="start" className="w-56">
                 {resourcesMenu.map((item, i) => (
                   <DropdownMenuItem key={i} asChild>
-                    <a href={item.href} className="flex items-center gap-3 cursor-pointer">
+                    <Link to={item.href} className="flex items-center gap-3 cursor-pointer">
                       <item.icon className="w-4 h-4" />
                       <span>{item.label}</span>
-                    </a>
+                    </Link>
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
@@ -247,15 +247,15 @@ const Navbar = () => {
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-1.5 pl-3 pt-1">
                   {resourcesMenu.map((item, i) => (
-                    <a
+                    <Link
                       key={i}
-                      href={item.href}
+                      to={item.href}
                       onClick={() => setMobileOpen(false)}
                       className="tap-feedback focus-ring flex min-h-10 items-center gap-2 rounded-lg px-2 text-sm text-muted-foreground transition-colors hover:bg-muted/40 hover:text-primary"
                     >
                       <item.icon className="w-4 h-4" />
                       {item.label}
-                    </a>
+                    </Link>
                   ))}
                 </CollapsibleContent>
               </Collapsible>

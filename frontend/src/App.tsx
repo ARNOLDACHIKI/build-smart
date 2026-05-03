@@ -22,6 +22,8 @@ import TermsAndConditions from "./pages/TermsAndConditions";
 import NotFound from "./pages/NotFound";
 import Search from "./pages/Search";
 import Solutions from "./pages/Solutions";
+import Documentation from "./pages/Documentation";
+import ApiDocs from "./pages/ApiDocs";
 
 import DashboardLayout from "./components/dashboard/DashboardLayout";
 import DashboardHome from "./pages/dashboard/DashboardHome";
@@ -95,6 +97,9 @@ const App = () => (
                 <Route path="/terms" element={<TermsAndConditions />} />
                 <Route path="/search" element={<Search />} />
                 <Route path="/solutions" element={<Solutions />} />
+                <Route path="/documentation" element={<Documentation />} />
+                <Route path="/api-docs" element={<ApiDocs />} />
+                <Route path="/support" element={<Support />} />
 
                 {/* User Dashboard */}
                 <Route
