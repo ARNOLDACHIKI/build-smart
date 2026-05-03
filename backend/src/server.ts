@@ -36,7 +36,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const httpServer = createServer(app);
-const prisma = new PrismaClient();
+const prisma: any = new PrismaClient();
 const realtimePresence = new Map<string, { online: boolean; lastSeen: string }>();
 let realtimeIo: SocketIOServer | null = null;
 const prismaDynamic = prisma as typeof prisma & {
@@ -513,7 +513,7 @@ app.post("/api/chat/messages", authMiddleware, rateLimit(20, 60_000), async (req
         timestamp: new Date(),
         attachments: attachments.length
           ? {
-              connect: attachments.map((attachment) => ({ id: attachment.id })),
+              connect: attachments.map((attachment: any) => ({ id: attachment.id })),
             }
           : undefined,
       } as never,
@@ -641,8 +641,8 @@ app.get("/api/presence/:userId", authMiddleware, async (req: AuthenticatedReques
     const settings = await prismaDynamic.platformSetting.findMany({
       where: { key: { in: [`presence.online.${userId}`, `presence.lastSeen.${userId}`] } },
     });
-    const online = settings.find((setting) => setting.key === `presence.online.${userId}`)?.value === "true";
-    const lastSeen = settings.find((setting) => setting.key === `presence.lastSeen.${userId}`)?.value || null;
+    const online = settings.find((setting: any) => setting.key === `presence.online.${userId}`)?.value === "true";
+    const lastSeen = settings.find((setting: any) => setting.key === `presence.lastSeen.${userId}`)?.value || null;
     return res.json({ userId, online, lastSeen });
   } catch (error) {
     console.error("Presence lookup error:", error);
@@ -657,7 +657,7 @@ const calculateProjectProgress = async (projectId: string): Promise<number> => {
   });
 
   if (milestones.length === 0) return 0;
-  const completedCount = milestones.filter((m) => m.status === "COMPLETED").length;
+  const completedCount = milestones.filter((m: any) => m.status === "COMPLETED").length;
   return Math.round((completedCount / milestones.length) * 100);
 };
 
@@ -834,15 +834,20 @@ const createPlatformNotification = async (payload: PlatformNotificationPayload) 
       } as never,
     });
 
+    const n: any = notification;
     emitRealtimeEvent(
       "notification:new",
       {
-        ...(notification as RealtimeNotificationPayload),
+        id: n.id,
+        userId: n.userId,
         type: payload.type,
         title: payload.title,
         body: payload.body,
         metadata: payload.metadata ?? undefined,
-      },
+        createdAt: n.createdAt instanceof Date ? n.createdAt.toISOString() : n.createdAt,
+        updatedAt: n.updatedAt instanceof Date ? n.updatedAt.toISOString() : n.updatedAt,
+        readAt: n.readAt instanceof Date ? n.readAt.toISOString() : n.readAt,
+      } as RealtimeNotificationPayload,
       getUserRoom(payload.userId)
     );
   } catch (error) {
@@ -4191,27 +4196,27 @@ const getProjectReminderSettings = async (userId: string): Promise<ProjectRemind
     },
   });
 
-  const valueByKey = new Map(settings.map((item) => [item.key, item.value]));
+  const valueByKey = new Map<string, any>(settings.map((item: any) => [item.key, item.value]));
 
   return {
-    enabled: parseBooleanSetting(valueByKey.get(getProjectReminderEnabledSettingKey(userId)), PROJECT_REMINDER_DEFAULT_ENABLED),
+    enabled: parseBooleanSetting(valueByKey.get(getProjectReminderEnabledSettingKey(userId)) as string | null | undefined, PROJECT_REMINDER_DEFAULT_ENABLED),
     frequency: parseProjectReminderFrequency(
-      valueByKey.get(getProjectReminderFrequencySettingKey(userId)),
+      valueByKey.get(getProjectReminderFrequencySettingKey(userId)) as string | null | undefined,
       PROJECT_REMINDER_DEFAULT_FREQUENCY,
     ),
     quietHoursStart: parseIntegerSetting(
-      valueByKey.get(getProjectReminderQuietHoursStartSettingKey(userId)),
+      valueByKey.get(getProjectReminderQuietHoursStartSettingKey(userId)) as string | null | undefined,
       PROJECT_REMINDER_DEFAULT_QUIET_HOURS_START,
       0,
       23,
     ),
     quietHoursEnd: parseIntegerSetting(
-      valueByKey.get(getProjectReminderQuietHoursEndSettingKey(userId)),
+      valueByKey.get(getProjectReminderQuietHoursEndSettingKey(userId)) as string | null | undefined,
       PROJECT_REMINDER_DEFAULT_QUIET_HOURS_END,
       0,
       23,
     ),
-    lastSentAt: valueByKey.get(getProjectReminderLastSentSettingKey(userId)) || null,
+    lastSentAt: (valueByKey.get(getProjectReminderLastSentSettingKey(userId)) as string) || null,
   };
 };
 
@@ -7749,13 +7754,13 @@ app.get("/api/inquiries", async (req: express.Request, res) => {
         take: 100,
       });
 
-      const matches = marketplaceInquiries.flatMap((inquiry) => inquiry.matches || []);
+      const matches = marketplaceInquiries.flatMap((inquiry: any) => inquiry.matches || []);
       return res.json({
         inquiries: marketplaceInquiries,
         matches,
         summary: {
-          openCount: marketplaceInquiries.filter((item) => item.marketplaceStatus === "OPEN").length,
-          matchedCount: marketplaceInquiries.filter((item) => item.marketplaceStatus === "MATCHED").length,
+          openCount: marketplaceInquiries.filter((item: any) => item.marketplaceStatus === "OPEN").length,
+          matchedCount: marketplaceInquiries.filter((item: any) => item.marketplaceStatus === "MATCHED").length,
         },
       });
     } catch (error) {
@@ -7773,7 +7778,7 @@ app.get("/api/inquiries", async (req: express.Request, res) => {
     const inquiries = await prisma.inquiry.findMany({
       where: { recipientId: userId },
       orderBy: { createdAt: "desc" },
-    }) as SentInquiryRecord[];
+    }) as any;
 
     return res.json(inquiries);
   } catch (error) {
