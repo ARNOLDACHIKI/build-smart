@@ -4,9 +4,11 @@ import { CheckCircle, TrendingUp, Users, Clock, Star } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Link } from 'react-router-dom';
 import { trackEvent } from '@/lib/utils';
+import { useLandingSectionNavigation } from '@/hooks/useLandingSectionNavigation';
 
 const MobileAppDashboardSection = () => {
   const { t } = useLanguage();
+  const { scrollToSection } = useLandingSectionNavigation();
   const [isPreviewMenuOpen, setIsPreviewMenuOpen] = useState(false);
   const previewMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -17,8 +19,11 @@ const MobileAppDashboardSection = () => {
     });
   };
 
-  const handlePreviewMenuItemClick = (action: string) => {
+  const handlePreviewMenuItemClick = (action: string, sectionId?: string) => {
     trackPreviewClick(action);
+    if (sectionId) {
+      scrollToSection(sectionId);
+    }
     setIsPreviewMenuOpen(false);
   };
 
@@ -135,21 +140,21 @@ const MobileAppDashboardSection = () => {
                         {isPreviewMenuOpen && (
                           <div className="absolute right-2 top-9 z-20 w-24 rounded-lg border border-slate-200 bg-white/95 backdrop-blur px-1.5 py-1.5 shadow-md">
                             <div className="flex flex-col text-[7px] text-slate-600">
-                              <a href="#features" onClick={() => handlePreviewMenuItemClick('menu_features')} className="rounded px-1.5 py-1 hover:bg-slate-100">Features</a>
+                              <button type="button" onClick={() => handlePreviewMenuItemClick('menu_features', 'features')} className="rounded px-1.5 py-1 hover:bg-slate-100 text-left">Features</button>
                               <Link to="/solutions" onClick={() => handlePreviewMenuItemClick('menu_solutions')} className="rounded px-1.5 py-1 hover:bg-slate-100 block">Solutions</Link>
-                              <a href="#pricing" onClick={() => handlePreviewMenuItemClick('menu_plans')} className="rounded px-1.5 py-1 hover:bg-slate-100">Plans</a>
-                              <a href="#pricing" onClick={() => handlePreviewMenuItemClick('menu_pricing')} className="rounded px-1.5 py-1 hover:bg-slate-100">Pricing</a>
-                              <a href="#about" onClick={() => handlePreviewMenuItemClick('menu_resources')} className="rounded px-1.5 py-1 hover:bg-slate-100">Resources</a>
+                              <button type="button" onClick={() => handlePreviewMenuItemClick('menu_plans', 'pricing')} className="rounded px-1.5 py-1 hover:bg-slate-100 text-left">Plans</button>
+                              <button type="button" onClick={() => handlePreviewMenuItemClick('menu_pricing', 'pricing')} className="rounded px-1.5 py-1 hover:bg-slate-100 text-left">Pricing</button>
+                              <button type="button" onClick={() => handlePreviewMenuItemClick('menu_resources', 'about')} className="rounded px-1.5 py-1 hover:bg-slate-100 text-left">Resources</button>
                             </div>
                           </div>
                         )}
 
                         <div className="mt-2.5 flex gap-1 text-[7px] text-slate-500 overflow-hidden">
-                          <a href="#features" onClick={() => trackPreviewClick('chip_features')} className="rounded-full border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100 transition-colors">Features</a>
+                          <button type="button" onClick={() => { trackPreviewClick('chip_features'); scrollToSection('features'); }} className="rounded-full border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100 transition-colors">Features</button>
                           <Link to="/solutions" onClick={() => trackPreviewClick('chip_solutions')} className="rounded-full border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100 transition-colors">Solutions</Link>
-                          <a href="#pricing" onClick={() => trackPreviewClick('chip_plans')} className="rounded-full border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100 transition-colors">Plans</a>
-                          <a href="#pricing" onClick={() => trackPreviewClick('chip_pricing')} className="rounded-full border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100 transition-colors">Pricing</a>
-                          <a href="#about" onClick={() => trackPreviewClick('chip_resources')} className="rounded-full border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100 transition-colors">Resources</a>
+                          <button type="button" onClick={() => { trackPreviewClick('chip_plans'); scrollToSection('pricing'); }} className="rounded-full border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100 transition-colors">Plans</button>
+                          <button type="button" onClick={() => { trackPreviewClick('chip_pricing'); scrollToSection('pricing'); }} className="rounded-full border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100 transition-colors">Pricing</button>
+                          <button type="button" onClick={() => { trackPreviewClick('chip_resources'); scrollToSection('about'); }} className="rounded-full border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100 transition-colors">Resources</button>
                         </div>
                       </div>
 
@@ -159,7 +164,7 @@ const MobileAppDashboardSection = () => {
                         <p className="text-[8px] opacity-90 mt-1 leading-tight">Find contractors, compare plans, and manage delivery from one platform.</p>
                         <div className="mt-2 flex gap-1.5">
                           <Link to="/register" onClick={() => trackPreviewClick('hero_get_started')} className="text-[7px] rounded-full bg-white/20 px-2 py-0.5 hover:bg-white/30 transition-colors">Get Started</Link>
-                          <a href="#pricing" onClick={() => trackPreviewClick('hero_watch_demo')} className="text-[7px] rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20 transition-colors">Watch Demo</a>
+                          <button type="button" onClick={() => { trackPreviewClick('hero_watch_demo'); scrollToSection('pricing'); }} className="text-[7px] rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20 transition-colors">Watch Demo</button>
                         </div>
                       </div>
 
@@ -195,7 +200,7 @@ const MobileAppDashboardSection = () => {
                       <div className="rounded-xl border border-slate-200 bg-white p-2.5">
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-[9px] font-semibold text-slate-800">Pricing plans</p>
-                          <a href="#pricing" onClick={() => trackPreviewClick('pricing_compare')} className="text-[7px] text-slate-500 hover:text-primary transition-colors">Compare</a>
+                          <button type="button" onClick={() => { trackPreviewClick('pricing_compare'); scrollToSection('pricing'); }} className="text-[7px] text-slate-500 hover:text-primary transition-colors">Compare</button>
                         </div>
                         <div className="space-y-1.5">
                           <Link to="/register" onClick={() => trackPreviewClick('plan_free')} className="rounded-md border border-slate-200 px-2 py-1.5 flex items-center justify-between hover:bg-slate-50 transition-colors">
