@@ -15,7 +15,7 @@ const FeaturesSection = () => {
   ];
 
   return (
-    <section id="features" className="py-24 relative">
+    <section id="features" className="scroll-mt-24 py-24 relative">
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full bg-primary/5 blur-3xl" />
       </div>

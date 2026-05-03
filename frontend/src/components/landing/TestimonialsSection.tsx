@@ -12,7 +12,7 @@ const TestimonialsSection = () => {
   const { t } = useLanguage();
 
   return (
-    <section id="about" className="py-24 relative">
+    <section id="about" className="scroll-mt-24 py-24 relative">
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute bottom-0 right-1/4 w-96 h-96 rounded-full bg-accent/5 blur-3xl" />
       </div>

@@ -61,7 +61,7 @@ const MobileAppDashboardSection = () => {
   };
 
   return (
-    <section id="dashboard" className="py-24 overflow-hidden">
+    <section id="dashboard" className="scroll-mt-24 py-24 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           variants={containerVariants}
