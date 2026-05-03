@@ -13,6 +13,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLandingSectionNavigation } from '@/hooks/useLandingSectionNavigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { trackEvent } from '@/lib/utils';
 import logoDark from '@/assets/logo-dark.png';
@@ -25,6 +26,7 @@ const Navbar = () => {
   const [mobileResources, setMobileResources] = useState(false);
   const { language, setLanguage, t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
+  const { scrollToSection } = useLandingSectionNavigation();
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -58,6 +60,14 @@ const Navbar = () => {
     { icon: Users, label: 'Community', href: '/community' },
   ];
 
+  const handleSectionNavigation = (sectionId: string, label?: string) => {
+    if (label) {
+      trackEvent('navbar_feature_click', { feature: label });
+    }
+
+    scrollToSection(sectionId);
+  };
+
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -77,14 +87,14 @@ const Navbar = () => {
               <DropdownMenuContent align="start" className="w-56">
                 {featuresMenu.map((item, i) => (
                   <DropdownMenuItem key={i} asChild>
-                    <a 
-                      href={item.href} 
-                      onClick={() => trackEvent('navbar_feature_click', { feature: item.label })}
+                    <button
+                      type="button"
+                      onClick={() => handleSectionNavigation(item.href, item.label)}
                       className="flex items-center gap-3 cursor-pointer"
                     >
                       <item.icon className="w-4 h-4" />
                       <span>{item.label}</span>
-                    </a>
+                    </button>
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
@@ -105,16 +115,16 @@ const Navbar = () => {
               <DropdownMenuContent align="start" className="w-48">
                 {plansMenu.map((item, i) => (
                   <DropdownMenuItem key={i} asChild>
-                    <a href={item.href} className="cursor-pointer">
+                    <button type="button" onClick={() => handleSectionNavigation(item.href)} className="cursor-pointer">
                       {item.label}
-                    </a>
+                    </button>
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <a href="#pricing" className="text-primary font-medium cursor-pointer">
+                  <button type="button" onClick={() => handleSectionNavigation('pricing')} className="text-primary font-medium cursor-pointer">
                     Compare All Plans
-                  </a>
+                  </button>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -193,18 +203,18 @@ const Navbar = () => {
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-1.5 pl-3 pt-1">
                   {featuresMenu.map((item, i) => (
-                    <a
+                    <button
+                      type="button"
                       key={i}
-                      href={item.href}
                       onClick={() => {
-                        trackEvent('navbar_feature_click', { feature: item.label });
+                        handleSectionNavigation(item.href, item.label);
                         setMobileOpen(false);
                       }}
                       className="tap-feedback focus-ring flex min-h-10 items-center gap-2 rounded-lg px-2 text-sm text-muted-foreground transition-colors hover:bg-muted/40 hover:text-primary"
                     >
                       <item.icon className="w-4 h-4" />
                       {item.label}
-                    </a>
+                    </button>
                   ))}
                 </CollapsibleContent>
               </Collapsible>
@@ -223,18 +233,21 @@ const Navbar = () => {
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-1.5 pl-3 pt-1">
                   {plansMenu.map((item, i) => (
-                    <a
+                    <button
+                      type="button"
                       key={i}
-                      href={item.href}
-                      onClick={() => setMobileOpen(false)}
+                      onClick={() => {
+                        handleSectionNavigation(item.href);
+                        setMobileOpen(false);
+                      }}
                       className="tap-feedback focus-ring flex min-h-10 items-center rounded-lg px-2 text-sm text-muted-foreground transition-colors hover:bg-muted/40 hover:text-primary"
                     >
                       {item.label}
-                    </a>
+                    </button>
                   ))}
-                  <a href="#pricing" onClick={() => setMobileOpen(false)} className="tap-feedback focus-ring flex min-h-10 items-center rounded-lg px-2 text-sm font-medium text-primary transition-colors hover:bg-muted/40">
+                  <button type="button" onClick={() => { handleSectionNavigation('pricing'); setMobileOpen(false); }} className="tap-feedback focus-ring flex min-h-10 items-center rounded-lg px-2 text-sm font-medium text-primary transition-colors hover:bg-muted/40">
                     Compare All Plans
-                  </a>
+                  </button>
                 </CollapsibleContent>
               </Collapsible>
 

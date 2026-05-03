@@ -1,12 +1,14 @@
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Link } from 'react-router-dom';
+import { useLandingSectionNavigation } from '@/hooks/useLandingSectionNavigation';
 import logoDark from '@/assets/logo-dark.png';
 import logoLight from '@/assets/logo-light.png';
 
 const Footer = () => {
   const { t } = useLanguage();
   const { theme } = useTheme();
+  const { scrollToSection } = useLandingSectionNavigation();
 
   const footerColumns = [
     {
@@ -52,7 +54,19 @@ const Footer = () => {
               <h4 className="font-semibold text-sm mb-3">{col.title}</h4>
               <ul className="space-y-2">
                 {col.links.map((link, j) => (
-                  <li key={j}><Link to={link.href} className="text-sm text-muted-foreground hover:text-primary transition-colors">{link.label}</Link></li>
+                  <li key={j}>
+                    {link.href.startsWith('/#') ? (
+                      <button
+                        type="button"
+                        onClick={() => scrollToSection(link.href.slice(2))}
+                        className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        {link.label}
+                      </button>
+                    ) : (
+                      <Link to={link.href} className="text-sm text-muted-foreground hover:text-primary transition-colors">{link.label}</Link>
+                    )}
+                  </li>
                 ))}
               </ul>
             </div>
