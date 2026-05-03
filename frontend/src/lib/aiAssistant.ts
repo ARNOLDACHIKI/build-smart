@@ -16,6 +16,14 @@ type AssistantResponse = {
   remainingChats?: number;
   dailyLimit?: number;
   remainingDailyMessages?: number;
+  inquiryDraft?: {
+    title: string;
+    description: string;
+    budget: string;
+    location: string;
+    category: string;
+  } | null;
+  suggestedAction?: "create_inquiry" | "post_inquiry" | null;
 };
 
 export const askAssistant = async (input: {

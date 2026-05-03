@@ -1,18 +1,22 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Award } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Link } from 'react-router-dom';
+import { calculatePriceWithVAT, formatKES } from '@/lib/pricing';
 
 const PricingSection = () => {
   const { t } = useLanguage();
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
 
   const plans = [
     {
       name: t('pricing.student'),
-      price: 'USD 5',
-      period: t('pricing.year'),
+      monthlyBase: 1800,
+      annualBase: 18000,
+      period: t('pricing.month'),
       desc: 'Best for students and first-time users',
       features: ['Platform access', 'Community access', 'Basic sector data', 'Learning resources', '6-month bonus credits'],
       cta: t('pricing.getStarted'),
@@ -20,8 +24,9 @@ const PricingSection = () => {
     },
     {
       name: t('pricing.basic'),
-      price: 'USD 30',
-      period: t('pricing.year'),
+      monthlyBase: 4200,
+      annualBase: 42000,
+      period: t('pricing.month'),
       desc: 'For growing teams placing regular requests',
       features: ['Full platform access', 'Community messaging', 'Product directory', 'Basic analytics', 'Direct contact', '6-month bonus credits'],
       cta: t('pricing.getStarted'),
@@ -29,8 +34,9 @@ const PricingSection = () => {
     },
     {
       name: t('pricing.professional'),
-      price: 'USD 50',
-      period: t('pricing.year'),
+      monthlyBase: 7800,
+      annualBase: 78000,
+      period: t('pricing.month'),
       desc: 'For advanced teams needing stronger AI support',
       features: ['Everything in Basic', 'Consultant access', 'Team support', 'AI insights', 'Advanced reports', 'Risk predictions', 'Priority support', '6-month bonus credits'],
       cta: t('pricing.getStarted'),
@@ -38,14 +44,24 @@ const PricingSection = () => {
     },
     {
       name: t('pricing.enterprise'),
-      price: 'USD 75',
-      period: t('pricing.year'),
+      monthlyBase: 12000,
+      annualBase: 120000,
+      period: t('pricing.month'),
       desc: 'For organizations requiring full-scale coordination',
       features: ['Everything in Pro', 'Supplier access', 'Product samples', 'Contractor network', 'Specialized data', 'Custom integrations', 'Dedicated support', '6-month bonus credits'],
       cta: t('pricing.contactSales'),
       featured: false,
     },
   ];
+
+  const getPlanPrice = (plan: (typeof plans)[number]) => {
+    const basePrice = billingCycle === 'monthly' ? plan.monthlyBase : plan.annualBase;
+    const price = calculatePriceWithVAT(basePrice);
+    return {
+      baseLabel: formatKES(price.basePrice),
+      totalLabel: `${formatKES(price.totalPrice)} (incl. VAT)`,
+    };
+  };
 
   return (
     <section id="pricing" className="py-24 relative">
@@ -69,6 +85,22 @@ const PricingSection = () => {
           <Badge className="gradient-primary text-primary-foreground px-4 py-1.5 text-sm">
             <Award className="w-4 h-4 mr-1" /> {t('pricing.credits6months')}
           </Badge>
+          <div className="mt-4 inline-flex rounded-full border border-border bg-background p-1 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setBillingCycle('monthly')}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${billingCycle === 'monthly' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Monthly
+            </button>
+            <button
+              type="button"
+              onClick={() => setBillingCycle('annual')}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${billingCycle === 'annual' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Annual
+            </button>
+          </div>
         </motion.div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
@@ -89,8 +121,16 @@ const PricingSection = () => {
               <h3 className="text-lg font-semibold font-['Space_Grotesk']">{plan.name}</h3>
               <p className="text-xs text-muted-foreground mt-1">{plan.desc}</p>
               <div className="mt-4 mb-6">
-                <span className="text-3xl font-bold font-['Space_Grotesk']">{plan.price}</span>
-                <span className="text-muted-foreground text-sm">{plan.period}</span>
+                {(() => {
+                  const price = getPlanPrice(plan);
+                  return (
+                    <>
+                      <p className="text-sm text-muted-foreground">Base: {price.baseLabel}</p>
+                      <span className="block text-3xl font-bold font-['Space_Grotesk']">{price.totalLabel}</span>
+                      <span className="text-muted-foreground text-sm">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
+                    </>
+                  );
+                })()}
               </div>
               <ul className="space-y-3 mb-8 flex-1">
                 {plan.features.map((f, j) => (

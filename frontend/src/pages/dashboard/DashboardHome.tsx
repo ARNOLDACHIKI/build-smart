@@ -8,6 +8,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiUrl } from '@/lib/api';
 
+import ProjectTracker from '@/components/ProjectTracker';
+
 const DASHBOARD_PROJECTS_STORAGE_KEY = 'dashboardProjects';
 
 const PROJECT_PREVIEW = [
@@ -237,6 +239,10 @@ const DashboardHome = () => {
           </CardContent>
         </Card>
       </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.20 }}>
+          <ProjectTracker />
+        </motion.div>
     </div>
   );
 };

@@ -185,11 +185,11 @@ export const generateMockPost = (index: number): CommunityPost => {
   };
 };
 
-export const generateMockPosts = (count: number): CommunityPost[] => {
+export const generateMockPosts = (count: number, startIndex = 0): CommunityPost[] => {
   const posts: CommunityPost[] = [];
   for (let i = 0; i < count; i++) {
     try {
-      posts.push(generateMockPost(i));
+      posts.push(generateMockPost(startIndex + i));
     } catch (error) {
       console.error(`Error generating mock post ${i}:`, error);
     }
@@ -197,5 +197,5 @@ export const generateMockPosts = (count: number): CommunityPost[] => {
   return posts;
 };
 
-// Generate 150 diverse mock posts
-export const mockPosts = generateMockPosts(150);
+// Generate over a thousand diverse mock posts
+export const mockPosts = generateMockPosts(1200);

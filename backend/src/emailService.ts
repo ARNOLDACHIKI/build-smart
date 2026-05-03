@@ -1026,3 +1026,452 @@ function generateInquiryReplyNotificationTemplate(
     </html>
   `);
 }
+
+  /**
+   * Send milestone created notification email
+   */
+  export async function sendMilestoneCreatedEmail(
+    clientEmail: string,
+    clientName: string,
+    projectTitle: string,
+    milestoneTitle: string,
+    milestoneDescription: string | undefined | null,
+    dueDate: Date,
+    projectId: string
+  ): Promise<boolean> {
+    try {
+      const projectLink = `${APP_URL}/project/${projectId}`;
+      const formattedDate = new Date(dueDate).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+
+      const htmlContent = generateMilestoneCreatedTemplate(
+        clientName,
+        projectTitle,
+        milestoneTitle,
+        milestoneDescription,
+        formattedDate,
+        projectLink
+      );
+
+      const info = await transporter.sendMail({
+        from: `"${COMPANY_NAME}" <${COMPANY_EMAIL}>`,
+        to: clientEmail,
+        subject: `New Milestone in "${projectTitle}" - ${COMPANY_NAME}`,
+        html: htmlContent,
+      });
+
+      console.log("✅ Milestone created email sent to:", clientEmail, "Message ID:", info.messageId);
+      return true;
+    } catch (error) {
+      console.error("❌ Failed to send milestone created email:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Send milestone due reminder email
+   */
+  export async function sendMilestoneDueReminderEmail(
+    email: string,
+    name: string,
+    projectTitle: string,
+    milestoneTitle: string,
+    dueDate: Date,
+    projectId: string
+  ): Promise<boolean> {
+    try {
+      const projectLink = `${APP_URL}/project/${projectId}`;
+      const formattedDate = new Date(dueDate).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+
+      const htmlContent = generateMilestoneDueReminderTemplate(
+        name,
+        projectTitle,
+        milestoneTitle,
+        formattedDate,
+        projectLink
+      );
+
+      const info = await transporter.sendMail({
+        from: `"${COMPANY_NAME}" <${COMPANY_EMAIL}>`,
+        to: email,
+        subject: `Reminder: "${milestoneTitle}" due on ${formattedDate}`,
+        html: htmlContent,
+      });
+
+      console.log("✅ Milestone due reminder email sent to:", email, "Message ID:", info.messageId);
+      return true;
+    } catch (error) {
+      console.error("❌ Failed to send milestone reminder email:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Send milestone completed notification email
+   */
+  export async function sendMilestoneCompletedEmail(
+    email: string,
+    name: string,
+    projectTitle: string,
+    milestoneTitle: string,
+    projectId: string
+  ): Promise<boolean> {
+    try {
+      const projectLink = `${APP_URL}/project/${projectId}`;
+      const htmlContent = generateMilestoneCompletedTemplate(
+        name,
+        projectTitle,
+        milestoneTitle,
+        projectLink
+      );
+
+      const info = await transporter.sendMail({
+        from: `"${COMPANY_NAME}" <${COMPANY_EMAIL}>`,
+        to: email,
+        subject: `✅ Milestone Completed: "${milestoneTitle}"`,
+        html: htmlContent,
+      });
+
+      console.log("✅ Milestone completed email sent to:", email, "Message ID:", info.messageId);
+      return true;
+    } catch (error) {
+      console.error("❌ Failed to send milestone completed email:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Send project created notification email
+   */
+  export async function sendProjectCreatedEmail(
+    email: string,
+    name: string,
+    projectTitle: string,
+    projectDescription: string | undefined | null,
+    partnerName: string,
+    projectId: string
+  ): Promise<boolean> {
+    try {
+      const projectLink = `${APP_URL}/project/${projectId}`;
+      const htmlContent = generateProjectCreatedTemplate(
+        name,
+        projectTitle,
+        projectDescription,
+        partnerName,
+        projectLink
+      );
+
+      const info = await transporter.sendMail({
+        from: `"${COMPANY_NAME}" <${COMPANY_EMAIL}>`,
+        to: email,
+        subject: `New Project Created: "${projectTitle}" - ${COMPANY_NAME}`,
+        html: htmlContent,
+      });
+
+      console.log("✅ Project created email sent to:", email, "Message ID:", info.messageId);
+      return true;
+    } catch (error) {
+      console.error("❌ Failed to send project created email:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Send project completed notification email
+   */
+  export async function sendProjectCompletedEmail(
+    email: string,
+    name: string,
+    projectTitle: string,
+    projectId: string
+  ): Promise<boolean> {
+    try {
+      const projectLink = `${APP_URL}/project/${projectId}`;
+      const htmlContent = generateProjectCompletedTemplate(
+        name,
+        projectTitle,
+        projectLink
+      );
+
+      const info = await transporter.sendMail({
+        from: `"${COMPANY_NAME}" <${COMPANY_EMAIL}>`,
+        to: email,
+        subject: `✅ Project Completed: "${projectTitle}"`,
+        html: htmlContent,
+      });
+
+      console.log("✅ Project completed email sent to:", email, "Message ID:", info.messageId);
+      return true;
+    } catch (error) {
+      console.error("❌ Failed to send project completed email:", error);
+      return false;
+    }
+  }
+
+  // Email template generators for milestones and projects
+
+  function generateMilestoneCreatedTemplate(
+    clientName: string,
+    projectTitle: string,
+    milestoneTitle: string,
+    description: string | undefined | null,
+    dueDate: string,
+    projectLink: string
+  ): string {
+    return applyBrandedEmailTheme(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #f5f5f5; margin: 0; padding: 0; }
+          .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+          .header { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 40px 20px; text-align: center; }
+          .header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+          .content { padding: 40px; }
+          .milestone-box { background-color: #f9f9f9; border-left: 4px solid #f093fb; padding: 20px; border-radius: 4px; margin: 20px 0; }
+          .milestone-title { font-size: 18px; font-weight: 600; color: #333; margin: 0 0 10px 0; }
+          .milestone-detail { font-size: 14px; color: #666; margin: 5px 0; }
+          .button-container { text-align: center; margin: 30px 0; }
+          .button { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; text-decoration: none; padding: 12px 40px; border-radius: 5px; display: inline-block; font-weight: 600; }
+          .footer { background-color: #f5f5f5; padding: 20px; text-align: center; border-top: 1px solid #e0e0e0; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>📋 New Milestone Created</h1>
+          </div>
+          <div class="content">
+            <p>Hi ${clientName},</p>
+            <p>A new milestone has been added to your project <strong>"${projectTitle}"</strong>:</p>
+            <div class="milestone-box">
+              <p class="milestone-title">${milestoneTitle}</p>
+              ${description ? `<p class="milestone-detail">${description}</p>` : ""}
+              <p class="milestone-detail"><strong>Due Date:</strong> ${dueDate}</p>
+            </div>
+            <p>Track the progress and stay updated on your project timeline.</p>
+            <div class="button-container">
+              <a href="${projectLink}" class="button">View Project</a>
+            </div>
+          </div>
+          <div class="footer">
+            <p><strong>${COMPANY_NAME}</strong></p>
+            <p>&copy; ${new Date().getFullYear()} ${COMPANY_NAME}. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+
+  function generateMilestoneDueReminderTemplate(
+    name: string,
+    projectTitle: string,
+    milestoneTitle: string,
+    dueDate: string,
+    projectLink: string
+  ): string {
+    return applyBrandedEmailTheme(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #f5f5f5; margin: 0; padding: 0; }
+          .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+          .header { background: linear-gradient(135deg, #ffc107 0%, #ff9f1c 100%); color: #333; padding: 40px 20px; text-align: center; }
+          .header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+          .content { padding: 40px; }
+          .reminder-box { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; border-radius: 4px; margin: 20px 0; }
+          .button-container { text-align: center; margin: 30px 0; }
+          .button { background: linear-gradient(135deg, #ffc107 0%, #ff9f1c 100%); color: #333; text-decoration: none; padding: 12px 40px; border-radius: 5px; display: inline-block; font-weight: 600; }
+          .footer { background-color: #f5f5f5; padding: 20px; text-align: center; border-top: 1px solid #e0e0e0; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>⏰ Milestone Due Reminder</h1>
+          </div>
+          <div class="content">
+            <p>Hi ${name},</p>
+            <p>This is a friendly reminder that a milestone is coming up!</p>
+            <div class="reminder-box">
+              <p><strong>Milestone:</strong> ${milestoneTitle}</p>
+              <p><strong>Project:</strong> ${projectTitle}</p>
+              <p><strong>Due Date:</strong> ${dueDate}</p>
+            </div>
+            <p>Make sure to stay on track and complete this milestone on time.</p>
+            <div class="button-container">
+              <a href="${projectLink}" class="button">Check Progress</a>
+            </div>
+          </div>
+          <div class="footer">
+            <p><strong>${COMPANY_NAME}</strong></p>
+            <p>&copy; ${new Date().getFullYear()} ${COMPANY_NAME}. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+
+  function generateMilestoneCompletedTemplate(
+    name: string,
+    projectTitle: string,
+    milestoneTitle: string,
+    projectLink: string
+  ): string {
+    return applyBrandedEmailTheme(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #f5f5f5; margin: 0; padding: 0; }
+          .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+          .header { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 40px 20px; text-align: center; }
+          .header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+          .content { padding: 40px; }
+          .success-box { background-color: #f0fdf4; border-left: 4px solid #38ef7d; padding: 20px; border-radius: 4px; margin: 20px 0; }
+          .button-container { text-align: center; margin: 30px 0; }
+          .button { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; text-decoration: none; padding: 12px 40px; border-radius: 5px; display: inline-block; font-weight: 600; }
+          .footer { background-color: #f5f5f5; padding: 20px; text-align: center; border-top: 1px solid #e0e0e0; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>✅ Milestone Completed!</h1>
+          </div>
+          <div class="content">
+            <p>Hi ${name},</p>
+            <p>Great news! A milestone has been marked as complete:</p>
+            <div class="success-box">
+              <p><strong>Milestone:</strong> ${milestoneTitle}</p>
+              <p><strong>Project:</strong> ${projectTitle}</p>
+            </div>
+            <p>Keep up the excellent work on your construction project!</p>
+            <div class="button-container">
+              <a href="${projectLink}" class="button">View Project</a>
+            </div>
+          </div>
+          <div class="footer">
+            <p><strong>${COMPANY_NAME}</strong></p>
+            <p>&copy; ${new Date().getFullYear()} ${COMPANY_NAME}. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+
+  function generateProjectCreatedTemplate(
+    name: string,
+    projectTitle: string,
+    description: string | undefined | null,
+    partnerName: string,
+    projectLink: string
+  ): string {
+    return applyBrandedEmailTheme(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #f5f5f5; margin: 0; padding: 0; }
+          .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+          .header { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 40px 20px; text-align: center; }
+          .header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+          .content { padding: 40px; }
+          .project-box { background-color: #f0f4ff; border-left: 4px solid #4facfe; padding: 20px; border-radius: 4px; margin: 20px 0; }
+          .button-container { text-align: center; margin: 30px 0; }
+          .button { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; text-decoration: none; padding: 12px 40px; border-radius: 5px; display: inline-block; font-weight: 600; }
+          .footer { background-color: #f5f5f5; padding: 20px; text-align: center; border-top: 1px solid #e0e0e0; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🎉 Project Created!</h1>
+          </div>
+          <div class="content">
+            <p>Hi ${name},</p>
+            <p>Your new construction project has been created and is ready to go!</p>
+            <div class="project-box">
+              <p><strong>Project:</strong> ${projectTitle}</p>
+              <p><strong>Partner:</strong> ${partnerName}</p>
+              ${description ? `<p><strong>Details:</strong> ${description}</p>` : ""}
+            </div>
+            <p>Start adding milestones and tracking progress on your journey to project completion.</p>
+            <div class="button-container">
+              <a href="${projectLink}" class="button">Start Project</a>
+            </div>
+          </div>
+          <div class="footer">
+            <p><strong>${COMPANY_NAME}</strong></p>
+            <p>&copy; ${new Date().getFullYear()} ${COMPANY_NAME}. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+
+  function generateProjectCompletedTemplate(
+    name: string,
+    projectTitle: string,
+    projectLink: string
+  ): string {
+    return applyBrandedEmailTheme(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #f5f5f5; margin: 0; padding: 0; }
+          .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+          .header { background: linear-gradient(135deg, #fcb045 0%, #fd1d1d 100%); color: white; padding: 40px 20px; text-align: center; }
+          .header h1 { margin: 0; font-size: 28px; font-weight: 600; }
+          .content { padding: 40px; }
+          .congrats-box { background-color: #fff3cd; border-left: 4px solid #fcb045; padding: 20px; border-radius: 4px; margin: 20px 0; text-align: center; }
+          .button-container { text-align: center; margin: 30px 0; }
+          .button { background: linear-gradient(135deg, #fcb045 0%, #fd1d1d 100%); color: white; text-decoration: none; padding: 12px 40px; border-radius: 5px; display: inline-block; font-weight: 600; }
+          .footer { background-color: #f5f5f5; padding: 20px; text-align: center; border-top: 1px solid #e0e0e0; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🏆 Project Complete!</h1>
+          </div>
+          <div class="content">
+            <p>Hi ${name},</p>
+            <div class="congrats-box">
+              <h2 style="margin: 0 0 10px 0; font-size: 20px;">Congratulations!</h2>
+              <p style="margin: 0; font-size: 16px; font-weight: 600;">"${projectTitle}" is now complete!</p>
+            </div>
+            <p>Thank you for using our construction project tracking platform. We hope this project was a success!</p>
+            <p>Ready for your next project? We're here to help you manage it smoothly from start to finish.</p>
+            <div class="button-container">
+              <a href="${projectLink}" class="button">View Completion Report</a>
+            </div>
+          </div>
+          <div class="footer">
+            <p><strong>${COMPANY_NAME}</strong></p>
+            <p>&copy; ${new Date().getFullYear()} ${COMPANY_NAME}. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `);
+  }

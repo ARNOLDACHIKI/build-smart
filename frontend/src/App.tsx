@@ -41,8 +41,12 @@ import ProfessionalSearch from "./pages/dashboard/ProfessionalSearch";
 import Profile from "./pages/dashboard/Profile";
 import MyMessages from "./pages/dashboard/MyMessages";
 const CommunityHub = lazy(() => import("./pages/dashboard/CommunityHubV3"));
+const RedditCommunity = lazy(() => import("./pages/dashboard/community/CommunityPage"));
+const CommunityPostDetail = lazy(() => import("./components/community/PostDetail"));
 
 import AdminLayout from "./components/admin/AdminLayout";
+const MilestoneProjectDetail = lazy(() => import("./pages/ProjectDetail"));
+
 import AdminOverview from "./pages/admin/AdminOverview";
 import AdminUsers from "./pages/admin/AdminUsers";
 import { AdminProjects, AdminSubscriptions, AdminContent, AdminLogs, AdminAI, AdminSettings } from "./pages/admin/AdminPages";
@@ -127,13 +131,21 @@ const App = () => (
                   />
                 </Route>
 
+                {/* Milestone Tracking */}
                 <Route
-                  path="/community"
+                  path="/project/:id"
                   element={
                     <ProtectedRoute allowedRoles={["USER"]}>
-                      <DashboardLayout />
+                      <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Loading project...</div>}>
+                        <MilestoneProjectDetail />
+                      </Suspense>
                     </ProtectedRoute>
                   }
+                />
+
+                <Route
+                  path="/community"
+                  element={<DashboardLayout />}
                 >
                   <Route
                     index
@@ -206,6 +218,22 @@ const App = () => (
                   <Route path="settings" element={<SettingsPage />} />
                   <Route path="support" element={<RoleSupport />} />
                 </Route>
+
+                <Route path="/community/reddit" element={
+                  <ProtectedRoute allowedRoles={["USER"]}>
+                    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading community...</div>}>
+                      <RedditCommunity />
+                    </Suspense>
+                  </ProtectedRoute>
+                } />
+
+                <Route path="/community/post/:id" element={
+                  <ProtectedRoute allowedRoles={["USER"]}>
+                    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading post...</div>}>
+                      <CommunityPostDetail />
+                    </Suspense>
+                  </ProtectedRoute>
+                } />
 
                 <Route path="*" element={<NotFound />} />
               </Routes>

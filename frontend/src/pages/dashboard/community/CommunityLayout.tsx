@@ -3,6 +3,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import DemoModeBadge from '@/components/community/DemoModeBadge';
+import { useAuth } from '@/contexts/AuthContext';
 
 type CommunityLayoutProps = {
   search: string;
@@ -12,6 +13,7 @@ type CommunityLayoutProps = {
   onOpenActivity?: () => void;
   onOpenPostSettings?: () => void;
   onOpenReels?: () => void;
+  onOpenSimulationSettings?: () => void;
   followCount?: number;
   activityCount?: number;
   children: React.ReactNode;
@@ -25,10 +27,12 @@ const CommunityLayout = ({
   onOpenActivity,
   onOpenPostSettings,
   onOpenReels,
+  onOpenSimulationSettings,
   followCount = 0,
   activityCount = 0,
   children,
 }: CommunityLayoutProps) => {
+  const { isAuthenticated } = useAuth();
   return (
     <div className="min-h-screen bg-[#121420] text-slate-100">
       <DemoModeBadge />
@@ -63,6 +67,17 @@ const CommunityLayout = ({
                     {activityCount > 9 ? '9+' : activityCount}
                   </span>
                 )}
+              </button>
+            )}
+            {onOpenSimulationSettings && (
+              <button
+                type="button"
+                onClick={onOpenSimulationSettings}
+                className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#2A2D3C] bg-[#1A1D2B] transition hover:border-[#BED234]"
+                aria-label="Open simulation settings"
+                title="Simulation Settings"
+              >
+                <span className="text-xs font-bold">⚡</span>
               </button>
             )}
             {onOpenPostSettings && (
@@ -107,13 +122,23 @@ const CommunityLayout = ({
 
       <main className="mx-auto w-full max-w-[1280px] px-3 pb-28 pt-[80px] sm:px-4">{children}</main>
 
-      <Button
-        onClick={onOpenCreatePost}
-        className="fixed bottom-8 right-6 z-30 h-14 rounded-full border-0 bg-[#BED234] px-6 text-sm font-bold text-[#121420] shadow-[0_16px_32px_rgba(0,0,0,0.4)] transition hover:brightness-110"
-        aria-label="Create post"
-      >
-        <Plus className="mr-2 h-5 w-5" /> Create
-      </Button>
+      {isAuthenticated ? (
+        <Button
+          onClick={onOpenCreatePost}
+          className="fixed bottom-8 right-6 z-30 h-14 rounded-full border-0 bg-[#BED234] px-6 text-sm font-bold text-[#121420] shadow-[0_16px_32px_rgba(0,0,0,0.4)] transition hover:brightness-110"
+          aria-label="Create post"
+        >
+          <Plus className="mr-2 h-5 w-5" /> Create
+        </Button>
+      ) : (
+        <Button
+          onClick={() => (window.location.href = '/login')}
+          className="fixed bottom-8 right-6 z-30 h-14 rounded-full border-0 bg-[#121420] border border-[#2A2D3C] px-4 text-sm font-semibold text-slate-200 shadow-[0_16px_32px_rgba(0,0,0,0.12)] transition hover:border-[#BED234]"
+          aria-label="Login to post"
+        >
+          Log in to post
+        </Button>
+      )}
     </div>
   );
 };

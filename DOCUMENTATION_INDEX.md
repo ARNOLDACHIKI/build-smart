@@ -10,6 +10,7 @@ Complete guide to all landing page enhancements documentation.
 - 👤 **End Users**: [LANDING_NAV_USER_GUIDE.md](LANDING_NAV_USER_GUIDE.md)
 - ⚡ **Quick Start**: [QUICK_START_LANDING_NAV.md](QUICK_START_LANDING_NAV.md)
 - 👨‍💻 **Developers**: [CODE_CHANGES_SUMMARY.md](CODE_CHANGES_SUMMARY.md)
+- 📘 **System Overview**: [SYSTEM_FUNCTIONALITIES_OVERVIEW.md](SYSTEM_FUNCTIONALITIES_OVERVIEW.md)
 
 ---
 
@@ -19,6 +20,7 @@ Complete guide to all landing page enhancements documentation.
 | Document | Purpose | Audience | Read Time |
 |----------|---------|----------|-----------|
 | [PROJECT_COMPLETION_REPORT.md](PROJECT_COMPLETION_REPORT.md) | Full project status, metrics, testing results | Project managers, stakeholders | 15 min |
+| [SYSTEM_FUNCTIONALITIES_OVERVIEW.md](SYSTEM_FUNCTIONALITIES_OVERVIEW.md) | Single summary of system features and functionality | Stakeholders, reviewers, handoff recipients | 10 min |
 | [LANDING_PAGE_ENHANCEMENTS.md](LANDING_PAGE_ENHANCEMENTS.md) | Technical implementation details | Developers | 20 min |
 | [CODE_CHANGES_SUMMARY.md](CODE_CHANGES_SUMMARY.md) | Exact code modifications made | Developers, code reviewers | 25 min |
 

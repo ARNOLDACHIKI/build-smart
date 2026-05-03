@@ -27,6 +27,8 @@ import CreatePostModal from './community/CreatePostModal';
 import Feed from './community/Feed';
 import LiveRoomModal from './community/LiveRoomModal';
 import PostSettingsDrawer from './community/PostSettingsDrawer';
+import DemoModeBadge from '@/components/community/DemoModeBadge';
+import SimulationSettings from '@/components/community/SimulationSettings';
 import { ReelsPage } from './community/ReelsPage';
 import { filterBySearch, sortByPersona } from './community/tabUtils';
 import type { FeedItem } from './community/types';
@@ -89,7 +91,7 @@ const CommunityHubV2 = () => {
   } = useActivity();
 
   // Simulation mode
-  const { isSimulationMode, simulationPosts } = useSimulation();
+  const { isSimulationMode, simulationPosts, refreshSimulation } = useSimulation();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
@@ -97,6 +99,7 @@ const CommunityHubV2 = () => {
   const [isLiveRoomOpen, setIsLiveRoomOpen] = useState(false);
   const [activeLiveRoom, setActiveLiveRoom] = useState<{ roomId: string; title: string } | null>(null);
   const [isPostSettingsOpen, setIsPostSettingsOpen] = useState(false);
+  const [isSimulationSettingsOpen, setIsSimulationSettingsOpen] = useState(false);
   const [activityNotifications, setActivityNotifications] = useState<CommunityActivityNotification[]>([]);
   const [activityUnreadCount, setActivityUnreadCount] = useState(0);
   const [postVisibilityDefaults, setPostVisibilityDefaults] = useState<{
@@ -153,7 +156,12 @@ const CommunityHubV2 = () => {
       // Merge API posts with expanded mock posts for demo/fallback purposes
       const mergedData = {
         ...data,
-        posts: data.posts.length > 0 ? [...data.posts, ...expandedMockPosts.slice(0, 8)] : expandedMockPosts,
+        posts: (() => {
+          const basePosts = data.posts.length > 0 ? [...data.posts, ...expandedMockPosts.slice(0, 8)] : expandedMockPosts;
+          return isSimulationMode
+            ? [...simulationPosts, ...basePosts.filter((post) => !post.id.startsWith('demo_post_'))]
+            : basePosts;
+        })(),
       };
       setFeed(mergedData);
       hydrateUiState(mergedData);
@@ -172,7 +180,7 @@ const CommunityHubV2 = () => {
     } finally {
       if (!silent && currentLoadId === loadIdRef.current) setIsLoading(false);
     }
-  }, [search, toast]);
+  }, [isSimulationMode, search, simulationPosts, toast]);
 
   useEffect(() => {
     try {
@@ -218,21 +226,6 @@ const CommunityHubV2 = () => {
     setBookmarkIds(Object.keys(bookmarks));
   }, [activityNotifications, activityUnreadCount, follows, bookmarks, setContextActivityNotifications, setContextActivityUnreadCount, setFollowIds, setBookmarkIds]);
 
-  // Blend simulation posts into feed when simulation mode is enabled
-  useEffect(() => {
-    if (!isSimulationMode || simulationPosts.length === 0) {
-      return;
-    }
-    
-    setFeed((prevFeed) => {
-      const blendedPosts = [...simulationPosts, ...prevFeed.posts.filter(p => !p.id.startsWith('demo_post_'))];
-      return {
-        ...prevFeed,
-        posts: blendedPosts,
-      };
-    });
-  }, [isSimulationMode, simulationPosts]);
-
   useEffect(() => {
     if (!highlightedPostId) return;
 
@@ -244,26 +237,39 @@ const CommunityHubV2 = () => {
   }, [highlightedPostId]);
 
   const feedItems = useMemo<FeedItem[]>(() => {
-    return feed.posts.map((post) => ({
-      id: post.id,
-      title: post.title,
-      summary: post.summary,
-      field: post.field,
-      tags: post.interests,
-      location: feed.personalization.inferredField,
-      contentTypes: inferContentTypes(post),
-      author: post.author,
-      metrics: post.stats,
-      createdAt: post.createdAt,
-      kind: post.type,
-      verified: true,
-      media: post.media,
-      liveSession: post.liveSession,
-      engagement: post.engagement,
-      canDelete: Boolean(post.canDelete),
-      source: 'api',
-    }));
-  }, [feed]);
+    return feed.posts.map((post) => {
+      const metricsStr: string = typeof post.stats === 'string' 
+        ? post.stats 
+        : `${post.stats.likes} likes, ${post.stats.comments} comments`;
+      const liveSession = post.liveSession ? {
+        title: post.liveSession.title,
+        startsAt: post.liveSession.startsAt || new Date().toISOString(),
+        roomUrl: post.liveSession.roomUrl || '',
+        roomId: post.liveSession.roomId,
+        description: post.liveSession.description,
+      } : null;
+      return {
+        id: post.id,
+        title: post.title,
+        summary: post.summary,
+        field: post.field,
+        tags: post.interests,
+        location: feed.personalization.inferredField,
+        contentTypes: inferContentTypes(post),
+        author: post.author,
+        metrics: metricsStr,
+        createdAt: post.createdAt,
+        kind: post.type,
+        verified: true,
+        media: post.media,
+        liveSession,
+        engagement: post.engagement,
+        canDelete: Boolean(post.canDelete),
+        source: 'api',
+        demoLabel: (post as any).demoLabel,
+      };
+    });
+  }, [feed, feed.personalization.inferredField]);
 
   const savedPosts = useMemo(() => {
     return feed.posts.filter((post) => bookmarks[post.id]);
@@ -286,6 +292,41 @@ const CommunityHubV2 = () => {
   const visibleFeedItems = useMemo(() => {
     return filterBySearch(sortByPersona(feedItems, feed.personalization), search);
   }, [feed.personalization, feedItems, search]);
+
+  const scrollStateRef = useRef({ lastY: 0, hasLeftTop: false, locked: false });
+
+  useEffect(() => {
+    if (!isSimulationMode) {
+      scrollStateRef.current = { lastY: 0, hasLeftTop: false, locked: false };
+      return;
+    }
+
+    const handleScroll = () => {
+      const currentY = window.scrollY || document.documentElement.scrollTop || 0;
+      const state = scrollStateRef.current;
+
+      if (currentY > 200) {
+        state.hasLeftTop = true;
+      }
+
+      const isBackAtTop = currentY < 120 && state.hasLeftTop;
+      const isScrollingUp = currentY < state.lastY;
+
+      if (isBackAtTop && isScrollingUp && !state.locked) {
+        state.locked = true;
+        state.hasLeftTop = false;
+        refreshSimulation();
+        window.setTimeout(() => {
+          scrollStateRef.current.locked = false;
+        }, 1500);
+      }
+
+      state.lastY = currentY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isSimulationMode, refreshSimulation]);
 
   const activeCommentPost = useMemo(
     () => visibleFeedItems.find((item) => item.id === activeCommentPostId) || null,
@@ -647,6 +688,7 @@ const CommunityHubV2 = () => {
 
   return (
     <>
+      <DemoModeBadge />
       {viewMode === 'reels' ? (
         <div className="relative">
           <ReelsPage />
@@ -666,6 +708,7 @@ const CommunityHubV2 = () => {
           onOpenActivity={() => setIsActivityOpen(true)}
           onOpenPostSettings={() => setIsPostSettingsOpen(true)}
           onOpenReels={() => setViewMode('reels')}
+          onOpenSimulationSettings={() => setIsSimulationSettingsOpen(true)}
           followCount={Object.keys(follows).length}
           activityCount={activityUnreadCount}
         >
@@ -795,6 +838,29 @@ const CommunityHubV2 = () => {
         settings={postVisibilityDefaults}
         onChange={(patch) => setPostVisibilityDefaults((current) => ({ ...current, ...patch }))}
       />
+
+      {/* Simulation Settings Drawer */}
+      {isSimulationSettingsOpen && (
+        <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setIsSimulationSettingsOpen(false)} />
+      )}
+      <div
+        className={`fixed right-0 top-0 h-screen w-96 bg-[#0F1117] border-l border-[#2A2D3C] overflow-y-auto transition-transform duration-300 z-50 ${
+          isSimulationSettingsOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-slate-100">Simulation Settings</h2>
+            <button
+              onClick={() => setIsSimulationSettingsOpen(false)}
+              className="text-slate-400 hover:text-slate-200 transition"
+            >
+              ✕
+            </button>
+          </div>
+          <SimulationSettings />
+        </div>
+      </div>
     </>
   );
 };

@@ -92,7 +92,13 @@ const Feed = ({
       (entries) => {
         const [entry] = entries;
         if (entry?.isIntersecting) {
-          setVisibleCount((current) => Math.min(regularPosts.length, current + LOAD_STEP));
+          setVisibleCount((current) => {
+            if (current < regularPosts.length) {
+              return Math.min(regularPosts.length, current + LOAD_STEP);
+            }
+
+            return current;
+          });
         }
       },
       { rootMargin: '260px' }
@@ -189,7 +195,15 @@ const Feed = ({
         />
       ))}
 
-      <div ref={sentinelRef} className="h-4" />
+      <div ref={sentinelRef} className="flex h-12 items-center justify-center">
+        {visibleCount >= regularPosts.length ? (
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+            End of feed reached
+          </p>
+        ) : (
+          <div className="h-4" />
+        )}
+      </div>
     </div>
   );
 };

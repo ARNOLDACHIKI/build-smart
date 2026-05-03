@@ -7,7 +7,9 @@ import jwt from "jsonwebtoken";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { createServer } from "http";
 import { fileURLToPath } from "url";
+import { Server as SocketIOServer } from "socket.io";
 import { 
   verifyEmailService, 
   sendVerificationEmail,
@@ -17,6 +19,15 @@ import {
   sendReminderEmail
 } from "./emailService.js";
 
+// Milestone and project email functions
+import {
+  sendMilestoneCreatedEmail,
+  sendMilestoneDueReminderEmail,
+  sendMilestoneCompletedEmail,
+  sendProjectCreatedEmail,
+  sendProjectCompletedEmail
+} from "./emailService.js";
+
 dotenv.config();
 
 // ES Module fix for __dirname
@@ -24,7 +35,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const httpServer = createServer(app);
 const prisma = new PrismaClient();
+const realtimePresence = new Map<string, { online: boolean; lastSeen: string }>();
+let realtimeIo: SocketIOServer | null = null;
 const prismaDynamic = prisma as typeof prisma & {
   assistantConversation: {
     findMany: (...args: any[]) => Promise<any[]>;
@@ -115,6 +129,780 @@ const getProjectReminderFrequencySettingKey = (userId: string) => `project.remin
 const getProjectReminderQuietHoursStartSettingKey = (userId: string) => `project.reminders.quiet_start.${userId}`;
 const getProjectReminderQuietHoursEndSettingKey = (userId: string) => `project.reminders.quiet_end.${userId}`;
 const getProjectReminderLastSentSettingKey = (userId: string) => `project.reminders.last_sent.${userId}`;
+const KES_VAT_RATE = 0.16;
+
+const calculatePriceWithVAT = (basePrice: number) => {
+  const vatAmount = Math.round(basePrice * KES_VAT_RATE);
+  return {
+    basePrice,
+    vatAmount,
+    totalPrice: basePrice + vatAmount,
+  };
+};
+
+const formatKES = (amount: number) => `KES ${amount.toLocaleString('en-KE')}`;
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, `${file.fieldname || "file"}-${uniqueSuffix}${path.extname(file.originalname)}`);
+  },
+});
+
+const createChatFileUpload = () => {
+  return multer({
+    storage,
+    limits: { fileSize: 30 * 1024 * 1024, files: 8 },
+    fileFilter: (_req, file, cb) => {
+      const allowedTypes = /jpeg|jpg|png|gif|webp|pdf|msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document|vnd\.ms-powerpoint|vnd\.openxmlformats-officedocument\.presentationml\.presentation|plain|csv|zip|webm|mp4|ogg|mpeg|wav/;
+      const ext = path.extname(file.originalname).toLowerCase();
+      const isAllowed = allowedTypes.test(ext) || allowedTypes.test(file.mimetype.toLowerCase());
+
+      if (isAllowed) {
+        return cb(null, true);
+      }
+
+      cb(new Error("Only common image, document, archive, audio, and video files are allowed."));
+    },
+  });
+};
+
+// Project CRUD endpoints
+app.post("/api/projects", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const { title, description, clientId, professionalId, budget, location, startDate, endDate, inquiryId } = req.body as {
+    title?: string;
+    description?: string;
+    clientId?: string;
+    professionalId?: string;
+    budget?: string;
+    location?: string;
+    startDate?: string;
+    endDate?: string;
+    inquiryId?: string;
+  };
+
+  if (!title || !clientId || !professionalId) {
+    return res.status(400).json({ error: "title, clientId, and professionalId are required" });
+  }
+
+  try {
+    const project = await prisma.project.create({
+      data: {
+        title: title.trim(),
+        description: description?.trim() || null,
+        clientId,
+        professionalId,
+        budget: budget?.trim() || null,
+        location: location?.trim() || null,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+        inquiryId: inquiryId || null,
+        status: "PLANNING",
+        progress: 0,
+      } as never,
+    });
+
+    await createPlatformNotification({
+      userId: clientId,
+      type: "PROJECT_CREATED",
+      title: "New project created",
+      body: `"${title}" has been created and assigned to your professional.`,
+      metadata: { projectId: project.id },
+    });
+
+    await createPlatformNotification({
+      userId: professionalId,
+      type: "PROJECT_CREATED",
+      title: "New project assigned",
+      body: `"${title}" has been assigned to you.`,
+      metadata: { projectId: project.id },
+    });
+
+    emitRealtimeEvent("project:created", { project }, getUserRoom(clientId));
+    emitRealtimeEvent("project:created", { project }, getUserRoom(professionalId));
+
+    try {
+      const client = await prisma.user.findUnique({ where: { id: clientId } });
+      const professional = await prisma.user.findUnique({ where: { id: professionalId } });
+
+      if (client?.email && client.emailVerified) {
+        await sendProjectCreatedEmail(
+          client.email,
+          client.name || "Client",
+          project.title,
+          project.description || undefined,
+          professional?.name || professional?.email || "Professional",
+          project.id
+        );
+      }
+
+      if (professional?.email && professional.emailVerified) {
+        await sendProjectCreatedEmail(
+          professional.email,
+          professional.name || "Professional",
+          project.title,
+          project.description || undefined,
+          client?.name || client?.email || "Client",
+          project.id
+        );
+      }
+    } catch (emailError) {
+      console.error("Failed to send project created emails:", emailError);
+    }
+
+    return res.status(201).json({ project });
+  } catch (error) {
+    console.error("Create project error:", error);
+    return res.status(500).json({ error: "Failed to create project" });
+  }
+});
+
+app.get("/api/projects", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const { scope } = req.query;
+  const userId = req.auth?.userId;
+
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    let projects;
+    if (scope === "client") {
+      projects = await prisma.project.findMany({
+        where: { clientId: userId },
+        include: { milestones: true },
+        orderBy: { createdAt: "desc" },
+      });
+    } else if (scope === "professional") {
+      projects = await prisma.project.findMany({
+        where: { professionalId: userId },
+        include: { milestones: true },
+        orderBy: { createdAt: "desc" },
+      });
+    } else {
+      projects = await prisma.project.findMany({
+        where: {
+          OR: [{ clientId: userId }, { professionalId: userId }],
+        },
+        include: { milestones: true },
+        orderBy: { createdAt: "desc" },
+      });
+    }
+
+    return res.json({ projects });
+  } catch (error) {
+    console.error("Get projects error:", error);
+    return res.status(500).json({ error: "Failed to fetch projects" });
+  }
+});
+
+app.get("/api/projects/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const project = await prisma.project.findUnique({
+      where: { id },
+      include: {
+        milestones: { orderBy: { order: "asc" } },
+        client: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            company: true,
+            location: true,
+          },
+        },
+        professional: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            company: true,
+            location: true,
+          },
+        },
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    return res.json({ project });
+  } catch (error) {
+    console.error("Get project error:", error);
+    return res.status(500).json({ error: "Failed to fetch project" });
+  }
+});
+
+app.patch("/api/projects/:id", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
+  const { title, description, budget, location, status, startDate, endDate } = req.body as {
+    title?: string;
+    description?: string;
+    budget?: string;
+    location?: string;
+    status?: "PLANNING" | "ACTIVE" | "COMPLETED" | "CANCELLED";
+    startDate?: string;
+    endDate?: string;
+  };
+
+  try {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const project = await prisma.project.findUnique({ where: { id } });
+    if (!project) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    if (project.clientId !== userId && project.professionalId !== userId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const updateData: any = {};
+    if (title) updateData.title = title.trim();
+    if (description !== undefined) updateData.description = description?.trim() || null;
+    if (budget !== undefined) updateData.budget = budget?.trim() || null;
+    if (location !== undefined) updateData.location = location?.trim() || null;
+    if (status) updateData.status = status;
+    if (startDate) updateData.startDate = new Date(startDate);
+    if (endDate) updateData.endDate = new Date(endDate);
+
+    const updated = await prisma.project.update({
+      where: { id },
+      data: updateData,
+      include: { milestones: true },
+    });
+
+    if (status === "COMPLETED") {
+      await createPlatformNotification({
+        userId: project.clientId,
+        type: "PROJECT_COMPLETED",
+        title: "Project completed",
+        body: `"${project.title}" has been marked as complete.`,
+        metadata: { projectId: id },
+      });
+
+      await createPlatformNotification({
+        userId: project.professionalId,
+        type: "PROJECT_COMPLETED",
+        title: "Project completed",
+        body: `"${project.title}" has been marked as complete.`,
+        metadata: { projectId: id },
+      });
+
+      try {
+        const client = await prisma.user.findUnique({ where: { id: project.clientId } });
+        if (client?.email && client.emailVerified) {
+          await sendProjectCompletedEmail(client.email, client.name || "Client", project.title, project.id);
+        }
+      } catch (emailError) {
+        console.error("Failed to send project completed email:", emailError);
+      }
+    }
+
+    emitRealtimeEvent("project:updated", { project: updated }, getProjectRoom(id));
+
+    return res.json({ project: updated });
+  } catch (error) {
+    console.error("Update project error:", error);
+    return res.status(500).json({ error: "Failed to update project" });
+  }
+});
+
+app.get("/api/chat/messages", authMiddleware, rateLimit(60, 60_000), async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  const projectId = typeof req.query.projectId === "string" ? req.query.projectId : undefined;
+  const peerId = typeof req.query.peerId === "string" ? req.query.peerId : undefined;
+
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (!projectId && !peerId) {
+    return res.status(400).json({ error: "projectId or peerId is required" });
+  }
+
+  try {
+    const where = projectId
+      ? { projectId }
+      : {
+          OR: [
+            { senderId: userId, receiverId: peerId },
+            { senderId: peerId, receiverId: userId },
+          ],
+        };
+
+    if (projectId) {
+      const project = await prisma.project.findUnique({ where: { id: projectId } });
+      if (!project || (project.clientId !== userId && project.professionalId !== userId)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+    }
+
+    const messages = await prisma.chatMessage.findMany({
+      where: where as never,
+      include: {
+        sender: { select: { id: true, name: true, email: true, profilePicture: true, role: true, location: true } },
+        receiver: { select: { id: true, name: true, email: true, profilePicture: true, role: true, location: true } },
+        attachments: true,
+      },
+      orderBy: { timestamp: "asc" },
+      take: 100,
+    });
+
+    return res.json({ messages });
+  } catch (error) {
+    console.error("Fetch chat messages error:", error);
+    return res.status(500).json({ error: "Failed to load chat messages" });
+  }
+});
+
+app.post("/api/chat/messages", authMiddleware, rateLimit(20, 60_000), async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  const { message, projectId, receiverId, attachmentIds } = req.body as {
+    message?: string;
+    projectId?: string;
+    receiverId?: string;
+    attachmentIds?: string[];
+  };
+
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const trimmedMessage = sanitizeText(message);
+  if (!trimmedMessage && (!attachmentIds || attachmentIds.length === 0)) {
+    return res.status(400).json({ error: "message or attachments are required" });
+  }
+
+  try {
+    if (projectId) {
+      const project = await prisma.project.findUnique({ where: { id: projectId } });
+      if (!project || (project.clientId !== userId && project.professionalId !== userId)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+    }
+
+    const attachments = attachmentIds?.length
+      ? await prisma.fileAttachment.findMany({
+          where: {
+            id: { in: attachmentIds },
+            uploadedById: userId,
+            ...(projectId ? { projectId } : {}),
+          },
+        })
+      : [];
+
+    const created = await prisma.chatMessage.create({
+      data: {
+        senderId: userId,
+        receiverId: receiverId || null,
+        projectId: projectId || null,
+        message: trimmedMessage || "File attachment",
+        timestamp: new Date(),
+        attachments: attachments.length
+          ? {
+              connect: attachments.map((attachment) => ({ id: attachment.id })),
+            }
+          : undefined,
+      } as never,
+      include: {
+        sender: { select: { id: true, name: true, email: true, profilePicture: true, role: true, location: true } },
+        receiver: { select: { id: true, name: true, email: true, profilePicture: true, role: true, location: true } },
+        attachments: true,
+      },
+    });
+
+    const roomId = projectId ? getProjectRoom(projectId) : receiverId ? getDirectRoom(userId, receiverId) : undefined;
+    if (roomId) {
+      emitRealtimeEvent("chat:message", created, roomId);
+    }
+
+    const notificationTargets = new Set<string>();
+    if (receiverId) notificationTargets.add(receiverId);
+    if (projectId) {
+      const project = await prisma.project.findUnique({ where: { id: projectId } });
+      if (project) {
+        if (project.clientId !== userId) notificationTargets.add(project.clientId);
+        if (project.professionalId !== userId) notificationTargets.add(project.professionalId);
+      }
+    }
+
+    for (const targetUserId of notificationTargets) {
+      await createPlatformNotification({
+        userId: targetUserId,
+        type: "CHAT_MESSAGE",
+        title: "New chat message",
+        body: trimmedMessage || "A new file was shared with you.",
+        metadata: { messageId: created.id, projectId: projectId || null, senderId: userId },
+      });
+    }
+
+    return res.status(201).json({ message: created });
+  } catch (error) {
+    console.error("Create chat message error:", error);
+    return res.status(500).json({ error: "Failed to send message" });
+  }
+});
+
+app.post(
+  "/api/files/upload",
+  authMiddleware,
+  rateLimit(20, 60_000),
+  createChatFileUpload().array("files", 8),
+  async (req: AuthenticatedRequest, res) => {
+    const userId = req.auth?.userId;
+    const projectId = typeof req.body?.projectId === "string" ? req.body.projectId : undefined;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const files = (Array.isArray(req.files) ? req.files : []) as Express.Multer.File[];
+    if (files.length === 0) {
+      return res.status(400).json({ error: "No files provided" });
+    }
+
+    try {
+      if (projectId) {
+        const project = await prisma.project.findUnique({ where: { id: projectId } });
+        if (!project || (project.clientId !== userId && project.professionalId !== userId)) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+      }
+
+      const uploads = await Promise.all(
+        files.map(async (file) => {
+          const uploaded = await uploadShareFile(file);
+          const record = await prisma.fileAttachment.create({
+            data: {
+              uploadedById: userId,
+              projectId: projectId || null,
+              fileUrl: uploaded.fileUrl,
+              fileType: uploaded.fileType,
+              fileName: uploaded.fileName,
+              mimeType: uploaded.mimeType,
+              fileSize: uploaded.fileSize,
+            } as never,
+          });
+
+          emitRealtimeEvent("file:uploaded", record, projectId ? getProjectRoom(projectId) : getUserRoom(userId));
+
+          if (projectId) {
+            const project = await prisma.project.findUnique({ where: { id: projectId } });
+            if (project) {
+              const recipients = [project.clientId, project.professionalId].filter((id) => id !== userId);
+              await Promise.all(
+                recipients.map((targetUserId) =>
+                  createPlatformNotification({
+                    userId: targetUserId,
+                    type: "FILE_UPLOADED",
+                    title: "New file uploaded",
+                    body: `${record.fileName} was uploaded to ${project.title}`,
+                    metadata: { projectId, fileId: record.id },
+                  })
+                )
+              );
+            }
+          }
+
+          return record;
+        })
+      );
+
+      return res.status(201).json({ files: uploads });
+    } catch (error) {
+      console.error("File upload error:", error);
+      return res.status(500).json({ error: "Failed to upload files" });
+    }
+  }
+);
+
+app.get("/api/presence/:userId", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const { userId } = req.params;
+
+  try {
+    const stored = realtimePresence.get(userId);
+    if (stored) {
+      return res.json({ userId, ...stored });
+    }
+
+    const settings = await prismaDynamic.platformSetting.findMany({
+      where: { key: { in: [`presence.online.${userId}`, `presence.lastSeen.${userId}`] } },
+    });
+    const online = settings.find((setting) => setting.key === `presence.online.${userId}`)?.value === "true";
+    const lastSeen = settings.find((setting) => setting.key === `presence.lastSeen.${userId}`)?.value || null;
+    return res.json({ userId, online, lastSeen });
+  } catch (error) {
+    console.error("Presence lookup error:", error);
+    return res.status(500).json({ error: "Failed to load presence" });
+  }
+});
+
+// Helper to calculate project progress from milestones
+const calculateProjectProgress = async (projectId: string): Promise<number> => {
+  const milestones = await prisma.milestone.findMany({
+    where: { projectId },
+  });
+
+  if (milestones.length === 0) return 0;
+  const completedCount = milestones.filter((m) => m.status === "COMPLETED").length;
+  return Math.round((completedCount / milestones.length) * 100);
+};
+
+const getMilestoneReminderSentKey = (milestoneId: string) => `milestone.reminder.sent.${milestoneId}`;
+
+const sendMilestoneDueReminders = async () => {
+  if (!dbAvailable) return;
+
+  const now = new Date();
+  const reminderWindow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+  try {
+    const milestones = await prisma.milestone.findMany({
+      where: {
+        status: { not: "COMPLETED" },
+        dueDate: { gte: now, lte: reminderWindow },
+      },
+      include: {
+        project: {
+          include: {
+            client: { select: { id: true, name: true, email: true, emailVerified: true } },
+            professional: { select: { id: true, name: true, email: true, emailVerified: true } },
+          },
+        },
+      },
+    });
+
+    for (const milestone of milestones) {
+      const reminderKey = getMilestoneReminderSentKey(milestone.id);
+      const existingReminder = await prismaDynamic.platformSetting.findMany({
+        where: { key: reminderKey },
+      });
+
+      if (existingReminder.length > 0) {
+        continue;
+      }
+
+      const recipients = [milestone.project.client, milestone.project.professional].filter(
+        (recipient): recipient is { id: string; name: string | null; email: string; emailVerified: boolean } => Boolean(recipient && recipient.emailVerified)
+      );
+
+      await Promise.all(
+        recipients.map(async (recipient) => {
+          await sendMilestoneDueReminderEmail(
+            recipient.email,
+            recipient.name || recipient.email.split("@")[0] || "Builder",
+            milestone.project.title,
+            milestone.title,
+            milestone.dueDate,
+            milestone.project.id
+          );
+        })
+      );
+
+      await prismaDynamic.platformSetting.upsert({
+        where: { key: reminderKey },
+        update: { value: now.toISOString() },
+        create: { key: reminderKey, value: now.toISOString() },
+      });
+
+      for (const recipient of recipients) {
+        await createPlatformNotification({
+          userId: recipient.id,
+          type: "MILESTONE_DUE_REMINDER",
+          title: "Milestone due soon",
+          body: `${milestone.title} is due within 24 hours for ${milestone.project.title}.`,
+          metadata: { projectId: milestone.project.id, milestoneId: milestone.id },
+        });
+      }
+
+      emitRealtimeEvent("milestone:reminder", {
+        projectId: milestone.project.id,
+        milestoneId: milestone.id,
+        title: milestone.title,
+        dueDate: milestone.dueDate.toISOString(),
+      }, getProjectRoom(milestone.project.id));
+    }
+  } catch (error) {
+    console.error("Milestone reminder job error:", error);
+  }
+};
+
+type MarketplaceInquiryDraft = {
+  title: string;
+  description: string;
+  budget: string;
+  location: string;
+  category: string;
+};
+
+type MarketplaceInquiryPayload = {
+  title?: string;
+  description?: string;
+  budget?: string;
+  location?: string;
+  category?: string;
+  createdById?: string;
+  createdByName?: string;
+  createdByEmail?: string;
+  recipientId?: string;
+  senderName?: string;
+  senderEmail?: string;
+  senderPhone?: string;
+  message?: string;
+};
+
+type MarketplaceMatchPayload = {
+  inquiryId?: string;
+  professionalId?: string;
+  status?: "PENDING" | "ACCEPTED" | "REJECTED";
+  note?: string;
+};
+
+type PlatformNotificationPayload = {
+  userId: string;
+  type: "INQUIRY_RESPONSE" | "MATCH_CREATED" | "AI_INQUIRY_DRAFT" | "MILESTONE_CREATED" | "MILESTONE_DUE_REMINDER" | "MILESTONE_COMPLETED" | "PROJECT_CREATED" | "PROJECT_COMPLETED" | "CHAT_MESSAGE" | "FILE_UPLOADED" | "COMMUNITY_POST_CREATED";
+  title: string;
+  body: string;
+  metadata?: Record<string, unknown>;
+};
+
+type RealtimeNotificationPayload = PlatformNotificationPayload & { id?: string; createdAt?: string };
+
+const sanitizeText = (value: unknown, fallback = "") => {
+  if (typeof value !== "string") return fallback;
+  return value.replace(/[<>]/g, "").trim();
+};
+
+const getUserRoom = (userId: string) => `user:${userId}`;
+const getProjectRoom = (projectId: string) => `project:${projectId}`;
+const getDirectRoom = (leftUserId: string, rightUserId: string) => {
+  const participants = [leftUserId, rightUserId].sort();
+  return `direct:${participants.join(":")}`;
+};
+
+const emitRealtimeEvent = (event: string, payload: unknown, room?: string) => {
+  if (!realtimeIo) return;
+  if (room) {
+    realtimeIo.to(room).emit(event, payload);
+    return;
+  }
+
+  realtimeIo.emit(event, payload);
+};
+
+const updatePresence = async (userId: string, online: boolean) => {
+  const lastSeen = new Date().toISOString();
+  realtimePresence.set(userId, { online, lastSeen });
+
+  await prismaDynamic.platformSetting.upsert({
+    where: { key: `presence.lastSeen.${userId}` },
+    update: { value: lastSeen },
+    create: { key: `presence.lastSeen.${userId}`, value: lastSeen },
+  });
+  await prismaDynamic.platformSetting.upsert({
+    where: { key: `presence.online.${userId}` },
+    update: { value: online ? "true" : "false" },
+    create: { key: `presence.online.${userId}`, value: online ? "true" : "false" },
+  });
+
+  emitRealtimeEvent("presence:updated", { userId, online, lastSeen }, getUserRoom(userId));
+  emitRealtimeEvent("presence:updated", { userId, online, lastSeen });
+};
+
+const createPlatformNotification = async (payload: PlatformNotificationPayload) => {
+  try {
+    const notification = await prisma.notification.create({
+      data: {
+        userId: payload.userId,
+        type: payload.type,
+        title: payload.title,
+        body: payload.body,
+        metadata: payload.metadata ?? undefined,
+      } as never,
+    });
+
+    emitRealtimeEvent(
+      "notification:new",
+      {
+        ...(notification as RealtimeNotificationPayload),
+        type: payload.type,
+        title: payload.title,
+        body: payload.body,
+        metadata: payload.metadata ?? undefined,
+      },
+      getUserRoom(payload.userId)
+    );
+  } catch (error) {
+    console.error("Create notification error:", error);
+  }
+};
+
+const buildMarketplaceInquiryDraft = (message: string, userName: string): MarketplaceInquiryDraft => {
+  const normalizedMessage = message.trim();
+  const location = getLocationFromMessage(normalizedMessage) || "Kenya";
+  const budgetMatch = normalizedMessage.match(/(?:KES|KSH|ksh|kes)\s?[\d,]+(?:\.\d+)?/i);
+  const bedroomMatch = normalizedMessage.match(/(\d+[- ]?bedroom|\d+\s*bedroom)/i);
+  const category = getServiceCategory(normalizedMessage) || "Engineer";
+
+  return {
+    title: `${bedroomMatch?.[1] || getProjectType(normalizedMessage)} request in ${location}`,
+    description: `${normalizedMessage}${userName ? ` (posted by ${userName})` : ""}`,
+    budget: budgetMatch?.[0] || "",
+    location,
+    category,
+  };
+};
+
+const isProfessionInfoIntent = (message: string) => {
+  return /\b(what does|what is|who is|tell me about|explain)\b.*\b(quantity surveyor|qs|engineer|architect|contractor|project manager)\b/i.test(message);
+};
+
+const isCreateInquiryIntent = (message: string) => {
+  return /\b(i want to build|i need to build|help me post|create inquiry|post this request|find me a professional|i need an engineer|i need a contractor|i need a quantity surveyor)\b/i.test(message);
+};
+
+const buildProfessionInfoReply = (message: string) => {
+  const lower = message.toLowerCase();
+  if (lower.includes("quantity surveyor") || lower.includes("qs")) {
+    return "A quantity surveyor helps you price the job, prepare the BOQ, control costs, assess variations, and keep the project financially on track.";
+  }
+  if (lower.includes("engineer")) {
+    return "An engineer designs and checks the technical side of the project, including structure, compliance, safety, and buildability.";
+  }
+  if (lower.includes("architect")) {
+    return "An architect turns the brief into a workable design, coordinates the layout, and supports approvals and presentation.";
+  }
+  if (lower.includes("contractor")) {
+    return "A contractor manages site execution, labour, materials, and delivery so the project is built to specification.";
+  }
+  if (lower.includes("project manager")) {
+    return "A project manager coordinates schedule, budget, team communication, risk, and delivery across the whole project.";
+  }
+  return "That professional supports construction delivery by coordinating design, cost, execution, or compliance depending on their discipline.";
+};
+
+const buildInquirySummary = (draft: MarketplaceInquiryDraft) => {
+  return [
+    `Title: ${draft.title}`,
+    `Category: ${draft.category}`,
+    `Location: ${draft.location}`,
+    draft.budget ? `Budget: ${draft.budget}` : "Budget: not set",
+    `Description: ${draft.description}`,
+  ].join("\n");
+};
 
 type SentInquiryRecord = {
   id: string;
@@ -2134,10 +2922,10 @@ const ICDBO_TARGET_MARKET = [
 ];
 
 const ICDBO_PRICING = [
-  "Package 1: Students free for 1 year, then USD 5/year",
-  "Package 2: Platform + products + community access at USD 30/year",
-  "Package 3: Consultant and team support at USD 50/year",
-  "Package 4: Supplier access + approved samples + contractor engagement + specialized project data at USD 75/year",
+  `Student: ${formatKES(calculatePriceWithVAT(18_000).basePrice)} -> ${formatKES(calculatePriceWithVAT(18_000).totalPrice)} (incl. VAT) / year`,
+  `Basic: ${formatKES(calculatePriceWithVAT(42_000).basePrice)} -> ${formatKES(calculatePriceWithVAT(42_000).totalPrice)} (incl. VAT) / year`,
+  `Professional: ${formatKES(calculatePriceWithVAT(78_000).basePrice)} -> ${formatKES(calculatePriceWithVAT(78_000).totalPrice)} (incl. VAT) / year`,
+  `Enterprise: ${formatKES(calculatePriceWithVAT(120_000).basePrice)} -> ${formatKES(calculatePriceWithVAT(120_000).totalPrice)} (incl. VAT) / year`,
 ];
 
 const SAMPLE_ENGINEERS = [
@@ -3036,17 +3824,6 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, `${file.fieldname || "file"}-${uniqueSuffix}${path.extname(file.originalname)}`);
-  },
-});
-
 const profileUpload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
@@ -3120,6 +3897,85 @@ const liveRecordingChunkUpload = multer({
     cb(new Error("Only audio/video recording files are allowed."));
   },
 });
+
+const requestCounters = new Map<string, { count: number; resetAt: number }>();
+function rateLimit(limit: number, windowMs: number) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const key = `${req.ip}:${req.path}`;
+  const now = Date.now();
+  const current = requestCounters.get(key);
+
+  if (!current || current.resetAt <= now) {
+    requestCounters.set(key, { count: 1, resetAt: now + windowMs });
+    return next();
+  }
+
+  if (current.count >= limit) {
+    return res.status(429).json({ error: "Too many requests" });
+  }
+
+  current.count += 1;
+  requestCounters.set(key, current);
+  return next();
+  };
+}
+
+const getShareFileType = (mimeType: string, filename: string) => {
+  const normalizedMime = mimeType.toLowerCase();
+  const extension = path.extname(filename).toLowerCase();
+
+  if (normalizedMime.startsWith("image/") || /\.(png|jpe?g|gif|webp)$/i.test(extension)) return "image";
+  if (normalizedMime === "application/pdf" || extension === ".pdf") return "pdf";
+  if (normalizedMime.startsWith("video/") || /\.(mp4|webm|mov|mkv)$/i.test(extension)) return "video";
+  if (normalizedMime.startsWith("audio/") || /\.(mp3|wav|ogg|m4a)$/i.test(extension)) return "audio";
+  if (/\.(doc|docx|ppt|pptx|txt|csv|zip)$/i.test(extension)) return "document";
+
+  return "file";
+};
+
+const uploadShareFile = async (file: Express.Multer.File) => {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
+  const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET?.trim();
+
+  if (cloudName && uploadPreset) {
+    const fileBuffer = fs.readFileSync(file.path);
+    const payload = new FormData();
+    payload.append("file", new Blob([fileBuffer]), file.originalname);
+    payload.append("upload_preset", uploadPreset);
+
+    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+      method: "POST",
+      body: payload,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Cloud upload failed with status ${response.status}`);
+    }
+
+    const result = (await response.json()) as { secure_url?: string; resource_type?: string };
+    if (!result.secure_url) {
+      throw new Error("Cloud upload did not return a secure URL");
+    }
+
+    return {
+      fileUrl: result.secure_url,
+      fileType: result.resource_type || getShareFileType(file.mimetype, file.originalname),
+      fileName: file.originalname,
+      mimeType: file.mimetype,
+      fileSize: file.size,
+      storage: "cloud",
+    };
+  }
+
+  return {
+    fileUrl: `/uploads/${path.basename(file.path)}`,
+    fileType: getShareFileType(file.mimetype, file.originalname),
+    fileName: file.originalname,
+    mimeType: file.mimetype,
+    fileSize: file.size,
+    storage: "local",
+  };
+};
 
 type SafeUser = {
   id: string;
@@ -3754,11 +4610,11 @@ const resolveOptionalAuth = (req: express.Request): JwtPayload | null => {
   }
 };
 
-const authMiddleware = (
+function authMiddleware(
   req: AuthenticatedRequest,
   res: express.Response,
   next: express.NextFunction
-) => {
+) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -3774,7 +4630,7 @@ const authMiddleware = (
   } catch (_error) {
     return res.status(401).json({ error: "Invalid or expired token" });
   }
-};
+}
 
 const adminOnlyMiddleware = (
   req: AuthenticatedRequest,
@@ -5146,6 +6002,14 @@ app.post(
         updatedAt: created.updatedAt,
       });
 
+      emitRealtimeEvent("community:post:new", {
+        id: created.id,
+        title: created.title,
+        summary: created.summary,
+        field: created.field,
+        createdAt: created.createdAt,
+      });
+
       return res.status(201).json({
         post: {
           id: created.id,
@@ -5191,6 +6055,14 @@ app.post(
           itemId: fallbackPost.id,
           field: fallbackPost.field,
           tokens: Array.from(new Set([...fallbackPost.interests, ...tokenizeInterestText(fallbackPost.title, content, fallbackPost.field)])),
+        });
+
+        emitRealtimeEvent("community:post:new", {
+          id: fallbackPost.id,
+          title: fallbackPost.title,
+          summary: fallbackPost.summary,
+          field: fallbackPost.field,
+          createdAt: fallbackCreatedAt.toISOString(),
         });
 
         return res.status(201).json({
@@ -6644,86 +7516,256 @@ app.get("/api/engineers", async (req, res) => {
   }
 });
 
-// Create inquiry (contact form submission)
+// Create inquiry (contact form submission or marketplace request)
 app.post("/api/inquiries", async (req, res) => {
-  const { recipientId, senderName, senderEmail, senderPhone, message } = req.body as {
-    recipientId?: string;
-    senderName?: string;
-    senderEmail?: string;
-    senderPhone?: string;
-    message?: string;
-  };
+  const body = req.body as MarketplaceInquiryPayload;
+  const optionalAuth = resolveOptionalAuth(req);
+  const isMarketplaceRequest = Boolean(body.title || body.description || body.location || body.category || body.budget);
 
-  if (!recipientId || !senderName || !senderEmail || !message) {
-    return res.status(400).json({ error: "Missing required fields" });
+  if (isMarketplaceRequest) {
+    if (!optionalAuth || !optionalAuth.userId) {
+      return res.status(401).json({ error: "Authentication required to post marketplace inquiries" });
+    }
+  }
+
+  if (!isMarketplaceRequest) {
+    const { recipientId, senderName, senderEmail, senderPhone, message } = body;
+
+    if (!recipientId || !senderName || !senderEmail || !message) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    if (!dbAvailable) {
+      return res.status(201).json({
+        id: `offline-inquiry-${Date.now()}`,
+        recipientId,
+        senderName,
+        senderEmail,
+        senderPhone: senderPhone || null,
+        message,
+        senderUserId: null,
+        replyMessage: null,
+        senderViewedAt: null,
+        status: "PENDING",
+        marketplaceStatus: "OPEN",
+        respondedAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        offline: true,
+      });
+    }
+
+    try {
+      if (recipientId.startsWith("mock-")) {
+        console.log("Demo inquiry received:", { recipientId, senderName, senderEmail, message });
+        return res.status(201).json({
+          id: "demo-" + Date.now(),
+          recipientId,
+          senderName,
+          senderEmail,
+          senderPhone: senderPhone || null,
+          message,
+          status: "PENDING",
+          marketplaceStatus: "OPEN",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          demo: true,
+        });
+      }
+
+      const inquiry = await prisma.inquiry.create({
+        data: {
+          recipientId,
+          senderName,
+          senderEmail,
+          senderPhone: senderPhone || null,
+          senderUserId: optionalAuth?.userId && optionalAuth.userId !== "dev-engineer" ? optionalAuth.userId : null,
+          message,
+        } as never,
+      });
+
+      return res.status(201).json(inquiry);
+    } catch (error: any) {
+      if (error?.code === "P2003") {
+        return res.status(404).json({ error: "Recipient not found" });
+      }
+
+      console.error("Create inquiry error:", error);
+      return res.status(500).json({ error: "Failed to create inquiry" });
+    }
   }
 
   if (!dbAvailable) {
     return res.status(201).json({
-      id: `offline-inquiry-${Date.now()}`,
-      recipientId,
-      senderName,
-      senderEmail,
-      senderPhone: senderPhone || null,
-      message,
-      senderUserId: null,
-      replyMessage: null,
-      senderViewedAt: null,
-      status: "PENDING",
-      respondedAt: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      offline: true,
+      inquiry: {
+        id: `marketplace-inquiry-${Date.now()}`,
+        title: body.title || "New construction inquiry",
+        description: body.description || "",
+        budget: body.budget || null,
+        location: body.location || null,
+        category: body.category || null,
+        createdById: optionalAuth?.userId || null,
+        senderName: body.senderName || optionalAuth?.userId || "Marketplace client",
+        senderEmail: body.senderEmail || optionalAuth?.email || "client@buildbuddy.local",
+        senderPhone: body.senderPhone || null,
+        message: body.description || body.message || body.title || "",
+        recipientId: null,
+        status: "PENDING",
+        marketplaceStatus: "OPEN",
+        respondedAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        matches: [],
+      },
     });
   }
 
   try {
-    const optionalAuth = resolveOptionalAuth(req);
-
-    // Check if this is a demo/mock inquiry (recipientId starts with 'mock-')
-    if (recipientId.startsWith('mock-')) {
-      // For demo purposes, return success without storing in database
-      console.log('Demo inquiry received:', { recipientId, senderName, senderEmail, message });
-      return res.status(201).json({
-        id: 'demo-' + Date.now(),
-        recipientId,
-        senderName,
-        senderEmail,
-        senderPhone: senderPhone || null,
-        message,
-        status: 'PENDING',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        demo: true,
-      });
-    }
+    const creatorId = optionalAuth?.userId && optionalAuth.userId !== "dev-engineer" ? optionalAuth.userId : body.createdById || null;
+    const senderName = body.createdByName || body.senderName || optionalAuth?.email || "Marketplace client";
+    const senderEmail = body.createdByEmail || body.senderEmail || optionalAuth?.email || "client@buildbuddy.local";
+    const summary = body.description || body.message || body.title || "Construction inquiry";
 
     const inquiry = await prisma.inquiry.create({
       data: {
-        recipientId,
-        senderName,
-        senderEmail,
-        senderPhone: senderPhone || null,
-        senderUserId: optionalAuth?.userId && optionalAuth.userId !== "dev-engineer" ? optionalAuth.userId : null,
-        message,
+        title: body.title?.trim() || null,
+        description: body.description?.trim() || null,
+        budget: body.budget?.trim() || null,
+        location: body.location?.trim() || null,
+        category: body.category?.trim() || null,
+        createdById: creatorId,
+        senderName: senderName.trim(),
+        senderEmail: senderEmail.trim(),
+        senderPhone: body.senderPhone || null,
+        message: summary.trim(),
+        recipientId: body.recipientId || null,
+        status: "PENDING",
+        marketplaceStatus: "OPEN",
+      } as never,
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            company: true,
+            location: true,
+          },
+        },
+        matches: {
+          include: {
+            professional: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                company: true,
+                location: true,
+              },
+            },
+          },
+        },
       } as never,
     });
 
-    return res.status(201).json(inquiry);
-  } catch (error: any) {
-    if (error?.code === "P2003") {
-      return res.status(404).json({ error: "Recipient not found" });
+    if (creatorId) {
+      await createPlatformNotification({
+        userId: creatorId,
+        type: "AI_INQUIRY_DRAFT",
+        title: "Inquiry posted",
+        body: `${inquiry.title || "Your construction request"} is now open for matching.`,
+        metadata: { inquiryId: inquiry.id },
+      });
     }
 
-    console.error("Create inquiry error:", error);
+    return res.status(201).json({ inquiry });
+  } catch (error) {
+    console.error("Create marketplace inquiry error:", error);
     return res.status(500).json({ error: "Failed to create inquiry" });
   }
 });
 
-// Get inquiries for authenticated engineer
-app.get("/api/inquiries", authMiddleware, async (req: AuthenticatedRequest, res) => {
+// Get inquiries for authenticated users and marketplace feed data
+app.get("/api/inquiries", async (req: express.Request, res) => {
+  const optionalAuth = resolveOptionalAuth(req);
+  const scope = String(req.query.scope || "").toLowerCase();
+
+  if (scope === "marketplace") {
+    try {
+      const statusFilter = String(req.query.status || "").toLowerCase();
+      const categoryFilter = String(req.query.category || "").trim();
+      const locationFilter = String(req.query.location || "").trim();
+
+      const marketplaceInquiries = await prisma.inquiry.findMany({
+        where: {
+          ...(statusFilter === "matched"
+            ? { marketplaceStatus: "MATCHED" }
+            : statusFilter === "closed"
+              ? { marketplaceStatus: "CLOSED" }
+              : { marketplaceStatus: { in: ["OPEN", "MATCHED"] } }),
+          ...(categoryFilter ? { category: { contains: categoryFilter, mode: "insensitive" } } : {}),
+          ...(locationFilter ? { location: { contains: locationFilter, mode: "insensitive" } } : {}),
+        } as never,
+        include: {
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+              company: true,
+              location: true,
+            },
+          },
+          matchedProfessional: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+              company: true,
+              location: true,
+            },
+          },
+          matches: {
+            include: {
+              professional: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  role: true,
+                  company: true,
+                  location: true,
+                },
+              },
+            },
+            orderBy: { createdAt: "desc" },
+          },
+        } as never,
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      });
+
+      const matches = marketplaceInquiries.flatMap((inquiry) => inquiry.matches || []);
+      return res.json({
+        inquiries: marketplaceInquiries,
+        matches,
+        summary: {
+          openCount: marketplaceInquiries.filter((item) => item.marketplaceStatus === "OPEN").length,
+          matchedCount: marketplaceInquiries.filter((item) => item.marketplaceStatus === "MATCHED").length,
+        },
+      });
+    } catch (error) {
+      console.error("Marketplace inquiries error:", error);
+      return res.status(500).json({ error: "Failed to fetch marketplace inquiries" });
+    }
+  }
+
   try {
-    const userId = req.auth?.userId;
+    const userId = optionalAuth?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -6884,10 +7926,366 @@ app.post("/api/inquiries/:id/reply", authMiddleware, async (req: AuthenticatedRe
       } as never,
     });
 
+    if (updatedInquiry.senderUserId) {
+      await createPlatformNotification({
+        userId: updatedInquiry.senderUserId,
+        type: "INQUIRY_RESPONSE",
+        title: "Your inquiry received a response",
+        body: replyMessage.trim().slice(0, 180),
+        metadata: { inquiryId: updatedInquiry.id },
+      });
+    }
+
+    if (updatedInquiry.createdById) {
+      await prisma.inquiry.update({
+        where: { id },
+        data: {
+          marketplaceStatus: "MATCHED",
+          matchedProfessionalId: userId,
+        } as never,
+      });
+    }
+
+    await prisma.match.updateMany({
+      where: {
+        inquiryId: id,
+        professionalId: userId,
+      },
+      data: {
+        status: "ACCEPTED",
+        respondedAt: new Date(),
+      } as never,
+    });
+
+    if (updatedInquiry.createdById) {
+      const existingProject = await prisma.project.findFirst({
+        where: { inquiryId: id },
+      });
+
+      if (!existingProject) {
+        const project = await prisma.project.create({
+          data: {
+            title: updatedInquiry.title || "Construction Project",
+            description: updatedInquiry.description,
+            clientId: updatedInquiry.createdById,
+            professionalId: userId,
+            inquiryId: id,
+            budget: updatedInquiry.budget,
+            location: updatedInquiry.location,
+            status: "ACTIVE",
+            progress: 0,
+          } as never,
+        });
+
+        emitRealtimeEvent("project:created", { project }, getUserRoom(updatedInquiry.createdById));
+        emitRealtimeEvent("project:created", { project }, getUserRoom(userId));
+      }
+    }
+
     return res.json(updatedInquiry);
   } catch (error) {
     console.error("Reply inquiry error:", error);
     return res.status(500).json({ error: "Failed to send reply" });
+  }
+});
+app.post("/api/match", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const body = req.body as MarketplaceMatchPayload;
+  const inquiryId = body.inquiryId?.trim();
+  const professionalId = body.professionalId?.trim();
+  const matchStatus = body.status || "PENDING";
+
+  if (!inquiryId || !professionalId) {
+    return res.status(400).json({ error: "inquiryId and professionalId are required" });
+  }
+
+  try {
+    const inquiry = await prisma.inquiry.findUnique({ where: { id: inquiryId } });
+    const professional = await prisma.user.findUnique({ where: { id: professionalId } });
+
+    if (!inquiry) {
+      return res.status(404).json({ error: "Inquiry not found" });
+    }
+
+    if (!professional) {
+      return res.status(404).json({ error: "Professional not found" });
+    }
+
+    const match = await prisma.match.upsert({
+      where: {
+        inquiryId_professionalId: {
+          inquiryId,
+          professionalId,
+        },
+      },
+      create: {
+        inquiryId,
+        professionalId,
+        status: matchStatus,
+        note: body.note?.trim() || null,
+        respondedAt: matchStatus === "PENDING" ? null : new Date(),
+      } as never,
+      update: {
+        status: matchStatus,
+        note: body.note?.trim() || undefined,
+        respondedAt: matchStatus === "PENDING" ? null : new Date(),
+      } as never,
+      include: {
+        inquiry: true,
+        professional: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            company: true,
+            location: true,
+          },
+        },
+      } as never,
+    });
+
+    await prisma.inquiry.update({
+      where: { id: inquiryId },
+      data: {
+        marketplaceStatus: "MATCHED",
+        matchedProfessionalId: professionalId,
+      } as never,
+    });
+
+    if (inquiry.createdById) {
+      await createPlatformNotification({
+        userId: inquiry.createdById,
+        type: "MATCH_CREATED",
+        title: "A professional was matched to your inquiry",
+        body: `${professional.name || professional.email} is now connected to your request.`,
+        metadata: { inquiryId, professionalId, matchId: match.id },
+      });
+    }
+
+    await createPlatformNotification({
+      userId: professionalId,
+      type: "MATCH_CREATED",
+      title: "New inquiry match",
+      body: `${inquiry.title || inquiry.description || "A construction request"} has been assigned to you.`,
+      metadata: { inquiryId, matchId: match.id },
+    });
+
+    return res.status(201).json({ match });
+  } catch (error) {
+    console.error("Create match error:", error);
+    return res.status(500).json({ error: "Failed to create match" });
+  }
+});
+
+// Milestone CRUD endpoints
+app.post("/api/milestones", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const { projectId, title, description, dueDate, progress } = req.body as {
+    projectId?: string;
+    title?: string;
+    description?: string;
+    dueDate?: string;
+    progress?: number;
+  };
+
+  if (!projectId || !title || !dueDate) {
+    return res.status(400).json({ error: "projectId, title, and dueDate are required" });
+  }
+
+  try {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    if (project.professionalId !== userId) {
+      return res.status(403).json({ error: "Only the professional can create milestones" });
+    }
+
+    const lastMilestone = await prisma.milestone.findFirst({
+      where: { projectId },
+      orderBy: { order: "desc" },
+    });
+
+    const milestone = await prisma.milestone.create({
+      data: {
+        projectId,
+        title: title.trim(),
+        description: description?.trim() || null,
+        dueDate: new Date(dueDate),
+        progress: Math.max(0, Math.min(100, progress || 0)),
+        order: (lastMilestone?.order || 0) + 1,
+      } as never,
+    });
+
+    await createPlatformNotification({
+      userId: project.clientId,
+      type: "MILESTONE_CREATED",
+      title: "New milestone added",
+      body: `${title} is now part of the project "${project.title}".`,
+      metadata: { projectId, milestoneId: milestone.id },
+    });
+
+    try {
+      const client = await prisma.user.findUnique({ where: { id: project.clientId } });
+      if (client?.email && client.emailVerified) {
+        await sendMilestoneCreatedEmail(
+          client.email,
+          client.name || "Client",
+          project.title,
+          title,
+          description,
+          new Date(dueDate),
+          projectId
+        );
+      }
+    } catch (emailError) {
+      console.error("Failed to send milestone created email:", emailError);
+    }
+
+    emitRealtimeEvent("milestone:created", { milestone }, getProjectRoom(projectId));
+
+    const recalculatedProgress = await calculateProjectProgress(projectId);
+    await prisma.project.update({ where: { id: projectId }, data: { progress: recalculatedProgress } });
+    emitRealtimeEvent("project:updated", { projectId, progress: recalculatedProgress }, getProjectRoom(projectId));
+
+    return res.status(201).json({ milestone });
+  } catch (error) {
+    console.error("Create milestone error:", error);
+    return res.status(500).json({ error: "Failed to create milestone" });
+  }
+});
+
+app.get("/api/milestones/:projectId", async (req, res) => {
+  const { projectId } = req.params;
+
+  try {
+    const milestones = await prisma.milestone.findMany({
+      where: { projectId },
+      orderBy: { order: "asc" },
+    });
+
+    return res.json({ milestones });
+  } catch (error) {
+    console.error("Get milestones error:", error);
+    return res.status(500).json({ error: "Failed to fetch milestones" });
+  }
+});
+
+app.patch("/api/milestones/:id", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
+  const { title, description, dueDate, status, progress } = req.body as {
+    title?: string;
+    description?: string;
+    dueDate?: string;
+    status?: "PENDING" | "IN_PROGRESS" | "COMPLETED";
+    progress?: number;
+  };
+
+  try {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const milestone = await prisma.milestone.findUnique({
+      where: { id },
+      include: { project: true },
+    });
+
+    if (!milestone) {
+      return res.status(404).json({ error: "Milestone not found" });
+    }
+
+    if (milestone.project.professionalId !== userId) {
+      return res.status(403).json({ error: "Only the professional can update milestones" });
+    }
+
+    const updateData: any = {};
+    if (title) updateData.title = title.trim();
+    if (description !== undefined) updateData.description = description?.trim() || null;
+    if (dueDate) updateData.dueDate = new Date(dueDate);
+    if (status) updateData.status = status;
+    if (progress !== undefined) updateData.progress = Math.max(0, Math.min(100, progress));
+
+    const updated = await prisma.milestone.update({
+      where: { id },
+      data: updateData,
+      include: { project: true },
+    });
+
+    if (status === "COMPLETED") {
+      await createPlatformNotification({
+        userId: milestone.project.clientId,
+        type: "MILESTONE_COMPLETED",
+        title: "Milestone completed",
+        body: `"${milestone.title}" has been marked as complete.`,
+        metadata: { projectId: milestone.projectId, milestoneId: id },
+      });
+
+      try {
+        const client = await prisma.user.findUnique({ where: { id: milestone.project.clientId } });
+        if (client?.email && client.emailVerified) {
+          await sendMilestoneCompletedEmail(
+            client.email,
+            client.name || "Client",
+            milestone.project.title,
+            milestone.title,
+            milestone.projectId
+          );
+        }
+      } catch (emailError) {
+        console.error("Failed to send milestone completed email:", emailError);
+      }
+    }
+
+    const newProgress = await calculateProjectProgress(milestone.projectId);
+    const updatedProject = await prisma.project.update({
+      where: { id: milestone.projectId },
+      data: { progress: newProgress },
+    });
+
+    emitRealtimeEvent("milestone:updated", { milestone: updated }, getProjectRoom(milestone.projectId));
+    emitRealtimeEvent("project:updated", { project: updatedProject }, getProjectRoom(milestone.projectId));
+
+    return res.json({ milestone: updated, project: updatedProject });
+  } catch (error) {
+    console.error("Update milestone error:", error);
+    return res.status(500).json({ error: "Failed to update milestone" });
+  }
+});
+app.delete("/api/milestones/:id", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
+
+  try {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const milestone = await prisma.milestone.findUnique({
+      where: { id },
+      include: { project: true },
+    });
+
+    if (!milestone) {
+      return res.status(404).json({ error: "Milestone not found" });
+    }
+
+    if (milestone.project.professionalId !== userId) {
+      return res.status(403).json({ error: "Only the professional can delete milestones" });
+    }
+
+    await prisma.milestone.delete({ where: { id } });
+
+    return res.status(204).send("");
+  } catch (error) {
+    console.error("Delete milestone error:", error);
+    return res.status(500).json({ error: "Failed to delete milestone" });
   }
 });
 
@@ -7459,6 +8857,8 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
     fallbackReason?: string | null;
     model?: string;
     routing?: AssistantRoutingDebug;
+    inquiryDraft?: MarketplaceInquiryDraft | null;
+    suggestedAction?: "create_inquiry" | "post_inquiry" | null;
   }) => {
     if (canPersistConversation && req.auth?.userId) {
       try {
@@ -7528,6 +8928,8 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
       ...payload,
       fallbackReason: payload.fallbackReason || null,
       routing: payload.routing || routingDebug,
+      inquiryDraft: payload.inquiryDraft || null,
+      suggestedAction: payload.suggestedAction || null,
       conversationId: assistantConversation?.id || null,
       limit: limits.chatLimit,
       remainingChats: canPersistConversation
@@ -7593,6 +8995,27 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
         "• Create task to review BOQ tomorrow",
       ].join("\n"),
       source: "intent-greeting",
+    });
+  }
+
+  if (isProfessionInfoIntent(trimmedMessage)) {
+    return sendAssistantResponse({
+      reply: buildProfessionInfoReply(trimmedMessage),
+      source: "intent-profession-info",
+    });
+  }
+
+  if (isCreateInquiryIntent(trimmedMessage)) {
+    const draft = buildMarketplaceInquiryDraft(trimmedMessage, req.auth?.email || req.auth?.userId || "Client");
+    return sendAssistantResponse({
+      reply: [
+        "I drafted a construction inquiry from your message.",
+        buildInquirySummary(draft),
+        "Do you want to post this request?",
+      ].join("\n"),
+      source: "intent-create-inquiry",
+      inquiryDraft: draft,
+      suggestedAction: "create_inquiry",
     });
   }
 
@@ -8315,6 +9738,81 @@ app.post("/api/ai/assistant", authMiddleware, async (req: AuthenticatedRequest, 
   });
 });
 
+const initializeRealtime = () => {
+  if (realtimeIo) return realtimeIo;
+
+  realtimeIo = new SocketIOServer(httpServer, {
+    cors: {
+      origin: true,
+      credentials: true,
+    },
+  });
+
+  realtimeIo.use((socket, next) => {
+    try {
+      const token = typeof socket.handshake.auth?.token === "string" ? socket.handshake.auth.token : "";
+      if (!token) {
+        return next(new Error("Unauthorized"));
+      }
+
+      const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+      socket.data.user = decoded;
+      return next();
+    } catch (error) {
+      return next(error as Error);
+    }
+  });
+
+  realtimeIo.on("connection", async (socket) => {
+    const user = socket.data.user as JwtPayload;
+    const userRoom = getUserRoom(user.userId);
+    socket.join(userRoom);
+    socket.emit("presence:init", {
+      userId: user.userId,
+      online: true,
+      lastSeen: new Date().toISOString(),
+    });
+
+    await updatePresence(user.userId, true).catch((error) => {
+      console.warn("Presence update failed:", error);
+    });
+
+    socket.on("chat:join", async (payload: { projectId?: string; peerId?: string }) => {
+      const projectId = sanitizeText(payload?.projectId);
+      const peerId = sanitizeText(payload?.peerId);
+
+      if (projectId) {
+        const project = await prisma.project.findUnique({ where: { id: projectId } });
+        if (project && (project.clientId === user.userId || project.professionalId === user.userId)) {
+          socket.join(getProjectRoom(projectId));
+        }
+        return;
+      }
+
+      if (peerId) {
+        socket.join(getDirectRoom(user.userId, peerId));
+      }
+    });
+
+    socket.on("chat:typing", (payload: { projectId?: string; peerId?: string; isTyping?: boolean }) => {
+      const room = payload?.projectId
+        ? getProjectRoom(sanitizeText(payload.projectId))
+        : payload?.peerId
+          ? getDirectRoom(user.userId, sanitizeText(payload.peerId))
+          : userRoom;
+      emitRealtimeEvent("chat:typing", { userId: user.userId, isTyping: Boolean(payload?.isTyping) }, room);
+    });
+
+    socket.on("disconnect", async () => {
+      await updatePresence(user.userId, false).catch((error) => {
+        console.warn("Presence disconnect update failed:", error);
+      });
+    });
+  });
+
+  return realtimeIo;
+};
+
 // Error handling middleware
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);
@@ -8347,7 +9845,17 @@ const start = async () => {
     console.warn("⚠ Endpoints that require database access may fail until DB is reachable.");
   }
 
-  app.listen(PORT, () => {
+  initializeRealtime();
+
+  void sendMilestoneDueReminders();
+  const milestoneReminderTimer = setInterval(() => {
+    void sendMilestoneDueReminders();
+  }, 60 * 60 * 1000);
+  if (typeof milestoneReminderTimer.unref === "function") {
+    milestoneReminderTimer.unref();
+  }
+
+  httpServer.listen(PORT, () => {
     console.log(`✓ Server running on http://localhost:${PORT}`);
     if (dbConnected) {
       console.log("✓ Database connection successful");
@@ -8355,8 +9863,7 @@ const start = async () => {
     if (emailServiceReady) {
       console.log("✓ Email service connected");
     }
-  }
-  );
+  });
 };
 
 start();
