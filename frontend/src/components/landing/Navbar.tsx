@@ -26,7 +26,7 @@ const Navbar = () => {
   const [mobileResources, setMobileResources] = useState(false);
   const { language, setLanguage, t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
-  const { scrollToSection } = useLandingSectionNavigation();
+  const { scrollToSection, createSectionLinkProps } = useLandingSectionNavigation();
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -85,18 +85,25 @@ const Navbar = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56">
-                {featuresMenu.map((item, i) => (
-                  <DropdownMenuItem key={i} asChild>
-                    <button
-                      type="button"
-                      onClick={() => handleSectionNavigation(item.href, item.label)}
-                      className="flex items-center gap-3 cursor-pointer"
-                    >
-                      <item.icon className="w-4 h-4" />
-                      <span>{item.label}</span>
-                    </button>
-                  </DropdownMenuItem>
-                ))}
+                {featuresMenu.map((item, i) => {
+                  const linkProps = createSectionLinkProps(item.href);
+                  return (
+                    <DropdownMenuItem key={i} asChild>
+                      <a
+                        href={linkProps.href}
+                        onClick={(e) => {
+                          // track then delegate to hook's onClick
+                          trackEvent('navbar_feature_click', { feature: item.label });
+                          linkProps.onClick(e as unknown as React.MouseEvent<HTMLAnchorElement>);
+                        }}
+                        className="flex items-center gap-3 cursor-pointer"
+                      >
+                        <item.icon className="w-4 h-4" />
+                        <span>{item.label}</span>
+                      </a>
+                    </DropdownMenuItem>
+                  );
+                })}
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -113,18 +120,31 @@ const Navbar = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-48">
-                {plansMenu.map((item, i) => (
-                  <DropdownMenuItem key={i} asChild>
-                    <button type="button" onClick={() => handleSectionNavigation(item.href)} className="cursor-pointer">
-                      {item.label}
-                    </button>
-                  </DropdownMenuItem>
-                ))}
+                {plansMenu.map((item, i) => {
+                  const linkProps = createSectionLinkProps(item.href);
+                  return (
+                    <DropdownMenuItem key={i} asChild>
+                      <a
+                        href={linkProps.href}
+                        onClick={(e) => {
+                          linkProps.onClick(e as unknown as React.MouseEvent<HTMLAnchorElement>);
+                        }}
+                        className="cursor-pointer"
+                      >
+                        {item.label}
+                      </a>
+                    </DropdownMenuItem>
+                  );
+                })}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <button type="button" onClick={() => handleSectionNavigation('pricing')} className="text-primary font-medium cursor-pointer">
+                  <a
+                    href={createSectionLinkProps('pricing').href}
+                    onClick={(e) => createSectionLinkProps('pricing').onClick(e as unknown as React.MouseEvent<HTMLAnchorElement>)}
+                    className="text-primary font-medium cursor-pointer"
+                  >
                     Compare All Plans
-                  </button>
+                  </a>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
