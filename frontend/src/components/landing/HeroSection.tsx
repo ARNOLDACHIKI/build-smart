@@ -119,9 +119,11 @@ const HeroSection = () => {
                   {t('hero.initiateRequest')}
                 </Button>
               </Link>
-              <Button variant="outline" size="lg" className="tap-feedback focus-ring h-12 w-full text-base">
-                <Play className="w-4 h-4 mr-2" /> {t('hero.learnMore')}
-              </Button>
+              <Link to="/solutions" className="w-full">
+                <Button variant="outline" size="lg" className="tap-feedback focus-ring h-12 w-full text-base">
+                  <Play className="w-4 h-4 mr-2" /> {t('hero.learnMore')}
+                </Button>
+              </Link>
             </div>
           </motion.div>
 

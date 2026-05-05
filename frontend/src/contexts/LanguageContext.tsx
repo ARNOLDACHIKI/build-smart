@@ -29,7 +29,7 @@ const translations: Translations = {
   'hero.stats.projects': { en: 'Projects Managed', sw: 'Miradi Iliyosimamiwa' },
   'hero.stats.saved': { en: 'Cost Savings', sw: 'Akiba ya Gharama' },
   'hero.stats.users': { en: 'Active Users', sw: 'Watumiaji Hai' },
-  'hero.searchPlaceholder': { en: 'Search for engineers, contractors, architects in Kenya...', sw: 'Tafuta wahandisi, wakandarasi, wasanifu majengo nchini Kenya...' },
+  'hero.searchPlaceholder': { en: 'Initiate your query', sw: 'Anzisha swali lako' },
   'hero.explore': { en: 'Explore the Request Journey', sw: 'Chunguza Safari ya Maombi' },
   'hero.initiateRequest': { en: 'Initiate Request', sw: 'Anzisha Ombi' },
   'hero.step1': { en: 'Explore', sw: 'Chunguza' },

@@ -64,6 +64,7 @@ const Search = () => {
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [selectedProfessional, setSelectedProfessional] = useState<Professional | null>(null);
   const [contactForm, setContactForm] = useState({ name: '', email: '', phone: '', message: '' });
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const isMockProfessional = (id: string) => id.startsWith('mock-');
 
@@ -188,8 +189,8 @@ const Search = () => {
         </Link>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-3xl font-bold font-['Space_Grotesk'] mb-2">{t('search.title')}</h1>
-          <p className="text-muted-foreground mb-8">{t('search.subtitle')}</p>
+          <h1 className="text-4xl font-bold font-['Space_Grotesk'] mb-3">Who do you need for your project?</h1>
+          <p className="text-muted-foreground mb-8 text-lg">Search by name, skills, specialization, location, or project type. The system will find the right match for you.</p>
         </motion.div>
 
         {isFreeMode ? (
@@ -201,34 +202,70 @@ const Search = () => {
           </div>
         ) : null}
 
-        {/* Filters */}
-        <div className="card-3d p-4 mb-8 flex flex-wrap gap-4">
-          <div className="relative flex-1 min-w-[200px]">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder={t('hero.searchPlaceholder')} className="pl-9 border-0 bg-transparent" value={query} onChange={(e) => setQuery(e.target.value)} />
+        {/* Open-ended search bar */}
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }} 
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2 }}
+          className="mb-6"
+        >
+          <div className="card-3d p-4 flex gap-3">
+            <div className="relative flex-1">
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input 
+                placeholder={t('hero.searchPlaceholder')} 
+                className="pl-10 h-14 border-0 bg-transparent text-base" 
+                value={query} 
+                onChange={(e) => setQuery(e.target.value)} 
+                autoFocus
+              />
+            </div>
+            <Button 
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              variant="outline"
+              className="h-14 px-4"
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              {showAdvancedFilters ? 'Hide' : 'Filters'}
+            </Button>
           </div>
-          <Select value={roleFilter} onValueChange={setRoleFilter}>
-            <SelectTrigger className="w-[180px]"><Filter className="w-4 h-4 mr-1" /><SelectValue placeholder="Role" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Roles</SelectItem>
-              <SelectItem value="engineer">Engineers</SelectItem>
-              <SelectItem value="architect">Architects</SelectItem>
-              <SelectItem value="contractor">Contractors</SelectItem>
-              <SelectItem value="surveyor">Quantity Surveyors</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={locationFilter} onValueChange={setLocationFilter}>
-            <SelectTrigger className="w-[180px]"><MapPin className="w-4 h-4 mr-1" /><SelectValue placeholder="Location" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
-              <SelectItem value="nairobi">Nairobi</SelectItem>
-              <SelectItem value="mombasa">Mombasa</SelectItem>
-              <SelectItem value="kisumu">Kisumu</SelectItem>
-              <SelectItem value="eldoret">Eldoret</SelectItem>
-              <SelectItem value="naivasha">Naivasha</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+          
+          {/* Optional advanced filters */}
+          {showAdvancedFilters && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-4 p-4 card-3d flex flex-wrap gap-4"
+            >
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by Role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  <SelectItem value="engineer">Engineers</SelectItem>
+                  <SelectItem value="architect">Architects</SelectItem>
+                  <SelectItem value="contractor">Contractors</SelectItem>
+                  <SelectItem value="surveyor">Quantity Surveyors</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={locationFilter} onValueChange={setLocationFilter}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by Location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Locations</SelectItem>
+                  <SelectItem value="nairobi">Nairobi</SelectItem>
+                  <SelectItem value="mombasa">Mombasa</SelectItem>
+                  <SelectItem value="kisumu">Kisumu</SelectItem>
+                  <SelectItem value="eldoret">Eldoret</SelectItem>
+                  <SelectItem value="naivasha">Naivasha</SelectItem>
+                </SelectContent>
+              </Select>
+            </motion.div>
+          )}
+        </motion.div>
 
         <p className="text-sm text-muted-foreground mb-4">{filtered.length} {t('search.results')}</p>
 
