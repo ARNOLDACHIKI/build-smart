@@ -32,6 +32,10 @@ const professionals = [
   { name: 'Eng. Robert Maina', role: 'Water Engineer', location: 'Nyeri', rating: 4.6, projects: 36, skills: ['Water Supply', 'Irrigation', 'Drainage Systems'], portfolio: 'Nyeri Water Project, Mt. Kenya Irrigation, Nanyuki Pipeline', avatar: 'RM' },
   { name: 'Contractor Alice Njoroge', role: 'Road Contractor', location: 'Thika', rating: 4.7, projects: 51, skills: ['Road Construction', 'Asphalt Paving', 'Heavy Equipment'], portfolio: 'Thika Superhighway, Ruiru Bypass, Juja Road Network', avatar: 'AN' },
   { name: 'Arch. James Mutua', role: 'Urban Planner', location: 'Mombasa', rating: 4.8, projects: 24, skills: ['Urban Design', 'Master Planning', 'GIS'], portfolio: 'Mombasa Smart City, Nyali Master Plan, Diani Beach Development', avatar: 'JM' },
+  { name: 'Kilimani Design Studio', role: 'Architect', location: 'Kilimani, Nairobi', rating: 4.9, projects: 19, skills: ['Residential Design', 'Approvals', 'Space Planning'], portfolio: 'Kilimani villas, Lavington apartments, Westlands fit-outs', avatar: 'KD' },
+  { name: 'Kilimani Build Co.', role: 'Contractor', location: 'Kilimani, Nairobi', rating: 4.8, projects: 27, skills: ['House Builds', 'Renovation', 'Site Delivery'], portfolio: 'Kilimani family homes, Lavington remodels, Karen extensions', avatar: 'KB' },
+  { name: 'Swift Materials Kenya', role: 'Supplier', location: 'Nairobi', rating: 4.7, projects: 64, skills: ['Cement', 'Steel', 'Blocks'], portfolio: 'Bulk cement supply, steel bundles, site material dispatch', avatar: 'SM' },
+  { name: 'Prime Procurement Hub', role: 'Supplier', location: 'Nairobi', rating: 4.8, projects: 42, skills: ['Procurement', 'Hardware', 'Finishing Materials'], portfolio: 'Hardware packs, tiles, fixtures, and delivery coordination', avatar: 'PP' },
 ];
 
 type Professional = (typeof professionals)[number] & {
@@ -43,6 +47,86 @@ const fallbackProfessionals: Professional[] = professionals.map((pro) => ({
   ...pro,
   id: 'mock-' + pro.name.replace(/\s/g, '-').toLowerCase(),
 }));
+
+const searchNeedDefinitions = [
+  {
+    label: 'Architect',
+    roles: ['Architect'],
+    keywords: ['architect', 'design', 'drawing', 'layout', 'plan', 'plans', 'interior', 'space', 'permit'],
+  },
+  {
+    label: 'Contractor',
+    roles: ['Contractor'],
+    keywords: ['contractor', 'build', 'construction', 'house', 'home', 'site', 'renovation', 'delivery', 'execute'],
+  },
+  {
+    label: 'Supplier',
+    roles: ['Supplier'],
+    keywords: ['supplier', 'materials', 'cement', 'steel', 'blocks', 'sand', 'timber', 'tiles', 'hardware', 'procurement'],
+  },
+  {
+    label: 'Engineer',
+    roles: ['Engineer'],
+    keywords: ['engineer', 'structural', 'civil', 'electrical', 'mechanical', 'water', 'foundation', 'analysis', 'bim'],
+  },
+  {
+    label: 'Quantity Surveyor',
+    roles: ['Quantity Surveyor'],
+    keywords: ['cost', 'budget', 'estimate', 'boq', 'pricing', 'valuation', 'quantity surveyor'],
+  },
+] as const;
+
+const getSearchNeedSuggestions = (query: string) => {
+  const normalized = query.trim().toLowerCase();
+
+  if (!normalized) {
+    return searchNeedDefinitions.slice(0, 3);
+  }
+
+  const ranked = searchNeedDefinitions
+    .map((need) => ({
+      ...need,
+      score: need.keywords.reduce((score, keyword) => score + (normalized.includes(keyword) ? 1 : 0), 0),
+    }))
+    .filter((need) => need.score > 0)
+    .sort((left, right) => right.score - left.score);
+
+  return ranked.length > 0 ? ranked : searchNeedDefinitions.slice(0, 3);
+};
+
+const scoreProfessional = (professional: Professional, query: string, roleHints: string[]) => {
+  const normalized = query.trim().toLowerCase();
+
+  if (!normalized) {
+    return professional.rating;
+  }
+
+  const searchableText = [professional.name, professional.role, professional.location, professional.portfolio, ...professional.skills]
+    .join(' ')
+    .toLowerCase();
+
+  let score = 0;
+
+  if (searchableText.includes(normalized)) {
+    score += 15;
+  }
+
+  normalized.split(/\s+/).forEach((token) => {
+    if (token.length > 2 && searchableText.includes(token)) {
+      score += 2;
+    }
+  });
+
+  if (roleHints.some((role) => professional.role.toLowerCase().includes(role.toLowerCase()))) {
+    score += 6;
+  }
+
+  if (professional.location.toLowerCase().includes(normalized)) {
+    score += 3;
+  }
+
+  return score + professional.rating;
+};
 
 const getInitials = (nameOrEmail: string) =>
   nameOrEmail
@@ -115,7 +199,10 @@ const Search = () => {
           };
         });
 
-        setAvailableProfessionals(live);
+        setAvailableProfessionals([
+          ...live,
+          ...fallbackProfessionals.filter((pro) => !pro.role.toLowerCase().includes('engineer')),
+        ]);
       } catch {
         // fallback list remains
       }
@@ -173,12 +260,24 @@ const Search = () => {
     }
   };
 
-  const filtered = availableProfessionals.filter(p => {
-    const matchesQuery = !query || p.name.toLowerCase().includes(query.toLowerCase()) || p.role.toLowerCase().includes(query.toLowerCase()) || p.skills.some(s => s.toLowerCase().includes(query.toLowerCase()));
-    const matchesRole = roleFilter === 'all' || p.role.toLowerCase().includes(roleFilter.toLowerCase());
-    const matchesLocation = locationFilter === 'all' || p.location.toLowerCase() === locationFilter.toLowerCase();
-    return matchesQuery && matchesRole && matchesLocation;
-  });
+  const normalizedQuery = query.trim().toLowerCase();
+  const searchNeedSuggestions = getSearchNeedSuggestions(query);
+  const roleHints = searchNeedSuggestions.flatMap((need) => need.roles);
+
+  const filtered = availableProfessionals
+    .filter((professional) => {
+      const searchableText = [professional.name, professional.role, professional.location, professional.portfolio, ...professional.skills]
+        .join(' ')
+        .toLowerCase();
+
+      const matchesQuery = !normalizedQuery
+        || searchableText.includes(normalizedQuery)
+        || normalizedQuery.split(/\s+/).some((token) => token.length > 2 && searchableText.includes(token));
+      const matchesRole = roleFilter === 'all' || professional.role.toLowerCase().includes(roleFilter.toLowerCase());
+      const matchesLocation = locationFilter === 'all' || professional.location.toLowerCase() === locationFilter.toLowerCase();
+      return matchesQuery && matchesRole && matchesLocation;
+    })
+    .sort((left, right) => scoreProfessional(right, query, roleHints) - scoreProfessional(left, query, roleHints));
 
   return (
     <div className="min-h-screen bg-background">
@@ -190,7 +289,7 @@ const Search = () => {
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="text-4xl font-bold font-['Space_Grotesk'] mb-3">Who do you need for your project?</h1>
-          <p className="text-muted-foreground mb-8 text-lg">Search by name, skills, specialization, location, or project type. The system will find the right match for you.</p>
+          <p className="text-muted-foreground mb-8 text-lg">Describe the need in your own words and we will infer the right professionals, suppliers, and specialists.</p>
         </motion.div>
 
         {isFreeMode ? (
@@ -229,6 +328,21 @@ const Search = () => {
               {showAdvancedFilters ? 'Hide' : 'Filters'}
             </Button>
           </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {searchNeedSuggestions.slice(0, 3).map((need) => (
+              <Button
+                key={need.label}
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-9 rounded-full px-4"
+                onClick={() => setRoleFilter(need.label === 'Quantity Surveyor' ? 'surveyor' : need.label.toLowerCase())}
+              >
+                {need.label}
+              </Button>
+            ))}
+          </div>
           
           {/* Optional advanced filters */}
           {showAdvancedFilters && (
@@ -247,6 +361,7 @@ const Search = () => {
                   <SelectItem value="engineer">Engineers</SelectItem>
                   <SelectItem value="architect">Architects</SelectItem>
                   <SelectItem value="contractor">Contractors</SelectItem>
+                  <SelectItem value="supplier">Suppliers</SelectItem>
                   <SelectItem value="surveyor">Quantity Surveyors</SelectItem>
                 </SelectContent>
               </Select>
@@ -266,6 +381,13 @@ const Search = () => {
             </motion.div>
           )}
         </motion.div>
+
+        {normalizedQuery ? (
+          <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground">
+            <span className="font-medium">Best matches for:</span>{' '}
+            {searchNeedSuggestions.slice(0, 3).map((need) => need.label).join(', ')}
+          </div>
+        ) : null}
 
         <p className="text-sm text-muted-foreground mb-4">{filtered.length} {t('search.results')}</p>
 

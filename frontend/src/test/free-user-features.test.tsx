@@ -25,7 +25,7 @@ const translationMap: Record<string, string> = {
   "common.back": "Back",
   "search.title": "Find Construction Professionals",
   "search.subtitle": "Search professionals across Kenya",
-  "hero.searchPlaceholder": "Search for engineers...",
+  "hero.searchPlaceholder": "Initiate your query",
   "search.results": "Results",
   "search.viewProfile": "View Profile",
   "search.contact": "Contact",
@@ -96,7 +96,7 @@ describe("Free user feature checks", () => {
 
     expect(await screen.findByText("Eng Jane Doe")).toBeInTheDocument();
 
-    const searchInput = screen.getByPlaceholderText("Search for engineers...");
+    const searchInput = screen.getByPlaceholderText("Initiate your query");
     fireEvent.change(searchInput, { target: { value: "no-match-query" } });
 
     await waitFor(() => {
@@ -130,8 +130,8 @@ describe("Free user feature checks", () => {
       </MemoryRouter>
     );
 
-    const contactButton = await screen.findByRole("button", { name: "Contact" });
-    fireEvent.click(contactButton);
+    const contactButton = await screen.findAllByRole("button", { name: "Contact" });
+    fireEvent.click(contactButton[0]);
 
     fireEvent.change(screen.getByLabelText("Your Name *"), { target: { value: "Free User" } });
     fireEvent.change(screen.getByLabelText("Your Email *"), { target: { value: "free.user@example.com" } });

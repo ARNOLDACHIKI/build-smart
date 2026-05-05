@@ -9,7 +9,7 @@ const translationMap: Record<string, string> = {
   "search.subtitle": "Search for engineers, architects, contractors and suppliers across Kenya",
   "search.freeModeBanner": "You are browsing as a free user. Login to unlock dashboards, saved requests, and team collaboration.",
   "search.demoContactNotice": "This is a demo profile. Login to contact verified professionals.",
-  "hero.searchPlaceholder": "Search...",
+  "hero.searchPlaceholder": "Initiate your query",
   "search.results": "Results",
   "search.viewProfile": "View Profile",
   "search.contact": "Contact",
