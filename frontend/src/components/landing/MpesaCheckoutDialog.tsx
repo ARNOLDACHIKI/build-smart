@@ -14,7 +14,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { apiUrl } from '@/lib/api';
-import { Button } from '@/components/ui/button';
 
 export type BillingCycle = 'monthly' | 'annual';
 
@@ -43,7 +42,9 @@ const MpesaCheckoutDialog = ({ open, onOpenChange, plan, billingCycle, monthlyAm
   const [phoneNumber, setPhoneNumber] = useState(defaultPhoneNumber || '');
   const [selectedCycle, setSelectedCycle] = useState<BillingCycle>(billingCycle);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const selectedAmount = selectedCycle === 'monthly' ? monthlyAmount : annualAmount;
+  const selectedAmount = Number.isFinite(selectedCycle === 'monthly' ? monthlyAmount : annualAmount)
+    ? (selectedCycle === 'monthly' ? monthlyAmount : annualAmount)
+    : 0;
   const selectedPriceLabel = selectedAmount.toLocaleString('en-KE');
 
   useEffect(() => {

@@ -181,8 +181,8 @@ const PricingSection = () => {
           onOpenChange={setPaymentDialogOpen}
           plan={currentPlan ? { key: currentPlan.key, name: currentPlan.name, description: currentPlan.desc } : null}
           billingCycle={billingCycle}
-          amount={currentPlanPrice?.totalPrice || 0}
-          priceLabel={currentPlanPrice?.totalLabel || ''}
+          monthlyAmount={currentPlan ? calculatePriceWithVAT(currentPlan.monthlyBase).totalPrice : 0}
+          annualAmount={currentPlan ? calculatePriceWithVAT(currentPlan.annualBase).totalPrice : 0}
           userId={user?.id}
           defaultPayerName={user?.name || ''}
           defaultPayerEmail={user?.email || ''}
