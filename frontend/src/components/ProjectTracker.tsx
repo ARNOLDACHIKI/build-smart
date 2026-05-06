@@ -64,7 +64,7 @@ const ProjectTracker = () => {
     };
 
     fetchProjects();
-  }, [user, token, toast]);
+  }, [isHydrating, user, token]);
 
   const filteredProjects = filterStatus === 'all'
     ? projects
