@@ -59,6 +59,31 @@ const Billing = () => {
     };
   }, [user]);
 
+  const resetPaymentHistory = async () => {
+    if (!token) return;
+
+    if (!window.confirm('This will delete all payment history for your account. Are you sure?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(apiUrl('/api/payments/mpesa/reset'), {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to reset payment history' }));
+        throw new Error(error.error || 'Failed to reset payment history');
+      }
+
+      toast.success('Payment history cleared successfully');
+      await loadBillingData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to reset payment history');
+    }
+  };
+
   const loadBillingData = async () => {
     if (!token) return;
 
@@ -210,7 +235,14 @@ const Billing = () => {
 
       <Card className="card-3d border-0">
         <CardHeader>
-          <CardTitle className="font-['Space_Grotesk']">Payment History</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="font-['Space_Grotesk']">Payment History</CardTitle>
+            {payments.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={() => void resetPaymentHistory()} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                Clear All
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -258,6 +290,7 @@ const Billing = () => {
         userId={user?.id}
         defaultPayerName={user?.name || ''}
         defaultPayerEmail={user?.email || ''}
+        defaultPhoneNumber={user?.phone || ''}
       />
     </div>
   );

@@ -4969,6 +4969,26 @@ app.get("/api/payments/mpesa/:checkoutRequestId", async (req, res) => {
   return res.status(200).json({ payment });
 });
 
+app.delete("/api/payments/mpesa/reset", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  if (!req.auth?.userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const deleted = await prisma.paymentTransaction.deleteMany({
+      where: { userId: req.auth.userId },
+    });
+
+    return res.status(200).json({ 
+      message: "Payment history cleared successfully", 
+      deletedCount: deleted.count 
+    });
+  } catch (error) {
+    console.error("[PAYMENT_RESET_ERROR]", error);
+    return res.status(500).json({ error: "Failed to reset payment history" });
+  }
+});
+
 // Auth - register
 app.post("/api/auth/register", async (req, res) => {
   const { email, password, name, phone, company, role } = req.body as {

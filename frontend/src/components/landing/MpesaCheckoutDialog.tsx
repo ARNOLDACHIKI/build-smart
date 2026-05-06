@@ -33,20 +33,22 @@ type MpesaCheckoutDialogProps = {
   userId?: string | null;
   defaultPayerName?: string;
   defaultPayerEmail?: string;
+  defaultPhoneNumber?: string;
 };
 
-const MpesaCheckoutDialog = ({ open, onOpenChange, plan, billingCycle, amount, priceLabel, userId, defaultPayerName, defaultPayerEmail }: MpesaCheckoutDialogProps) => {
+const MpesaCheckoutDialog = ({ open, onOpenChange, plan, billingCycle, amount, priceLabel, userId, defaultPayerName, defaultPayerEmail, defaultPhoneNumber }: MpesaCheckoutDialogProps) => {
   const [payerName, setPayerName] = useState(defaultPayerName || '');
   const [payerEmail, setPayerEmail] = useState(defaultPayerEmail || '');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState(defaultPhoneNumber || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) {
       setPayerName(defaultPayerName || '');
       setPayerEmail(defaultPayerEmail || '');
+      setPhoneNumber(defaultPhoneNumber || '');
     }
-  }, [defaultPayerEmail, defaultPayerName, open]);
+  }, [defaultPayerEmail, defaultPayerName, defaultPhoneNumber, open]);
 
   const submitPayment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

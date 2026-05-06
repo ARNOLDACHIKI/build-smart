@@ -97,16 +97,7 @@ export function ReelsPage() {
     }
   }, [currentIndex, likedByMe, reels]);
 
-  if (reels.length === 0) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-black text-slate-300">
-        No reel videos available right now.
-      </div>
-    );
-  }
-
-  const currentReel = reels[currentIndex];
-  const currentPost = currentReel.post;
+  const currentReel = reels[currentIndex] ?? null;
 
   // Handle smooth scrolling to reel
   const scrollToReel = useCallback((index: number) => {
@@ -185,7 +176,7 @@ export function ReelsPage() {
 
   const togglePictureInPicture = async () => {
     const video = videoRefs.current[currentIndex];
-    if (!video || typeof document === 'undefined' || !document.pictureInPictureEnabled || !currentReel.pipEnabled) {
+    if (!video || typeof document === 'undefined' || !document.pictureInPictureEnabled || !currentReel?.pipEnabled) {
       return;
     }
 
@@ -199,6 +190,14 @@ export function ReelsPage() {
       // Ignore browser-level PiP restrictions.
     }
   };
+
+  if (reels.length === 0) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-black text-slate-300">
+        No reel videos available right now.
+      </div>
+    );
+  }
 
   // Render media based on type
   const renderReelMedia = (media: MediaItem[], isPlaying: boolean, isMuted: boolean) => {
@@ -391,10 +390,10 @@ export function ReelsPage() {
                 {/* Like Button */}
                 <button onClick={toggleReelLike} className="flex flex-col items-center gap-1 group">
                   <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-all group-hover:scale-110">
-                    <Heart className={cn('w-6 h-6', likedByMe[currentPost.id] ? 'fill-red-400 text-red-400' : 'text-white')} />
+                    <Heart className={cn('w-6 h-6', likedByMe[reel.post.id] ? 'fill-red-400 text-red-400' : 'text-white')} />
                   </div>
                   <span className="text-white text-xs font-medium group-hover:text-red-400 transition-colors">
-                    {reelLikes[currentPost.id] ?? 0}
+                    {reelLikes[reel.post.id] ?? 0}
                   </span>
                 </button>
 
@@ -404,7 +403,7 @@ export function ReelsPage() {
                     <MessageCircle className="w-6 h-6 text-white" />
                   </div>
                   <span className="text-white text-xs font-medium">
-                    {reelComments[currentPost.id] ?? 0}
+                    {reelComments[reel.post.id] ?? 0}
                   </span>
                 </button>
 
