@@ -41,8 +41,8 @@ describe('Mpesa checkout dialog', () => {
         onOpenChange={vi.fn()}
         plan={{ key: 'basic', name: 'Basic', description: 'For growing teams' }}
         billingCycle="annual"
-        amount={48720}
-        priceLabel="KES 48,720 (incl. VAT)"
+        monthlyAmount={4872}
+        annualAmount={48720}
         userId="user-1"
         defaultPayerName="Jane Doe"
         defaultPayerEmail="jane@example.com"
@@ -72,5 +72,50 @@ describe('Mpesa checkout dialog', () => {
 
     expect(toastSuccess).toHaveBeenCalled();
     expect(toastInfo).toHaveBeenCalled();
+  });
+
+  it('allows switching between monthly and annual billing cycles', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        message: 'M-Pesa STK push sent.',
+        mpesa: { CheckoutRequestID: 'ws_CO_67890' },
+      }),
+    });
+
+    render(
+      <MpesaCheckoutDialog
+        open
+        onOpenChange={vi.fn()}
+        plan={{ key: 'basic', name: 'Basic', description: 'For growing teams' }}
+        billingCycle="annual"
+        monthlyAmount={4872}
+        annualAmount={48720}
+        userId="user-1"
+        defaultPayerName="Jane Doe"
+        defaultPayerEmail="jane@example.com"
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Monthly' }));
+    fireEvent.change(screen.getByLabelText('M-Pesa phone number'), { target: { value: '0712345678' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send STK Push' }));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/payments/mpesa/stk-push',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            planKey: 'basic',
+            billingCycle: 'monthly',
+            phoneNumber: '0712345678',
+            payerName: 'Jane Doe',
+            payerEmail: 'jane@example.com',
+            userId: 'user-1',
+          }),
+        })
+      );
+    });
   });
 });

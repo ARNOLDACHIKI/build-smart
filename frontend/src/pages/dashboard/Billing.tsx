@@ -202,9 +202,14 @@ const Billing = () => {
                       <span>Annual</span>
                       <span className="font-medium">{formatKES(calculatePriceWithVAT(plan.annualBase).totalPrice)}</span>
                     </div>
-                    <Button className="w-full" variant="outline" onClick={() => openCheckout(plan, 'annual')}>
-                      <Smartphone className="mr-2 h-4 w-4" /> Pay with M-Pesa
-                    </Button>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <Button className="w-full" variant="outline" onClick={() => openCheckout(plan, 'monthly')}>
+                        <Smartphone className="mr-2 h-4 w-4" /> Monthly
+                      </Button>
+                      <Button className="w-full" variant="outline" onClick={() => openCheckout(plan, 'annual')}>
+                        <Smartphone className="mr-2 h-4 w-4" /> Annual
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -285,8 +290,8 @@ const Billing = () => {
         onOpenChange={setCheckoutOpen}
         plan={selectedPlan}
         billingCycle={selectedCycle}
-        amount={selectedPlan ? getPlanPrice(selectedPlan, selectedCycle).totalPrice : 0}
-        priceLabel={selectedPlan ? `${formatKES(getPlanPrice(selectedPlan, selectedCycle).totalPrice)} (incl. VAT)` : ''}
+        monthlyAmount={selectedPlan ? getPlanPrice(selectedPlan, 'monthly').totalPrice : 0}
+        annualAmount={selectedPlan ? getPlanPrice(selectedPlan, 'annual').totalPrice : 0}
         userId={user?.id}
         defaultPayerName={user?.name || ''}
         defaultPayerEmail={user?.email || ''}

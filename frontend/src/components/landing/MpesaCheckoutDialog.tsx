@@ -14,6 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { apiUrl } from '@/lib/api';
+import { Button } from '@/components/ui/button';
 
 export type BillingCycle = 'monthly' | 'annual';
 
@@ -28,27 +29,31 @@ type MpesaCheckoutDialogProps = {
   onOpenChange: (open: boolean) => void;
   plan: MpesaPlan | null;
   billingCycle: BillingCycle;
-  amount: number;
-  priceLabel: string;
+  monthlyAmount: number;
+  annualAmount: number;
   userId?: string | null;
   defaultPayerName?: string;
   defaultPayerEmail?: string;
   defaultPhoneNumber?: string;
 };
 
-const MpesaCheckoutDialog = ({ open, onOpenChange, plan, billingCycle, amount, priceLabel, userId, defaultPayerName, defaultPayerEmail, defaultPhoneNumber }: MpesaCheckoutDialogProps) => {
+const MpesaCheckoutDialog = ({ open, onOpenChange, plan, billingCycle, monthlyAmount, annualAmount, userId, defaultPayerName, defaultPayerEmail, defaultPhoneNumber }: MpesaCheckoutDialogProps) => {
   const [payerName, setPayerName] = useState(defaultPayerName || '');
   const [payerEmail, setPayerEmail] = useState(defaultPayerEmail || '');
   const [phoneNumber, setPhoneNumber] = useState(defaultPhoneNumber || '');
+  const [selectedCycle, setSelectedCycle] = useState<BillingCycle>(billingCycle);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const selectedAmount = selectedCycle === 'monthly' ? monthlyAmount : annualAmount;
+  const selectedPriceLabel = selectedAmount.toLocaleString('en-KE');
 
   useEffect(() => {
     if (open) {
       setPayerName(defaultPayerName || '');
       setPayerEmail(defaultPayerEmail || '');
       setPhoneNumber(defaultPhoneNumber || '');
+      setSelectedCycle(billingCycle);
     }
-  }, [defaultPayerEmail, defaultPayerName, defaultPhoneNumber, open]);
+  }, [billingCycle, defaultPayerEmail, defaultPayerName, defaultPhoneNumber, open]);
 
   const submitPayment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -73,7 +78,7 @@ const MpesaCheckoutDialog = ({ open, onOpenChange, plan, billingCycle, amount, p
         },
         body: JSON.stringify({
           planKey: plan.key,
-          billingCycle,
+            billingCycle: selectedCycle,
           phoneNumber,
           payerName,
           payerEmail: payerEmail.trim() || undefined,
@@ -112,9 +117,31 @@ const MpesaCheckoutDialog = ({ open, onOpenChange, plan, billingCycle, amount, p
             Pay with M-Pesa
           </DialogTitle>
           <DialogDescription>
-            {plan ? `${plan.name} plan • ${priceLabel} / ${billingCycle === 'monthly' ? 'month' : 'year'}` : 'Choose a plan first.'}
+            {plan ? `${plan.name} plan • KES ${selectedPriceLabel} / ${selectedCycle === 'monthly' ? 'month' : 'year'}` : 'Choose a plan first.'}
           </DialogDescription>
         </DialogHeader>
+
+        <div className="space-y-2">
+          <Label>Billing cycle</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant={selectedCycle === 'monthly' ? 'default' : 'outline'}
+              onClick={() => setSelectedCycle('monthly')}
+              className="w-full"
+            >
+              Monthly
+            </Button>
+            <Button
+              type="button"
+              variant={selectedCycle === 'annual' ? 'default' : 'outline'}
+              onClick={() => setSelectedCycle('annual')}
+              className="w-full"
+            >
+              Annual
+            </Button>
+          </div>
+        </div>
 
         <form className="space-y-4" onSubmit={submitPayment}>
           <div className="space-y-2">
@@ -156,7 +183,7 @@ const MpesaCheckoutDialog = ({ open, onOpenChange, plan, billingCycle, amount, p
           <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
             <div className="flex items-center justify-between gap-3">
               <span>Amount to pay</span>
-              <span className="font-semibold text-foreground">{amount.toLocaleString('en-KE')} KES</span>
+              <span className="font-semibold text-foreground">{selectedAmount.toLocaleString('en-KE')} KES</span>
             </div>
             <p className="mt-1">You will receive an STK push prompt on the phone number you enter.</p>
           </div>
