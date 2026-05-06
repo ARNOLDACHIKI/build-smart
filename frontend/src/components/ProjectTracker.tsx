@@ -28,14 +28,18 @@ interface Milestone {
 }
 
 const ProjectTracker = () => {
-  const { user, token } = useAuth();
+  const { user, token, isHydrating } = useAuth();
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'all' | 'ACTIVE' | 'COMPLETED' | 'PLANNING'>('all');
 
   useEffect(() => {
-    if (!user || !token) return;
+    if (isHydrating) return;
+    if (!user || !token) {
+      setProjects([]);
+      return;
+    }
 
     const fetchProjects = async () => {
       setLoadingProjects(true);
@@ -43,6 +47,11 @@ const ProjectTracker = () => {
         const response = await fetch(apiUrl('/api/projects'), {
           headers: { Authorization: `Bearer ${token}` },
         });
+
+        if (response.status === 401 || response.status === 403) {
+          setProjects([]);
+          return;
+        }
 
         if (!response.ok) throw new Error('Failed to fetch projects');
 
