@@ -181,7 +181,7 @@ const Login = () => {
               {isSubmitting ? 'Signing in...' : t('nav.login')}
             </Button>
 
-            <Link to="/community" className="block">
+            <Link to="/search?mode=free" className="block">
               <Button type="button" variant="outline" className="w-full h-11 mt-2">
                 {t('auth.skipLoginFree')}
               </Button>

@@ -188,7 +188,7 @@ const Navbar = () => {
               {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
             </Button>
             <Link to="/login"><Button size="sm" className="tap-feedback focus-ring gradient-primary text-primary-foreground glow">{t('nav.login')}</Button></Link>
-            <Link to="/community"><Button variant="outline" size="sm" className="tap-feedback focus-ring">{t('nav.skipLogin')}</Button></Link>
+            <Link to="/search?mode=free"><Button variant="outline" size="sm" className="tap-feedback focus-ring">{t('nav.skipLogin')}</Button></Link>
           </div>
 
           <Button
@@ -316,7 +316,7 @@ const Navbar = () => {
                     {t('nav.login')}
                   </Button>
                 </Link>
-                <Link to="/community" className="flex-1">
+                <Link to="/search?mode=free" className="flex-1">
                   <Button variant="outline" className="tap-feedback focus-ring h-11 w-full" size="sm">
                     {t('nav.skipLogin')}
                   </Button>
