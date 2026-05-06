@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Calendar, Briefcase, CheckCircle, AlertCircle, TrendingUp } from 'lucide-react';
+import { apiUrl } from '@/lib/api';
 
 interface Project {
   id: string;
@@ -39,13 +40,13 @@ const ProjectTracker = () => {
     const fetchProjects = async () => {
       setLoadingProjects(true);
       try {
-        const response = await fetch('/api/projects', {
+        const response = await fetch(apiUrl('/api/projects'), {
           headers: { Authorization: `Bearer ${token}` },
         });
 
         if (!response.ok) throw new Error('Failed to fetch projects');
 
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         setProjects(data.projects || []);
       } catch (error) {
         console.error('Error fetching projects:', error);

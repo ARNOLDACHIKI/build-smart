@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Calendar, MapPin, DollarSign, CheckCircle, Circle, AlertCircle, Plus } from 'lucide-react';
 import ChatPanel from '@/components/chat/ChatPanel';
+import { apiUrl } from '@/lib/api';
 
 interface Milestone {
   id: string;
@@ -45,13 +46,13 @@ const ProjectDetailPage = () => {
     const fetchProject = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/projects/${id}`, {
+        const response = await fetch(apiUrl(`/api/projects/${id}`), {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
 
         if (!response.ok) throw new Error('Failed to fetch project');
 
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         setProject(data.project);
       } catch (error) {
         console.error('Error fetching project:', error);
@@ -74,7 +75,7 @@ const ProjectDetailPage = () => {
 
     setUpdatingStatus((prev) => ({ ...prev, [milestoneId]: true }));
     try {
-      const response = await fetch(`/api/milestones/${milestoneId}`, {
+      const response = await fetch(apiUrl(`/api/milestones/${milestoneId}`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -88,12 +89,12 @@ const ProjectDetailPage = () => {
       toast({ title: 'Milestone updated successfully' });
 
       // Refresh project
-      const projectResponse = await fetch(`/api/projects/${id}`, {
+      const projectResponse = await fetch(apiUrl(`/api/projects/${id}`), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
       if (projectResponse.ok) {
-        const data = await projectResponse.json();
+        const data = await projectResponse.json().catch(() => ({}));
         setProject(data.project);
       }
     } catch (error) {
