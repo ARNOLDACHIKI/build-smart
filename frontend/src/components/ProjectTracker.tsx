@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
 import { Calendar, Briefcase, CheckCircle, AlertCircle, TrendingUp } from 'lucide-react';
 import { apiUrl } from '@/lib/api';
 
@@ -29,7 +28,6 @@ interface Milestone {
 
 const ProjectTracker = () => {
   const { user, token, isHydrating } = useAuth();
-  const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'all' | 'ACTIVE' | 'COMPLETED' | 'PLANNING'>('all');
@@ -59,11 +57,7 @@ const ProjectTracker = () => {
         setProjects(data.projects || []);
       } catch (error) {
         console.error('Error fetching projects:', error);
-        toast({
-          title: 'Unable to load projects',
-          description: error instanceof Error ? error.message : 'Please try again.',
-          variant: 'destructive',
-        });
+        setProjects([]);
       } finally {
         setLoadingProjects(false);
       }
