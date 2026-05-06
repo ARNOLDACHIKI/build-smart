@@ -4,15 +4,21 @@ import { Check, Award } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { calculatePriceWithVAT, formatKES } from '@/lib/pricing';
+import MpesaCheckoutDialog, { BillingCycle, MpesaPlan } from '@/components/landing/MpesaCheckoutDialog';
 
 const PricingSection = () => {
   const { t } = useLanguage();
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
+  const { user } = useAuth();
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('annual');
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<MpesaPlan | null>(null);
 
   const plans = [
     {
+      key: 'student',
       name: t('pricing.student'),
       monthlyBase: 1800,
       annualBase: 18000,
@@ -23,6 +29,7 @@ const PricingSection = () => {
       featured: false,
     },
     {
+      key: 'basic',
       name: t('pricing.basic'),
       monthlyBase: 4200,
       annualBase: 42000,
@@ -33,6 +40,7 @@ const PricingSection = () => {
       featured: false,
     },
     {
+      key: 'professional',
       name: t('pricing.professional'),
       monthlyBase: 7800,
       annualBase: 78000,
@@ -43,6 +51,7 @@ const PricingSection = () => {
       featured: true,
     },
     {
+      key: 'enterprise',
       name: t('pricing.enterprise'),
       monthlyBase: 12000,
       annualBase: 120000,
@@ -60,8 +69,12 @@ const PricingSection = () => {
     return {
       baseLabel: formatKES(price.basePrice),
       totalLabel: `${formatKES(price.totalPrice)} (incl. VAT)`,
+      totalPrice: price.totalPrice,
     };
   };
+
+  const currentPlan = selectedPlan ? plans.find((plan) => plan.key === selectedPlan.key) || null : null;
+  const currentPlanPrice = currentPlan ? getPlanPrice(currentPlan) : null;
 
   return (
     <section id="pricing" className="scroll-mt-24 py-24 relative">
@@ -106,7 +119,7 @@ const PricingSection = () => {
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
           {plans.map((plan, i) => (
             <motion.div
-              key={i}
+              key={plan.key}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -140,14 +153,40 @@ const PricingSection = () => {
                   </li>
                 ))}
               </ul>
-              <Link to="/register">
-                <Button className={`w-full ${plan.featured ? 'gradient-primary text-primary-foreground glow' : ''}`} variant={plan.featured ? 'default' : 'outline'}>
-                  {plan.cta}
+              {plan.key === 'enterprise' ? (
+                <Link to="/register">
+                  <Button className={`w-full ${plan.featured ? 'gradient-primary text-primary-foreground glow' : ''}`} variant={plan.featured ? 'default' : 'outline'}>
+                    {plan.cta}
+                  </Button>
+                </Link>
+              ) : (
+                <Button
+                  type="button"
+                  className={`w-full ${plan.featured ? 'gradient-primary text-primary-foreground glow' : ''}`}
+                  variant={plan.featured ? 'default' : 'outline'}
+                  onClick={() => {
+                    setSelectedPlan({ key: plan.key, name: plan.name, description: plan.desc });
+                    setPaymentDialogOpen(true);
+                  }}
+                >
+                  Pay with M-Pesa
                 </Button>
-              </Link>
+              )}
             </motion.div>
           ))}
         </div>
+
+        <MpesaCheckoutDialog
+          open={paymentDialogOpen}
+          onOpenChange={setPaymentDialogOpen}
+          plan={currentPlan ? { key: currentPlan.key, name: currentPlan.name, description: currentPlan.desc } : null}
+          billingCycle={billingCycle}
+          amount={currentPlanPrice?.totalPrice || 0}
+          priceLabel={currentPlanPrice?.totalLabel || ''}
+          userId={user?.id}
+          defaultPayerName={user?.name || ''}
+          defaultPayerEmail={user?.email || ''}
+        />
 
         <motion.p
           initial={{ opacity: 0 }}

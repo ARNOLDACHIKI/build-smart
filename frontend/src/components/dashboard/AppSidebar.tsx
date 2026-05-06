@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, Settings, Sun, Moon, Globe,
+  LayoutDashboard, Users, Settings, Sun, Moon, Globe, CreditCard,
   LogOut, User
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -31,6 +31,7 @@ import { assetUrl } from '@/lib/api';
 
 const menuItems = [
   { key: 'sidebar.dashboard', icon: LayoutDashboard, url: '/dashboard' },
+  { key: 'sidebar.billing', icon: CreditCard, url: '/dashboard/billing' },
   { key: 'sidebar.community', icon: Users, url: '/community' },
 ];
 

@@ -27,6 +27,14 @@ import {
   sendProjectCreatedEmail,
   sendProjectCompletedEmail
 } from "./emailService.js";
+import {
+  normalizeKenyanPhoneNumber,
+  sendMpesaStkPush,
+} from "./mpesa.js";
+import {
+  buildSubscriptionActivation,
+  resolvePlanAmount,
+} from "./paymentService.js";
 
 dotenv.config();
 
@@ -123,6 +131,16 @@ const PROJECT_REMINDER_DEFAULT_ENABLED = true;
 const PROJECT_REMINDER_DEFAULT_FREQUENCY = "daily" as const;
 const PROJECT_REMINDER_DEFAULT_QUIET_HOURS_START = 22;
 const PROJECT_REMINDER_DEFAULT_QUIET_HOURS_END = 7;
+const MPESA_CALLBACK_URL = (process.env.MPESA_CALLBACK_URL || "").trim();
+
+const extractMpesaMetadata = (items: Array<{ Name?: string; Value?: unknown }> = []) => {
+  return items.reduce<Record<string, unknown>>((accumulator, item) => {
+    if (item?.Name) {
+      accumulator[item.Name] = item.Value;
+    }
+    return accumulator;
+  }, {});
+};
 
 const getProjectReminderEnabledSettingKey = (userId: string) => `project.reminders.enabled.${userId}`;
 const getProjectReminderFrequencySettingKey = (userId: string) => `project.reminders.frequency.${userId}`;
@@ -3996,6 +4014,13 @@ type SafeUser = {
   role: AppUserRole;
   emailVerified: boolean;
   twoFactorEnabled: boolean;
+  subscriptionPlanKey: string | null;
+  subscriptionPlanName: string | null;
+  subscriptionBillingCycle: string | null;
+  subscriptionStatus: "INACTIVE" | "ACTIVE" | "EXPIRED";
+  subscriptionActivatedAt: Date | null;
+  subscriptionExpiresAt: Date | null;
+  subscriptionLastPaymentId: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -4029,6 +4054,13 @@ const toSafeUser = (user: {
   role: AppUserRole;
   emailVerified: boolean;
   twoFactorEnabled: boolean;
+  subscriptionPlanKey: string | null;
+  subscriptionPlanName: string | null;
+  subscriptionBillingCycle: string | null;
+  subscriptionStatus: "INACTIVE" | "ACTIVE" | "EXPIRED";
+  subscriptionActivatedAt: Date | null;
+  subscriptionExpiresAt: Date | null;
+  subscriptionLastPaymentId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): SafeUser => ({
@@ -4045,6 +4077,13 @@ const toSafeUser = (user: {
   role: user.role,
   emailVerified: user.emailVerified,
   twoFactorEnabled: user.twoFactorEnabled,
+  subscriptionPlanKey: user.subscriptionPlanKey ?? null,
+  subscriptionPlanName: user.subscriptionPlanName ?? null,
+  subscriptionBillingCycle: user.subscriptionBillingCycle ?? null,
+  subscriptionStatus: user.subscriptionStatus,
+  subscriptionActivatedAt: user.subscriptionActivatedAt ?? null,
+  subscriptionExpiresAt: user.subscriptionExpiresAt ?? null,
+  subscriptionLastPaymentId: user.subscriptionLastPaymentId ?? null,
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
 });
@@ -4065,6 +4104,13 @@ const buildDevEngineerSafeUser = (): SafeUser => {
     role: "ENGINEER",
     emailVerified: true,
     twoFactorEnabled: devEngineerTwoFactorEnabled,
+    subscriptionPlanKey: null,
+    subscriptionPlanName: null,
+    subscriptionBillingCycle: null,
+    subscriptionStatus: "INACTIVE",
+    subscriptionActivatedAt: null,
+    subscriptionExpiresAt: null,
+    subscriptionLastPaymentId: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -4486,6 +4532,13 @@ const buildInMemorySafeUser = (
     role: profile.role,
     emailVerified: true,
     twoFactorEnabled,
+    subscriptionPlanKey: null,
+    subscriptionPlanName: null,
+    subscriptionBillingCycle: null,
+    subscriptionStatus: "INACTIVE",
+    subscriptionActivatedAt: null,
+    subscriptionExpiresAt: null,
+    subscriptionLastPaymentId: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -4685,6 +4738,235 @@ app.get("/api/health/db", async (_req, res) => {
       error: error instanceof Error ? error.message : "Unknown error",
     });
   }
+});
+
+app.post("/api/payments/mpesa/stk-push", async (req, res) => {
+  const { planKey, billingCycle, phoneNumber, payerName, payerEmail, userId } = req.body as {
+    planKey?: string;
+    billingCycle?: string;
+    phoneNumber?: string;
+    payerName?: string;
+    payerEmail?: string;
+    userId?: string;
+  };
+
+  if (!planKey || !billingCycle || !phoneNumber || !payerName) {
+    return res.status(400).json({ error: "planKey, billingCycle, phoneNumber, and payerName are required" });
+  }
+
+  const resolvedPlan = resolvePlanAmount(planKey, billingCycle);
+  if (!resolvedPlan) {
+    return res.status(400).json({ error: "Invalid planKey or billingCycle" });
+  }
+
+  if (!MPESA_CALLBACK_URL) {
+    return res.status(500).json({ error: "MPESA_CALLBACK_URL is not configured" });
+  }
+
+  let normalizedPhoneNumber: string;
+  try {
+    normalizedPhoneNumber = normalizeKenyanPhoneNumber(phoneNumber);
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : "Invalid phone number" });
+  }
+
+  if (userId) {
+    const existingUser = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+
+    if (!existingUser) {
+      return res.status(400).json({ error: "userId does not match an existing user" });
+    }
+  }
+
+  const accountReference = `Build Buddy ${resolvedPlan.plan.name} ${resolvedPlan.cycle}`;
+  const transactionDesc = `Subscription payment for ${resolvedPlan.plan.name} plan`;
+  let paymentRecord: { id: string } | null = null;
+
+  try {
+    const payment = await prisma.paymentTransaction.create({
+      data: {
+        userId: userId || null,
+        payerName: payerName.trim(),
+        payerEmail: payerEmail?.trim() || null,
+        phoneNumber: normalizedPhoneNumber,
+        planKey,
+        planName: resolvedPlan.plan.name,
+        billingCycle: resolvedPlan.cycle,
+        amount: resolvedPlan.pricing.totalPrice,
+        currency: "KES",
+        status: "PENDING",
+        requestPayload: {
+          planKey,
+          billingCycle: resolvedPlan.cycle,
+          phoneNumber: normalizedPhoneNumber,
+          payerName: payerName.trim(),
+          payerEmail: payerEmail?.trim() || null,
+        },
+      },
+    });
+    paymentRecord = { id: payment.id };
+
+    const stkResponse = await sendMpesaStkPush({
+      amount: resolvedPlan.pricing.totalPrice,
+      phoneNumber: normalizedPhoneNumber,
+      callbackUrl: MPESA_CALLBACK_URL,
+      accountReference,
+      transactionDesc,
+    });
+
+    const updatedPayment = await prisma.paymentTransaction.update({
+      where: { id: payment.id },
+      data: {
+        status: "REQUESTED",
+        merchantRequestId: stkResponse.MerchantRequestID,
+        checkoutRequestId: stkResponse.CheckoutRequestID,
+        responsePayload: stkResponse,
+      },
+    });
+
+    return res.status(200).json({
+      message: "M-Pesa STK push sent. Check your phone and enter the PIN prompt.",
+      payment: updatedPayment,
+      mpesa: stkResponse,
+    });
+  } catch (error) {
+    if (paymentRecord) {
+      await prisma.paymentTransaction.update({
+        where: { id: paymentRecord.id },
+        data: {
+          status: "FAILED",
+          resultDescription: error instanceof Error ? error.message : "Failed to initiate M-Pesa payment",
+          responsePayload: {
+            error: error instanceof Error ? error.message : "Failed to initiate M-Pesa payment",
+          },
+        },
+      }).catch(() => undefined);
+    }
+
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : "Failed to initiate M-Pesa payment",
+    });
+  }
+});
+
+app.post("/api/payments/mpesa/callback", async (req, res) => {
+  const stkCallback = req.body?.Body?.stkCallback as
+    | {
+        MerchantRequestID?: string;
+        CheckoutRequestID?: string;
+        ResultCode?: number;
+        ResultDesc?: string;
+        CallbackMetadata?: { Item?: Array<{ Name?: string; Value?: unknown }> };
+      }
+    | undefined;
+
+  if (!stkCallback?.CheckoutRequestID) {
+    return res.status(400).json({ error: "Missing STK callback payload" });
+  }
+
+  const callbackMetadata = extractMpesaMetadata(stkCallback.CallbackMetadata?.Item || []);
+  const resultCode = Number(stkCallback.ResultCode ?? -1);
+  const resultDescription = stkCallback.ResultDesc || "M-Pesa callback received";
+  
+  // Parse M-Pesa date format (YYYYMMDDHHmmss)
+  const parseM2pDate = (dateStr: string): Date => {
+    if (!dateStr || dateStr.length !== 14) return new Date();
+    const year = parseInt(dateStr.substring(0, 4), 10);
+    const month = parseInt(dateStr.substring(4, 6), 10) - 1;
+    const day = parseInt(dateStr.substring(6, 8), 10);
+    const hours = parseInt(dateStr.substring(8, 10), 10);
+    const minutes = parseInt(dateStr.substring(10, 12), 10);
+    const seconds = parseInt(dateStr.substring(12, 14), 10);
+    return new Date(year, month, day, hours, minutes, seconds);
+  };
+  
+  const completedAt = callbackMetadata.TransactionDate
+    ? parseM2pDate(String(callbackMetadata.TransactionDate))
+    : new Date();
+
+  const payment = await prisma.paymentTransaction.findFirst({
+    where: { checkoutRequestId: stkCallback.CheckoutRequestID },
+  });
+
+  if (!payment) {
+    return res.status(404).json({ error: "Payment transaction not found" });
+  }
+
+  const currentUser = payment.userId
+    ? await prisma.user.findUnique({
+        where: { id: payment.userId },
+        select: { subscriptionExpiresAt: true },
+      })
+    : null;
+
+  const updatedPayment = await prisma.paymentTransaction.update({
+    where: { id: payment.id },
+    data: {
+      status: resultCode === 0 ? "COMPLETED" : "FAILED",
+      resultCode,
+      resultDescription,
+      mpesaReceiptNumber: typeof callbackMetadata.MpesaReceiptNumber === "string" ? callbackMetadata.MpesaReceiptNumber : null,
+      callbackPayload: req.body,
+      completedAt: resultCode === 0 ? completedAt : payment.completedAt,
+      responsePayload: {
+        MerchantRequestID: stkCallback.MerchantRequestID,
+        CheckoutRequestID: stkCallback.CheckoutRequestID,
+        ResultCode: resultCode,
+        ResultDesc: resultDescription,
+        callbackMetadata,
+      },
+    },
+  });
+
+  if (resultCode === 0 && payment.userId) {
+    await prisma.user.update({
+      where: { id: payment.userId },
+      data: buildSubscriptionActivation(
+        {
+          id: payment.id,
+          planKey: payment.planKey,
+          planName: payment.planName,
+          billingCycle: payment.billingCycle,
+          completedAt,
+        },
+        currentUser?.subscriptionExpiresAt || null,
+        completedAt,
+      ),
+    });
+  }
+
+  return res.status(200).json({ status: "ok", payment: updatedPayment });
+});
+
+app.get("/api/payments/mpesa/history", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  if (!req.auth?.userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const payments = await prisma.paymentTransaction.findMany({
+    where: { userId: req.auth.userId },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return res.status(200).json({ payments });
+});
+
+app.get("/api/payments/mpesa/:checkoutRequestId", async (req, res) => {
+  const { checkoutRequestId } = req.params;
+
+  if (!checkoutRequestId) {
+    return res.status(400).json({ error: "checkoutRequestId is required" });
+  }
+
+  const payment = await prisma.paymentTransaction.findFirst({
+    where: { checkoutRequestId },
+  });
+
+  if (!payment) {
+    return res.status(404).json({ error: "Payment transaction not found" });
+  }
+
+  return res.status(200).json({ payment });
 });
 
 // Auth - register

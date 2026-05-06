@@ -38,6 +38,7 @@ import Notifications from "./pages/dashboard/Notifications";
 import SettingsPage from "./pages/dashboard/Settings";
 import Support from "./pages/dashboard/Support";
 import Credits from "./pages/dashboard/Credits";
+import Billing from "./pages/dashboard/Billing";
 import CustomerJourney from "./pages/dashboard/CustomerJourney";
 import ProfessionalSearch from "./pages/dashboard/ProfessionalSearch";
 import Profile from "./pages/dashboard/Profile";
@@ -122,6 +123,7 @@ const App = () => (
                   <Route path="settings" element={<SettingsPage />} />
                   <Route path="support" element={<Support />} />
                   <Route path="credits" element={<Credits />} />
+                  <Route path="billing" element={<Billing />} />
                   <Route path="journey" element={<CustomerJourney />} />
                   <Route path="search" element={<ProfessionalSearch />} />
                   <Route path="messages" element={<MyMessages />} />
@@ -179,6 +181,7 @@ const App = () => (
                   <Route path="logs" element={<AdminLogs />} />
                   <Route path="ai" element={<AdminAI />} />
                   <Route path="credits" element={<Credits />} />
+                  <Route path="billing" element={<Billing />} />
                   <Route path="journey" element={<CustomerJourney />} />
                   <Route path="settings" element={<AdminSettings />} />
                 </Route>

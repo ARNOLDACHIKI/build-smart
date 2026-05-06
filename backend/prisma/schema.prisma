@@ -25,6 +25,13 @@ model User {
   role           UserRole   @default(USER)
   emailVerified  Boolean    @default(false)
   twoFactorEnabled Boolean  @default(false)
+  subscriptionPlanKey String?
+  subscriptionPlanName String?
+  subscriptionBillingCycle String?
+  subscriptionStatus SubscriptionStatus @default(INACTIVE)
+  subscriptionActivatedAt DateTime?
+  subscriptionExpiresAt DateTime?
+  subscriptionLastPaymentId String?
   emailVerificationToken String?
   emailVerificationExpiry DateTime?
   emailVerificationSent DateTime?
@@ -46,6 +53,7 @@ model User {
   sentChatMessages ChatMessage[] @relation("ChatMessageSender")
   receivedChatMessages ChatMessage[] @relation("ChatMessageReceiver")
   uploadedFiles FileAttachment[] @relation("FileAttachmentUploader")
+  paymentTransactions PaymentTransaction[]
 
   @@map("users")
 }
@@ -261,6 +269,38 @@ model CommunityPostReport {
   @@map("community_post_reports")
 }
 
+model PaymentTransaction {
+  id                 String        @id @default(cuid())
+  userId             String?
+  user               User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  payerName          String
+  payerEmail         String?
+  phoneNumber        String
+  planKey            String
+  planName           String
+  billingCycle       String
+  amount             Int
+  currency           String        @default("KES")
+  status             PaymentStatus  @default(PENDING)
+  merchantRequestId  String?
+  checkoutRequestId  String?
+  mpesaReceiptNumber String?
+  resultCode         Int?
+  resultDescription  String?
+  callbackPayload    Json?
+  requestPayload     Json?
+  responsePayload    Json?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  completedAt        DateTime?
+
+  @@index([checkoutRequestId])
+  @@index([merchantRequestId])
+  @@index([phoneNumber, createdAt])
+  @@index([status, createdAt])
+  @@map("payment_transactions")
+}
+
 enum UserRole {
   USER
   ADMIN
@@ -321,6 +361,19 @@ enum ProjectStatus {
   ACTIVE
   COMPLETED
   CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  REQUESTED
+  COMPLETED
+  FAILED
+}
+
+enum SubscriptionStatus {
+  INACTIVE
+  ACTIVE
+  EXPIRED
 }
 
 enum MilestoneStatus {

@@ -15,6 +15,13 @@ export type AuthUser = {
   role: AppRole;
   emailVerified?: boolean;
   twoFactorEnabled?: boolean;
+  subscriptionPlanKey?: string | null;
+  subscriptionPlanName?: string | null;
+  subscriptionBillingCycle?: string | null;
+  subscriptionStatus?: 'INACTIVE' | 'ACTIVE' | 'EXPIRED';
+  subscriptionActivatedAt?: string | null;
+  subscriptionExpiresAt?: string | null;
+  subscriptionLastPaymentId?: string | null;
   createdAt: string;
   updatedAt: string;
 };
