@@ -33,8 +33,8 @@ const translations: Translations = {
   'hero.explore': { en: 'Explore the Request Journey', sw: 'Chunguza Safari ya Maombi' },
   'hero.initiateRequest': { en: 'Initiate Request', sw: 'Anzisha Ombi' },
   'hero.step1': { en: 'Explore', sw: 'Chunguza' },
-  'hero.step2': { en: 'Place a request', sw: 'Weka ombi' },
-  'hero.step3': { en: 'Confirm request matched', sw: 'Thibitisha ombi limelinganishwa' },
+  'hero.step2': { en: 'Make an inquiry', sw: 'Weka ombi' },
+  'hero.step3': { en: 'Inquiry matched', sw: 'Ombi limelinganishwa' },
   'hero.step4': { en: 'Track smart insights', sw: 'Fuatilia maarifa mahiri' },
 
   // Features
