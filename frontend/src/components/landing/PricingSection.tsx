@@ -35,10 +35,10 @@ const PricingSection: React.FC = () => {
         </motion.div>
 
         <div className="flex justify-center mb-8">
-          <Badge>{t('pricing.credits6months')}</Badge>
+          <Badge className="bg-slate-800 text-white">{t('pricing.credits6months')}</Badge>
           <div className="ml-4 inline-flex rounded-full border p-1">
-            <button onClick={() => setBillingCycle('monthly')} className={billingCycle === 'monthly' ? 'bg-primary text-white px-4 py-1 rounded' : 'px-4 py-1'}>Monthly</button>
-            <button onClick={() => setBillingCycle('annual')} className={billingCycle === 'annual' ? 'bg-primary text-white px-4 py-1 rounded' : 'px-4 py-1'}>Annual</button>
+            <button onClick={() => setBillingCycle('monthly')} className={billingCycle === 'monthly' ? 'bg-slate-900 text-white px-4 py-1 rounded' : 'px-4 py-1'}>Monthly</button>
+            <button onClick={() => setBillingCycle('annual')} className={billingCycle === 'annual' ? 'bg-slate-900 text-white px-4 py-1 rounded' : 'px-4 py-1'}>Annual</button>
           </div>
         </div>
 
@@ -55,7 +55,7 @@ const PricingSection: React.FC = () => {
                 </div>
                 <ul className="mt-4 space-y-2">
                   {p.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm"><Check className="w-4 h-4 text-primary" />{f}</li>
+                    <li key={f} className="flex items-center gap-2 text-sm"><Check className="w-4 h-4 text-slate-600" />{f}</li>
                   ))}
                 </ul>
                 <div className="mt-4">
@@ -72,7 +72,7 @@ const PricingSection: React.FC = () => {
         </div>
 
         <div className="mt-8 text-center">
-          <Button className="gradient-primary text-white" onClick={() => window.scrollTo({ top: document.getElementById('plans')?.offsetTop || 0, behavior: 'smooth' })}>Start with a plan</Button>
+          <Button className="bg-slate-900 text-white hover:bg-slate-800" onClick={() => window.scrollTo({ top: document.getElementById('plans')?.offsetTop || 0, behavior: 'smooth' })}>Start with a plan</Button>
         </div>
 
         <MpesaCheckoutDialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen} plan={selectedPlan} billingCycle={billingCycle} monthlyAmount={selectedPlan ? calculatePriceWithVAT(plans.find(x => x.key === selectedPlan.key)!.monthlyBase).totalPrice : 0} annualAmount={selectedPlan ? calculatePriceWithVAT(plans.find(x => x.key === selectedPlan.key)!.annualBase).totalPrice : 0} userId={user?.id} defaultPayerName={user?.name || ''} defaultPayerEmail={user?.email || ''} />
