@@ -20,7 +20,7 @@ html {
     --popover: 148 45% 12%;
     --popover-foreground: 120 37% 82%;
 
-    --primary: 122 46% 35%;
+    --primary: 123 46% 34%;
     --primary-foreground: 146 52% 8%;
 
     --secondary: 146 45% 18%;
@@ -29,7 +29,7 @@ html {
     --muted: 146 45% 15%;
     --muted-foreground: 111 24% 60%;
 
-    --accent: 122 39% 49%;
+    --accent: 123 46% 34%;
     --accent-foreground: 146 52% 8%;
 
     --destructive: 0 84% 60%;
@@ -43,12 +43,12 @@ html {
 
     --sidebar-background: 146 52% 12%;
     --sidebar-foreground: 111 28% 73%;
-    --sidebar-primary: 122 46% 35%;
+    --sidebar-primary: 123 46% 34%;
     --sidebar-primary-foreground: 146 52% 8%;
-    --sidebar-accent: 146 45% 18%;
+    --sidebar-accent: 123 46% 34%;
     --sidebar-accent-foreground: 111 28% 73%;
     --sidebar-border: 148 45% 15%;
-    --sidebar-ring: 122 46% 35%;
+    --sidebar-ring: 123 46% 34%;
 
     --success: 142 71% 45%;
     --warning: 38 92% 50%;
@@ -68,7 +68,7 @@ html {
     --popover: 148 45% 12%;
     --popover-foreground: 120 39% 92%;
 
-    --primary: 122 46% 35%;
+    --primary: 123 46% 34%;
     --primary-foreground: 146 52% 8%;
 
     --secondary: 146 45% 16%;
@@ -77,7 +77,7 @@ html {
     --muted: 146 45% 14%;
     --muted-foreground: 111 24% 60%;
 
-    --accent: 122 39% 49%;
+    --accent: 123 46% 34%;
     --accent-foreground: 146 52% 8%;
 
     --destructive: 0 84% 60%;
@@ -89,12 +89,12 @@ html {
 
     --sidebar-background: 148 45% 12%;
     --sidebar-foreground: 111 28% 73%;
-    --sidebar-primary: 122 46% 35%;
+    --sidebar-primary: 123 46% 34%;
     --sidebar-primary-foreground: 146 52% 8%;
-    --sidebar-accent: 146 45% 16%;
+    --sidebar-accent: 123 46% 34%;
     --sidebar-accent-foreground: 111 28% 73%;
     --sidebar-border: 148 45% 14%;
-    --sidebar-ring: 122 46% 35%;
+    --sidebar-ring: 123 46% 34%;
 
     --success: 142 71% 45%;
     --warning: 38 92% 50%;
@@ -209,29 +209,23 @@ html {
   }
 
   .gradient-primary {
-    background: hsl(122 46% 35%);
+    background: hsl(123 46% 34%);
   }
 
   .dark .gradient-primary {
-    background: hsl(122 46% 35%);
+    background: hsl(123 46% 34%);
   }
 
   .gradient-text {
-    background: linear-gradient(135deg, hsl(122 46% 35%), hsl(122 39% 49%));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: hsl(123 46% 34%);
   }
 
   .dark .gradient-text {
-    background: linear-gradient(135deg, hsl(122 46% 35%), hsl(122 39% 49%));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: hsl(123 46% 34%);
   }
 
   .glow {
-    box-shadow: 0 0 14px hsl(122 46% 35% / 0.2), 0 0 32px hsl(122 39% 49% / 0.1);
+    box-shadow: 0 0 14px hsl(123 46% 34% / 0.2), 0 0 32px hsl(123 46% 34% / 0.1);
   }
 
   .safe-bottom {
@@ -239,7 +233,7 @@ html {
   }
 
   .dark .glow {
-    box-shadow: 0 0 14px hsl(122 46% 35% / 0.2), 0 0 32px hsl(122 39% 49% / 0.1);
+    box-shadow: 0 0 14px hsl(123 46% 34% / 0.2), 0 0 32px hsl(123 46% 34% / 0.1);
   }
 }
 

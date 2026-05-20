@@ -128,7 +128,7 @@ export const ProjectUpdateChat = ({ project, onUpdate }: ProjectUpdateChatProps)
             <div
               className={`max-w-xs px-4 py-2 rounded-lg ${
                 msg.role === 'user'
-                  ? 'bg-lime-600 text-white'
+                  ? 'bg-primary text-primary-foreground'
                   : 'bg-slate-700 text-slate-100'
               }`}
             >
@@ -157,7 +157,7 @@ export const ProjectUpdateChat = ({ project, onUpdate }: ProjectUpdateChatProps)
           onClick={handleSendMessage}
           disabled={isLoading || !input.trim()}
           size="icon"
-          className="bg-lime-600 hover:bg-lime-700"
+          className="bg-primary hover:bg-primary/90 text-primary-foreground"
         >
           <Send className="w-4 h-4" />
         </Button>
