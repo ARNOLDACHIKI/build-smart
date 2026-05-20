@@ -116,7 +116,7 @@ const analyticsByProject: Record<
   },
 };
 
-const COLORS = ['hsl(69, 68%, 51%)', 'hsl(217, 91%, 60%)', 'hsl(38, 92%, 50%)', 'hsl(73, 42%, 31%)'];
+const COLORS = ['hsl(122, 46%, 35%)', 'hsl(217, 91%, 60%)', 'hsl(38, 92%, 50%)', 'hsl(122, 39%, 49%)'];
 
 const Analytics = () => {
   const { t } = useLanguage();
