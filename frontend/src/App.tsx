@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ActivityProvider } from "@/contexts/ActivityContext";
 import { SimulationProvider } from "@/contexts/SimulationContext";
+import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 import Index from "./pages/Index";
@@ -82,10 +83,11 @@ const App = () => (
         <AuthProvider>
           <SimulationProvider>
             <ActivityProvider>
-              <TooltipProvider>
-                <Toaster />
-                <Sonner />
-                <BrowserRouter>
+              <CurrencyProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <Sonner />
+                  <BrowserRouter>
               <Routes>
                 {/* Public */}
                 <Route path="/" element={<Index />} />
@@ -246,8 +248,9 @@ const App = () => (
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
-          </TooltipProvider>
-          </ActivityProvider>
+                </TooltipProvider>
+              </CurrencyProvider>
+            </ActivityProvider>
           </SimulationProvider>
         </AuthProvider>
       </LanguageProvider>
