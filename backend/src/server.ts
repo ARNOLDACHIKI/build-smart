@@ -5984,6 +5984,12 @@ app.get("/api/community/feed", authMiddleware, async (req: AuthenticatedRequest,
       take: 12,
     });
 
+    const updatesRaw = await prismaDynamic.communityUpdate.findMany({
+      where: { isPublished: true },
+      orderBy: [{ isPinned: 'desc' }, { pinnedAt: 'desc' }, { createdAt: 'desc' }],
+      take: 6,
+    });
+
     const feedPosts = dedupeCommunityPosts([...(postsRaw as CommunityPostRecord[]), ...communityPostCache.values()])
       .filter((post) => {
         // Apply field filter if specified
