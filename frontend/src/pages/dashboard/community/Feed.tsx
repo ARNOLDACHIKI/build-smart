@@ -144,7 +144,7 @@ const Feed = ({
   return (
     <div className="space-y-5">
       {spotlightPosts.length > 0 && (
-        <section className="overflow-hidden rounded-2xl border border-[#2A2D3C] bg-[#1A1D2B]/80 p-4 xl:ml-auto xl:w-[94%]">
+        <section className="overflow-hidden rounded-2xl border border-[#2A2D3C] bg-[#1A1D2B]/80 p-4">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#BED234]">Articles Spotlight</p>
             <p className="text-[11px] text-slate-500">Top reads from the construction community</p>

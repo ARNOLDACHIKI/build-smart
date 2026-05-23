@@ -708,7 +708,7 @@ const CommunityHubV2 = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-5 pt-32 xl:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="grid grid-cols-1 gap-5 pt-32 xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-4">
             <div className="min-w-0">
               <Feed
                 posts={visibleFeedItems}
