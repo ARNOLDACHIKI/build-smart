@@ -5922,6 +5922,19 @@ app.get("/api/community/feed", authMiddleware, async (req: AuthenticatedRequest,
   const requestedSpaceId = String(req.query.spaceId || "").trim();
 
   try {
+    // If a specific space is requested, verify the user has access to it
+    if (requestedSpaceId) {
+      const spaceAccess = await prismaDynamic.communityMembership.findFirst({
+        where: {
+          spaceId: requestedSpaceId,
+          userId,
+        },
+      });
+      if (!spaceAccess) {
+        return res.status(403).json({ error: "Access denied to this community space" });
+      }
+    }
+
     const state = await loadCommunityState(userId);
     const analytics = await loadCommunityAnalyticsState(userId);
     const behavior = deriveCommunityBehaviorSignals(analytics);
@@ -5951,27 +5964,18 @@ app.get("/api/community/feed", authMiddleware, async (req: AuthenticatedRequest,
       behaviorTokens: behavior.behaviorTokens,
     });
 
+    // Build where clause property
+    const postWhere: any = {
+      isPublished: true,
+    };
+    if (requestedSpaceId) {
+      postWhere.communitySpaceId = requestedSpaceId;
+    }
+    
     const postsRaw = await prismaDynamic.communityPost.findMany({
-      where: {
-        isPublished: true,
-        ...(requestedSpaceId ? { communitySpaceId: requestedSpaceId } : {}),
-        ...(requestedField !== "all"
-          ? {
-              field: {
-                equals: requestedField,
-                mode: "insensitive",
-              },
-            }
-          : {}),
-      },
+      where: postWhere,
       orderBy: { createdAt: "desc" },
       take: 24,
-    });
-
-    const updatesRaw = await prismaDynamic.communityUpdate.findMany({
-      where: { isPublished: true },
-      orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
-      take: 12,
     });
 
     const adsRaw = await prismaDynamic.communityAd.findMany({
@@ -5982,6 +5986,14 @@ app.get("/api/community/feed", authMiddleware, async (req: AuthenticatedRequest,
 
     const feedPosts = dedupeCommunityPosts([...(postsRaw as CommunityPostRecord[]), ...communityPostCache.values()])
       .filter((post) => {
+        // Apply field filter if specified
+        if (requestedField !== "all") {
+          const postField = post.field || "";
+          if (postField.toLowerCase() !== requestedField.toLowerCase()) {
+            return false;
+          }
+        }
+        // Apply search query filter if specified
         if (!q) return true;
         const decoded = decodePostContent(post.content);
         const haystack = `${post.title} ${post.summary} ${decoded.body} ${post.interests.join(" ")}`.toLowerCase();
