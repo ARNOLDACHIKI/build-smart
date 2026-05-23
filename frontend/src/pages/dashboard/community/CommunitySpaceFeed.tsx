@@ -11,6 +11,8 @@ import {
 } from '@/lib/community';
 import Feed from './Feed';
 import { expandedMockPosts } from './expandedMockPosts';
+import CommentThreadModal from './CommentThreadModal';
+import { joinCommunitySpace } from '@/lib/community';
 
 const CommunitySpaceFeed = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
@@ -46,6 +48,8 @@ const CommunitySpaceFeed = () => {
   const [follows, setFollows] = useState<Record<string, boolean>>({});
   const [votes, setVotes] = useState<Record<string, 'up' | 'down' | null>>({});
   const [highlightedPostId] = useState<string | null>(null);
+  const [discussionOpen, setDiscussionOpen] = useState(false);
+  const [activePostId, setActivePostId] = useState<string | null>(null);
 
   // Load space and feed
   useEffect(() => {
@@ -224,7 +228,7 @@ const CommunitySpaceFeed = () => {
             <p className="mt-1 text-xs text-slate-500">Be the first to share something!</p>
           </div>
         ) : (
-          <Feed
+            <Feed
             posts={feed.posts.map((post) => ({
               id: post.id,
               title: post.title,
@@ -258,9 +262,35 @@ const CommunitySpaceFeed = () => {
             onViewDiscussion={() => {}}
             onJoinLiveRoom={handleJoinLiveRoom}
             onToggleEngagementVisibility={async () => {}}
-          />
+            onViewDiscussion={(id) => {
+              setActivePostId(id);
+              setDiscussionOpen(true);
+            }}
+            />
         )}
       </div>
+      <CommentThreadModal
+        postId={activePostId}
+        open={discussionOpen}
+        canComment={Boolean(space && (space.isOwner || space.viewerMembership?.status === 'ACTIVE'))}
+        onRequestJoin={async () => {
+          if (!space) return;
+          try {
+            setIsMutating(true);
+            const res = await joinCommunitySpace(space.id);
+            if (res?.space) setSpace(res.space);
+            toast({ title: 'Requested to join', description: res?.message || 'Membership updated.' });
+          } catch (err) {
+            toast({ title: 'Join failed', description: err instanceof Error ? err.message : 'Unable to join', variant: 'destructive' });
+          } finally {
+            setIsMutating(false);
+          }
+        }}
+        onOpenChange={(open) => {
+          setDiscussionOpen(open);
+          if (!open) setActivePostId(null);
+        }}
+      />
     </div>
   );
 };
