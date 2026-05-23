@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivity } from '@/contexts/ActivityContext';
-import { useSimulation } from '@/contexts/SimulationContext';
+// import { useSimulation } from '@/contexts/SimulationContext';
 import {
   castCommunityVote,
   buildCommunityShareUrl,
@@ -27,8 +27,7 @@ import CreatePostModal from './community/CreatePostModal';
 import Feed from './community/Feed';
 import LiveRoomModal from './community/LiveRoomModal';
 import PostSettingsDrawer from './community/PostSettingsDrawer';
-import DemoModeBadge from '@/components/community/DemoModeBadge';
-import SimulationSettings from '@/components/community/SimulationSettings';
+// DemoModeBadge removed
 import { ReelsPage } from './community/ReelsPage';
 import { filterBySearch, sortByPersona } from './community/tabUtils';
 import type { FeedItem } from './community/types';
@@ -90,8 +89,7 @@ const CommunityHubV2 = () => {
     setSavedPosts,
   } = useActivity();
 
-  // Simulation mode
-  const { isSimulationMode, simulationPosts, refreshSimulation } = useSimulation();
+  // simulation/demo mode removed for production UI
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
@@ -99,7 +97,6 @@ const CommunityHubV2 = () => {
   const [isLiveRoomOpen, setIsLiveRoomOpen] = useState(false);
   const [activeLiveRoom, setActiveLiveRoom] = useState<{ roomId: string; title: string } | null>(null);
   const [isPostSettingsOpen, setIsPostSettingsOpen] = useState(false);
-  const [isSimulationSettingsOpen, setIsSimulationSettingsOpen] = useState(false);
   const [activityNotifications, setActivityNotifications] = useState<CommunityActivityNotification[]>([]);
   const [activityUnreadCount, setActivityUnreadCount] = useState(0);
   const [postVisibilityDefaults, setPostVisibilityDefaults] = useState<{
@@ -156,12 +153,7 @@ const CommunityHubV2 = () => {
       // Merge API posts with expanded mock posts for demo/fallback purposes
       const mergedData = {
         ...data,
-        posts: (() => {
-          const basePosts = data.posts.length > 0 ? [...data.posts, ...expandedMockPosts.slice(0, 8)] : expandedMockPosts;
-          return isSimulationMode
-            ? [...simulationPosts, ...basePosts.filter((post) => !post.id.startsWith('demo_post_'))]
-            : basePosts;
-        })(),
+        posts: data.posts.length > 0 ? [...data.posts, ...expandedMockPosts.slice(0, 8)] : expandedMockPosts,
       };
       setFeed(mergedData);
       hydrateUiState(mergedData);
@@ -180,7 +172,7 @@ const CommunityHubV2 = () => {
     } finally {
       if (!silent && currentLoadId === loadIdRef.current) setIsLoading(false);
     }
-  }, [isSimulationMode, search, simulationPosts, toast]);
+  }, [search, toast]);
 
   useEffect(() => {
     try {
@@ -296,10 +288,7 @@ const CommunityHubV2 = () => {
   const scrollStateRef = useRef({ lastY: 0, hasLeftTop: false, locked: false });
 
   useEffect(() => {
-    if (!isSimulationMode) {
-      scrollStateRef.current = { lastY: 0, hasLeftTop: false, locked: false };
-      return;
-    }
+    scrollStateRef.current = { lastY: 0, hasLeftTop: false, locked: false };
 
     const handleScroll = () => {
       const currentY = window.scrollY || document.documentElement.scrollTop || 0;
@@ -315,7 +304,6 @@ const CommunityHubV2 = () => {
       if (isBackAtTop && isScrollingUp && !state.locked) {
         state.locked = true;
         state.hasLeftTop = false;
-        refreshSimulation();
         window.setTimeout(() => {
           scrollStateRef.current.locked = false;
         }, 1500);
@@ -326,7 +314,7 @@ const CommunityHubV2 = () => {
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [isSimulationMode, refreshSimulation]);
+  }, []);
 
   const activeCommentPost = useMemo(
     () => visibleFeedItems.find((item) => item.id === activeCommentPostId) || null,
@@ -688,7 +676,7 @@ const CommunityHubV2 = () => {
 
   return (
     <>
-      <DemoModeBadge />
+      {/* Demo mode badge removed */}
       {viewMode === 'reels' ? (
         <div className="relative">
           <ReelsPage />
@@ -708,7 +696,6 @@ const CommunityHubV2 = () => {
           onOpenActivity={() => setIsActivityOpen(true)}
           onOpenPostSettings={() => setIsPostSettingsOpen(true)}
           onOpenReels={() => setViewMode('reels')}
-          onOpenSimulationSettings={() => setIsSimulationSettingsOpen(true)}
           followCount={Object.keys(follows).length}
           activityCount={activityUnreadCount}
         >
@@ -839,28 +826,7 @@ const CommunityHubV2 = () => {
         onChange={(patch) => setPostVisibilityDefaults((current) => ({ ...current, ...patch }))}
       />
 
-      {/* Simulation Settings Drawer */}
-      {isSimulationSettingsOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setIsSimulationSettingsOpen(false)} />
-      )}
-      <div
-        className={`fixed right-0 top-0 h-screen w-96 bg-[#0F1117] border-l border-[#2A2D3C] overflow-y-auto transition-transform duration-300 z-50 ${
-          isSimulationSettingsOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-slate-100">Simulation Settings</h2>
-            <button
-              onClick={() => setIsSimulationSettingsOpen(false)}
-              className="text-slate-400 hover:text-slate-200 transition"
-            >
-              ✕
-            </button>
-          </div>
-          <SimulationSettings />
-        </div>
-      </div>
+      {/* Simulation settings removed from user page */}
     </>
   );
 };

@@ -2,7 +2,7 @@ import { Bell, Plus, Search, Film, SlidersHorizontal } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import DemoModeBadge from '@/components/community/DemoModeBadge';
+// DemoModeBadge removed
 import { useAuth } from '@/contexts/AuthContext';
 
 type CommunityLayoutProps = {
@@ -13,7 +13,6 @@ type CommunityLayoutProps = {
   onOpenActivity?: () => void;
   onOpenPostSettings?: () => void;
   onOpenReels?: () => void;
-  onOpenSimulationSettings?: () => void;
   followCount?: number;
   activityCount?: number;
   children: React.ReactNode;
@@ -27,7 +26,6 @@ const CommunityLayout = ({
   onOpenActivity,
   onOpenPostSettings,
   onOpenReels,
-  onOpenSimulationSettings,
   followCount = 0,
   activityCount = 0,
   children,
@@ -35,7 +33,7 @@ const CommunityLayout = ({
   const { isAuthenticated } = useAuth();
   return (
     <div className="min-h-screen bg-[#121420] text-slate-100">
-      <DemoModeBadge />
+      {/* Demo mode badge removed */}
       <header className="fixed inset-x-0 top-0 z-40 h-16 border-b border-[#2A2D3C] bg-[#121420]/95 backdrop-blur-xl">
         <div className="mx-auto flex h-full w-full max-w-[1280px] items-center gap-3 px-3 sm:px-4">
           <div className="min-w-[120px]">
@@ -69,17 +67,7 @@ const CommunityLayout = ({
                 )}
               </button>
             )}
-            {onOpenSimulationSettings && (
-              <button
-                type="button"
-                onClick={onOpenSimulationSettings}
-                className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#2A2D3C] bg-[#1A1D2B] transition hover:border-[#BED234]"
-                aria-label="Open simulation settings"
-                title="Simulation Settings"
-              >
-                <span className="text-xs font-bold">⚡</span>
-              </button>
-            )}
+            {/* Simulation settings removed */}
             {onOpenPostSettings && (
               <button
                 type="button"

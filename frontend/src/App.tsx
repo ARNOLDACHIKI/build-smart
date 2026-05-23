@@ -8,7 +8,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ActivityProvider } from "@/contexts/ActivityContext";
-import { SimulationProvider } from "@/contexts/SimulationContext";
+// import { SimulationProvider } from '@/contexts/SimulationContext';
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 import Index from "./pages/Index";
@@ -80,7 +80,6 @@ const App = () => (
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
-          <SimulationProvider>
             <ActivityProvider>
               <TooltipProvider>
                 <Toaster />
@@ -246,9 +245,8 @@ const App = () => (
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
-          </TooltipProvider>
+            </TooltipProvider>
           </ActivityProvider>
-          </SimulationProvider>
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>

@@ -12,8 +12,17 @@ const COMPANY_EMAIL = process.env.COMPANY_EMAIL || "Icdboanalytics@gmail.com";
 const COMPANY_NAME = process.env.COMPANY_NAME || "ICDBO Analytics";
 const APP_URL = process.env.APP_URL || "http://localhost:5173";
 
-// Create transporter for sending emails
-const transporter = nodemailer.createTransport({
+const hasUsableSmtpConfig = () => {
+  const user = (SMTP_USER || "").trim();
+  const pass = (SMTP_PASSWORD || "").trim();
+  if (!user || !pass) return false;
+  if (user.includes("your-company-email") || user.includes("example.com")) return false;
+  if (pass.includes("your-app-password") || pass.includes("change-me")) return false;
+  return true;
+};
+
+// Create transporter for sending emails (may be replaced by a test account transporter)
+let transporter = nodemailer.createTransport({
   host: SMTP_HOST,
   port: SMTP_PORT,
   secure: SMTP_PORT === 465, // true for 465 (SSL), false for 587 (TLS)
@@ -23,14 +32,95 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Verify transporter connection on startup
+let usingTestAccount = false;
+let usingFileTransport = false;
+
+// Initialize or verify transporter; if verification fails and we're in non-production,
+// fall back to an Ethereal test account so dev can receive preview URLs.
 export async function verifyEmailService(): Promise<boolean> {
+  // In development, if SMTP credentials are placeholders, avoid noisy auth failures
+  // and route emails to local files immediately.
+  if (process.env.NODE_ENV !== 'production' && !hasUsableSmtpConfig()) {
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      const outDir = path.resolve(process.cwd(), 'emails');
+      if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+
+      transporter = {
+        async sendMail(mail: any) {
+          const filename = `email-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.html`;
+          const filePath = path.join(outDir, filename);
+          const content = `TO: ${mail.to}\nSUBJECT: ${mail.subject}\n\n${mail.html || mail.text || ''}`;
+          fs.writeFileSync(filePath, content, 'utf-8');
+          return { messageId: `file:${filename}`, filePath };
+        },
+        async verify() { return true; },
+      } as unknown as nodemailer.Transporter;
+
+      usingFileTransport = true;
+      console.log('✅ SMTP not configured for dev; using local file email transport at ./emails');
+      return true;
+    } catch (fsErr) {
+      console.error('❌ Failed to initialize local file email transport:', fsErr);
+      return false;
+    }
+  }
+
   try {
     await transporter.verify();
     console.log("✅ Email service connected successfully");
     return true;
   } catch (error) {
     console.error("❌ Email service connection failed:", error);
+
+    // In development, fall back to Ethereal test account so emails can still be inspected
+    if (process.env.NODE_ENV !== 'production') {
+      try {
+        const testAccount = await nodemailer.createTestAccount();
+        transporter = nodemailer.createTransport({
+          host: testAccount.smtp.host,
+          port: testAccount.smtp.port,
+          secure: testAccount.smtp.secure,
+          auth: {
+            user: testAccount.user,
+            pass: testAccount.pass,
+          },
+        });
+        usingTestAccount = true;
+        console.log('✅ Using Ethereal test account for email delivery (dev only).');
+        return true;
+      } catch (ethErr) {
+        console.error('❌ Failed to create Ethereal test account:', ethErr);
+        // As a last-resort fallback (no network access), write emails to disk for inspection.
+        try {
+          const fs = await import('fs');
+          const path = await import('path');
+          const outDir = path.resolve(process.cwd(), 'emails');
+          if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+
+          transporter = {
+            // minimal sendMail implementation used by our codepaths
+            async sendMail(mail: any) {
+              const filename = `email-${Date.now()}-${Math.random().toString(36).slice(2,8)}.html`;
+              const filePath = path.join(outDir, filename);
+              const content = `TO: ${mail.to}\nSUBJECT: ${mail.subject}\n\n${mail.html || mail.text || ''}`;
+              fs.writeFileSync(filePath, content, 'utf-8');
+              return { messageId: `file:${filename}`, filePath };
+            },
+            // noop verify
+            async verify() { return true; },
+          } as unknown as nodemailer.Transporter;
+          usingFileTransport = true;
+          console.log('✅ Using local file email transport (dev only). Emails written to ./emails');
+          return true;
+        } catch (fsErr) {
+          console.error('❌ Failed to create file transport fallback:', fsErr);
+          return false;
+        }
+      }
+    }
+
     return false;
   }
 }
@@ -58,6 +148,16 @@ export async function sendVerificationEmail(
       subject: `Email Verification - ${COMPANY_NAME}`,
       html: htmlContent,
     });
+    if (usingTestAccount) {
+      const preview = nodemailer.getTestMessageUrl(info) || null;
+      console.log("✅ Verification email sent (ethereal preview):", preview);
+      return true;
+    }
+
+    if (usingFileTransport && (info as any).filePath) {
+      console.log("✅ Verification email written to file:", (info as any).filePath);
+      return true;
+    }
 
     console.log("✅ Verification email sent to:", email, "Message ID:", info.messageId);
     return true;
@@ -94,6 +194,16 @@ export async function sendTwoFactorCodeEmail(
       subject: `Your 2FA Code - ${COMPANY_NAME}`,
       html: htmlContent,
     });
+    if (usingTestAccount) {
+      const preview = nodemailer.getTestMessageUrl(info) || null;
+      console.log('✅ Two-factor email sent (ethereal preview):', preview);
+      return true;
+    }
+
+    if (usingFileTransport && (info as any).filePath) {
+      console.log('✅ Two-factor email written to file:', (info as any).filePath);
+      return true;
+    }
 
     console.log("✅ Two-factor code email sent to:", email, "Message ID:", info.messageId);
     return true;

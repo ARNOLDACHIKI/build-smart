@@ -1,78 +1,88 @@
 import React, { useState } from 'react';
-import FeedList from '@/components/community/FeedList';
-import CreatePostModal from '@/components/community/CreatePostModal';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Plus } from 'lucide-react';
+import ArticlesTab from './tabs/ArticlesTab';
+import DiscussionsTab from './tabs/DiscussionsTab';
+import EventsTab from './tabs/EventsTab';
+import MarketplaceTab from './tabs/MarketplaceTab';
+import QATab from './tabs/QATab';
+import SimpleTabsWithCount from './SimpleTabsWithCount';
+import { localArticles, discussionThreads, eventAnnouncements, marketplaceItems, qaItems } from './data';
+import type { TabItem } from './SimpleTabsWithCount';
 
-const LeftNav = ({ onOpenCreate }:{ onOpenCreate: ()=>void }) => (
-  <nav className="w-56 pr-4 hidden lg:block">
-    <div className="sticky top-20 space-y-2">
-      <button className="w-full text-left px-3 py-2 rounded hover:bg-muted">Feed</button>
-      <button className="w-full text-left px-3 py-2 rounded hover:bg-muted">Requests</button>
-      <button className="w-full text-left px-3 py-2 rounded hover:bg-muted">Professionals</button>
-      <Link to="/saved" className="w-full block px-3 py-2 rounded hover:bg-muted">Saved</Link>
-      <button onClick={onOpenCreate} className="mt-3 w-full bg-primary text-primary-foreground px-3 py-2 rounded">Create Post</button>
-    </div>
-  </nav>
-);
-
-const RightPanel = () => (
-  <aside className="w-56 hidden lg:block pl-4">
-    <div className="sticky top-20 space-y-4">
-      <div className="p-3 border rounded">
-        <h4 className="font-semibold">Trending Tags</h4>
-        <div className="flex flex-wrap gap-2 mt-2">
-          <span className="px-2 py-1 bg-background border rounded text-sm">#safety</span>
-          <span className="px-2 py-1 bg-background border rounded text-sm">#materials</span>
-          <span className="px-2 py-1 bg-background border rounded text-sm">#equipment</span>
-        </div>
-      </div>
-
-      <div className="p-3 border rounded">
-        <h4 className="font-semibold">Suggested Pros</h4>
-        <ul className="mt-2 text-sm">
-          <li className="py-1">Jane Doe · Engineer</li>
-          <li className="py-1">Ahmed Ali · Contractor</li>
-          <li className="py-1">Lydia Kim · QS</li>
-        </ul>
-      </div>
-    </div>
-  </aside>
-);
+type TabType = 'articles' | 'discussions' | 'events' | 'marketplace' | 'qa';
 
 const CommunityPage = () => {
-  const [showCreate, setShowCreate] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('articles');
   const navigate = useNavigate();
 
+  const tabs: TabItem[] = [
+    { id: 'articles', label: 'Articles', count: localArticles.length, active: activeTab === 'articles' },
+    { id: 'discussions', label: 'Discussions', count: discussionThreads.length, active: activeTab === 'discussions' },
+    { id: 'events', label: 'Events', count: eventAnnouncements.length, active: activeTab === 'events' },
+    { id: 'marketplace', label: 'Marketplace', count: marketplaceItems.length, active: activeTab === 'marketplace' },
+    { id: 'qa', label: 'Q&A', count: qaItems.length, active: activeTab === 'qa' },
+  ];
+
+  const renderContent = () => {
+    const commonProps = {
+      persona: 'user',
+      search: '',
+      density: 'comfortable' as const,
+      isMutating: false,
+      bookmarks: {},
+      follows: {},
+      votes: {},
+      onBookmark: async () => {},
+      onFollow: async () => {},
+      onVote: async () => {},
+    };
+
+    switch (activeTab) {
+      case 'articles':
+        return <ArticlesTab {...commonProps} />;
+      case 'discussions':
+        return <DiscussionsTab {...commonProps} />;
+      case 'events':
+        return <EventsTab {...commonProps} />;
+      case 'marketplace':
+        return <MarketplaceTab {...commonProps} />;
+      case 'qa':
+        return <QATab {...commonProps} />;
+      default:
+        return <ArticlesTab {...commonProps} />;
+    }
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <div className="flex gap-6">
-        <LeftNav onOpenCreate={() => setShowCreate(true)} />
-
-        <main className="flex-1">
-          <div className="mx-auto max-w-[720px]">
-            <div className="flex items-center justify-between mb-4">
-              <h1 className="text-2xl font-bold">Community</h1>
-              <div className="space-x-2">
-                <button className="px-3 py-1 border rounded" onClick={() => navigate('/community')}>All</button>
-                <button className="px-3 py-1 border rounded">Discussions</button>
-                <button className="px-3 py-1 border rounded">Requests</button>
-              </div>
-            </div>
-
-            <FeedList onOpenPost={(id:string) => navigate(`/community/post/${id}`)} />
-          </div>
-        </main>
-
-        <RightPanel />
+    <div className="min-h-screen bg-[#0F1117]">
+      {/* Header */}
+      <div className="sticky top-0 z-40 border-b border-[#2A2D3C] bg-[#121420]/95 backdrop-blur-sm">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-slate-100">Community</h1>
+          <button
+            onClick={() => navigate('/create')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#BED234] text-[#121420] font-semibold hover:brightness-110 transition"
+          >
+            <Plus className="h-4 w-4" />
+            Create Post
+          </button>
+        </div>
       </div>
 
-      {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-2xl">
-            <CreatePostModal onClose={() => setShowCreate(false)} />
-          </div>
+      {/* Main Content */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Tabs */}
+        <SimpleTabsWithCount 
+          tabs={tabs} 
+          onTabChange={(tabId) => setActiveTab(tabId as TabType)} 
+        />
+
+        {/* Tab Content */}
+        <div className="mt-6">
+          {renderContent()}
         </div>
-      )}
+      </div>
     </div>
   );
 };
