@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Check, Globe, Link2, Plus, ShieldAlert, Sparkles, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { InviteTokenModal } from './InviteTokenModal';
 import {
   createCommunitySpace,
   createCommunitySpaceInvite,
@@ -48,11 +50,14 @@ const emptyCreateForm = {
 
 const CommunitySpacesPanel = ({ selectedSpaceId, onSelectSpace }: CommunitySpacesPanelProps) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [spaces, setSpaces] = useState<CommunitySpaceSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
   const [createForm, setCreateForm] = useState(emptyCreateForm);
+  const [inviteTokenModalOpen, setInviteTokenModalOpen] = useState(false);
+  const [pendingJoinSpace, setPendingJoinSpace] = useState<CommunitySpaceSummary | null>(null);
 
   const selectedSpace = useMemo(() => spaces.find((space) => space.id === selectedSpaceId) || null, [spaces, selectedSpaceId]);
 
@@ -114,22 +119,19 @@ const CommunitySpacesPanel = ({ selectedSpaceId, onSelectSpace }: CommunitySpace
 
   const handleJoinSpace = async (space: CommunitySpaceSummary) => {
     if (space.viewerMembership?.status === 'ACTIVE') {
-      onSelectSpace(space.id, space.name);
+      navigate(`/community/space/${space.id}/feed`);
       return;
     }
 
-    let inviteToken: string | undefined;
     if (space.joinPolicy === 'INVITE_ONLY') {
-      const tokenInput = window.prompt(`Enter invite token for ${space.name}`)?.trim();
-      if (!tokenInput) {
-        return;
-      }
-      inviteToken = tokenInput;
+      setPendingJoinSpace(space);
+      setInviteTokenModalOpen(true);
+      return;
     }
 
     setIsMutating(true);
     try {
-      const response = await joinCommunitySpace(space.id, inviteToken);
+      const response = await joinCommunitySpace(space.id);
       toast({
         title: response.membership?.status === 'PENDING' ? 'Request sent' : 'Joined community',
         description:
@@ -186,6 +188,30 @@ const CommunitySpacesPanel = ({ selectedSpaceId, onSelectSpace }: CommunitySpace
     } catch (error) {
       toast({
         title: 'Unable to create invite',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const handleConfirmInviteToken = async (inviteToken: string) => {
+    if (!pendingJoinSpace) return;
+
+    setInviteTokenModalOpen(false);
+    setIsMutating(true);
+    try {
+      const response = await joinCommunitySpace(pendingJoinSpace.id, inviteToken);
+      toast({
+        title: 'Joined community',
+        description: `You joined ${pendingJoinSpace.name}.`,
+      });
+      setPendingJoinSpace(null);
+      await refreshAfterMutation(response.space.id, response.space.name);
+    } catch (error) {
+      toast({
+        title: 'Unable to join community',
         description: error instanceof Error ? error.message : 'Please try again.',
         variant: 'destructive',
       });
@@ -450,7 +476,7 @@ const CommunitySpacesPanel = ({ selectedSpaceId, onSelectSpace }: CommunitySpace
                     type="button"
                     variant="ghost"
                     className="text-slate-400 hover:bg-[#1F2433] hover:text-slate-100"
-                    onClick={() => onSelectSpace(space.id, space.name)}
+                    onClick={() => navigate(`/community/space/${space.id}/feed`)}
                   >
                     {isSelected ? 'Selected' : 'View feed'}
                   </Button>
@@ -479,6 +505,13 @@ const CommunitySpacesPanel = ({ selectedSpaceId, onSelectSpace }: CommunitySpace
           Viewing <span className="font-semibold text-slate-100">{selectedSpace.name}</span>. Posts created now will go into this community.
         </div>
       )}
+
+      <InviteTokenModal
+        open={inviteTokenModalOpen}
+        onOpenChange={setInviteTokenModalOpen}
+        spaceName={pendingJoinSpace?.name || ''}
+        onConfirm={handleConfirmInviteToken}
+      />
     </section>
   );
 };
