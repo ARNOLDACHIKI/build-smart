@@ -2945,10 +2945,10 @@ const ICDBO_TARGET_MARKET = [
 ];
 
 const ICDBO_PRICING = [
-  `Student: ${formatKES(calculatePriceWithVAT(18_000).basePrice)} -> ${formatKES(calculatePriceWithVAT(18_000).totalPrice)} (incl. VAT) / year`,
-  `Basic: ${formatKES(calculatePriceWithVAT(42_000).basePrice)} -> ${formatKES(calculatePriceWithVAT(42_000).totalPrice)} (incl. VAT) / year`,
-  `Professional: ${formatKES(calculatePriceWithVAT(78_000).basePrice)} -> ${formatKES(calculatePriceWithVAT(78_000).totalPrice)} (incl. VAT) / year`,
-  `Enterprise: ${formatKES(calculatePriceWithVAT(120_000).basePrice)} -> ${formatKES(calculatePriceWithVAT(120_000).totalPrice)} (incl. VAT) / year`,
+  `Student: ${formatKES(calculatePriceWithVAT(640).basePrice)} -> ${formatKES(calculatePriceWithVAT(640).totalPrice)} (incl. VAT) / year`,
+  `Basic: ${formatKES(calculatePriceWithVAT(3_840).basePrice)} -> ${formatKES(calculatePriceWithVAT(3_840).totalPrice)} (incl. VAT) / year`,
+  `Professional: ${formatKES(calculatePriceWithVAT(6_400).basePrice)} -> ${formatKES(calculatePriceWithVAT(6_400).totalPrice)} (incl. VAT) / year`,
+  `Enterprise: ${formatKES(calculatePriceWithVAT(9_600).basePrice)} -> ${formatKES(calculatePriceWithVAT(9_600).totalPrice)} (incl. VAT) / year`,
 ];
 
 const SAMPLE_ENGINEERS = [

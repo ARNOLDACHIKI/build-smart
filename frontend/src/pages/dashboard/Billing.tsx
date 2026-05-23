@@ -32,9 +32,9 @@ type BillingPlan = MpesaPlan & {
 };
 
 const billingPlans: BillingPlan[] = [
-  { key: 'student', name: 'Student', description: 'Best for students and first-time users', monthlyBase: 1800, annualBase: 18000 },
-  { key: 'basic', name: 'Basic', description: 'For growing teams placing regular requests', monthlyBase: 4200, annualBase: 42000 },
-  { key: 'professional', name: 'Professional', description: 'For advanced teams needing stronger AI support', monthlyBase: 7800, annualBase: 78000 },
+  { key: 'student', name: 'Student', description: 'Free package for students - first year free, then paid annually', monthlyBase: 53, annualBase: 640 },
+  { key: 'basic', name: 'Basic', description: 'Access platform, products, services and community', monthlyBase: 320, annualBase: 3840 },
+  { key: 'professional', name: 'Professional', description: 'Consultants and team support for your project', monthlyBase: 533, annualBase: 6400 },
 ];
 
 const Billing = () => {

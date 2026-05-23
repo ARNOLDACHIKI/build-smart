@@ -11,10 +11,10 @@ export type PaymentPlan = {
 export const VAT_RATE = 0.16;
 
 export const PAYMENT_PLANS: Record<PaymentPlanKey, PaymentPlan> = {
-  student: { name: 'Student', monthlyBase: 1800, annualBase: 18000 },
-  basic: { name: 'Basic', monthlyBase: 4200, annualBase: 42000 },
-  professional: { name: 'Professional', monthlyBase: 7800, annualBase: 78000 },
-  enterprise: { name: 'Enterprise', monthlyBase: 12000, annualBase: 120000 },
+  student: { name: 'Student', monthlyBase: 53, annualBase: 640 },
+  basic: { name: 'Basic', monthlyBase: 320, annualBase: 3840 },
+  professional: { name: 'Professional', monthlyBase: 533, annualBase: 6400 },
+  enterprise: { name: 'Enterprise', monthlyBase: 800, annualBase: 9600 },
 };
 
 export const calculatePriceWithVAT = (basePrice: number) => {

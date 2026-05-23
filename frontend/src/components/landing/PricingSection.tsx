@@ -16,9 +16,9 @@ const PricingSection: React.FC = () => {
   const [selectedPlan, setSelectedPlan] = useState<MpesaPlan | null>(null);
 
   const plans = [
-    { key: 'student', name: t('pricing.student'), monthlyBase: 1800, annualBase: 18000, desc: 'Best for students and first-time users', features: ['Platform access', 'Community access'], cta: t('pricing.getStarted'), featured: false },
-    { key: 'basic', name: t('pricing.basic'), monthlyBase: 4200, annualBase: 42000, desc: 'For growing teams placing regular requests', features: ['Full platform access', 'Community messaging'], cta: t('pricing.getStarted'), featured: false },
-    { key: 'professional', name: t('pricing.professional'), monthlyBase: 7800, annualBase: 78000, desc: 'For advanced teams needing stronger AI support', features: ['Everything in Basic', 'Consultant access'], cta: t('pricing.getStarted'), featured: true },
+    { key: 'student', name: t('pricing.student'), monthlyBase: 53, annualBase: 640, desc: 'Free package for students - first year free, then paid annually', features: ['Platform access', 'Community access'], cta: t('pricing.getStarted'), featured: false },
+    { key: 'basic', name: t('pricing.basic'), monthlyBase: 320, annualBase: 3840, desc: 'Access platform, products, services and community', features: ['Full platform access', 'Community messaging'], cta: t('pricing.getStarted'), featured: false },
+    { key: 'professional', name: t('pricing.professional'), monthlyBase: 533, annualBase: 6400, desc: 'Consultants and team support for your project', features: ['Everything in Basic', 'Consultant access'], cta: t('pricing.getStarted'), featured: true },
   ];
 
   const getPlanPrice = (base: number) => {
