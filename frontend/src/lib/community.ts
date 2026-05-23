@@ -16,6 +16,7 @@ export type CommunityPost = {
   author: string;
   field: string;
   interests: string[];
+  communitySpaceId?: string | null;
   stats: string | { likes: number; comments: number; shares: number; follows: number };
   verified?: boolean;
   media?: MediaItem[];
@@ -391,6 +392,58 @@ export type CommunityActivityNotification = {
 
 export type CommunityShareTarget = "native" | "whatsapp" | "facebook" | "linkedin" | "instagram" | "copy";
 
+export type CommunitySpaceJoinPolicy = "OPEN" | "APPROVAL" | "INVITE_ONLY";
+export type CommunityMembershipStatus = "PENDING" | "ACTIVE" | "REJECTED" | "INVITED";
+export type CommunityMemberRole = "OWNER" | "MODERATOR" | "MEMBER";
+
+export type CommunitySpaceViewerMembership = {
+  id: string;
+  role: CommunityMemberRole;
+  status: CommunityMembershipStatus;
+  requestedAt: string | null;
+  approvedAt: string | null;
+  joinedAt: string | null;
+};
+
+export type CommunitySpacePendingRequest = {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  requestedAt: string | null;
+};
+
+export type CommunitySpaceSummary = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  joinPolicy: CommunitySpaceJoinPolicy;
+  isFeatured: boolean;
+  owner: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+  memberCount: number;
+  viewerMembership: CommunitySpaceViewerMembership | null;
+  pendingRequests: CommunitySpacePendingRequest[];
+  pendingInvitationsCount: number;
+  isOwner: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CommunitySpaceInvite = {
+  id: string;
+  token: string;
+  email: string | null;
+  status: string;
+  expiresAt: string | null;
+  inviteUrl: string;
+};
+
 const authorizedRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const token = authStorage.getToken();
   const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
@@ -414,12 +467,93 @@ const authorizedRequest = async <T>(path: string, init?: RequestInit): Promise<T
 export const getCommunityFeed = async (params?: {
   q?: string;
   field?: string;
+  spaceId?: string;
 }): Promise<CommunityFeedResponse> => {
   const query = new URLSearchParams();
   if (params?.q) query.set("q", params.q);
   if (params?.field) query.set("field", params.field);
+  if (params?.spaceId) query.set("spaceId", params.spaceId);
   const suffix = query.toString() ? `?${query.toString()}` : "";
   return authorizedRequest<CommunityFeedResponse>(`/api/community/feed${suffix}`);
+};
+
+export const getCommunitySpaces = async (): Promise<{ spaces: CommunitySpaceSummary[] }> => {
+  return authorizedRequest<{ spaces: CommunitySpaceSummary[] }>("/api/community/spaces");
+};
+
+export const createCommunitySpace = async (payload: {
+  name: string;
+  description: string;
+  joinPolicy: CommunitySpaceJoinPolicy;
+}): Promise<{ space: CommunitySpaceSummary }> => {
+  return authorizedRequest<{ space: CommunitySpaceSummary }>("/api/community/spaces", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const updateCommunitySpace = async (
+  spaceId: string,
+  payload: { name?: string; description?: string; joinPolicy?: CommunitySpaceJoinPolicy }
+): Promise<{ space: CommunitySpaceSummary }> => {
+  return authorizedRequest<{ space: CommunitySpaceSummary }>(`/api/community/spaces/${encodeURIComponent(spaceId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const joinCommunitySpace = async (
+  spaceId: string,
+  inviteToken?: string
+): Promise<{ space: CommunitySpaceSummary; membership: { id: string; status: CommunityMembershipStatus; role: CommunityMemberRole } | null; message?: string }> => {
+  return authorizedRequest<{ space: CommunitySpaceSummary; membership: { id: string; status: CommunityMembershipStatus; role: CommunityMemberRole } | null; message?: string }>(
+    `/api/community/spaces/${encodeURIComponent(spaceId)}/join`,
+    {
+      method: "POST",
+      body: JSON.stringify({ inviteToken }),
+    }
+  );
+};
+
+export const leaveCommunitySpace = async (spaceId: string): Promise<{ space: CommunitySpaceSummary; left: boolean }> => {
+  return authorizedRequest<{ space: CommunitySpaceSummary; left: boolean }>(`/api/community/spaces/${encodeURIComponent(spaceId)}/leave`, {
+    method: "POST",
+  });
+};
+
+export const respondToCommunitySpaceRequest = async (
+  spaceId: string,
+  membershipId: string,
+  action: "approve" | "reject"
+): Promise<{ space: CommunitySpaceSummary; membership: { id: string; status: CommunityMembershipStatus; role: CommunityMemberRole } }> => {
+  return authorizedRequest<{ space: CommunitySpaceSummary; membership: { id: string; status: CommunityMembershipStatus; role: CommunityMemberRole } }>(
+    `/api/community/spaces/${encodeURIComponent(spaceId)}/requests/${encodeURIComponent(membershipId)}/respond`,
+    {
+      method: "POST",
+      body: JSON.stringify({ action }),
+    }
+  );
+};
+
+export const createCommunitySpaceInvite = async (
+  spaceId: string,
+  email?: string
+): Promise<{ invite: CommunitySpaceInvite }> => {
+  return authorizedRequest<{ invite: CommunitySpaceInvite }>(`/api/community/spaces/${encodeURIComponent(spaceId)}/invites`, {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+};
+
+export const acceptCommunitySpaceInvite = async (
+  token: string
+): Promise<{ space: CommunitySpaceSummary; membership: { id: string; status: CommunityMembershipStatus; role: CommunityMemberRole } }> => {
+  return authorizedRequest<{ space: CommunitySpaceSummary; membership: { id: string; status: CommunityMembershipStatus; role: CommunityMemberRole } }>(
+    `/api/community/spaces/invites/${encodeURIComponent(token)}/accept`,
+    {
+      method: "POST",
+    }
+  );
 };
 
 export const getCommunityState = async (): Promise<CommunityState> => {
@@ -579,6 +713,7 @@ export type CreateCommunityPostPayload = {
   title: string;
   content: string;
   contentTypes: string[];
+  communitySpaceId?: string | null;
   scheduledAt?: string;
   mediaFiles?: File[];
   isLiveSession?: boolean;
@@ -595,6 +730,7 @@ export const createCommunityPost = async (
   formData.append("title", payload.title);
   formData.append("content", payload.content);
   formData.append("contentTypes", JSON.stringify(payload.contentTypes));
+  if (payload.communitySpaceId) formData.append("communitySpaceId", payload.communitySpaceId);
 
   if (payload.scheduledAt) formData.append("scheduledAt", payload.scheduledAt);
   if (payload.mediaFiles?.length) {

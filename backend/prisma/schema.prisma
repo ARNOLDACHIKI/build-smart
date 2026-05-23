@@ -54,6 +54,11 @@ model User {
   receivedChatMessages ChatMessage[] @relation("ChatMessageReceiver")
   uploadedFiles FileAttachment[] @relation("FileAttachmentUploader")
   paymentTransactions PaymentTransaction[]
+  communityOwnedSpaces CommunitySpace[]
+  communityMemberships CommunityMembership[]
+  communityMembershipInvitedBy CommunityMembership[] @relation("CommunityMembershipInvitedBy")
+  communityInvitationsSent CommunityInvitation[] @relation("CommunityInvitationSent")
+  communityInvitationsReceived CommunityInvitation[] @relation("CommunityInvitationReceived")
 
   @@map("users")
 }
@@ -216,12 +221,78 @@ model CommunityPost {
   authorName String
   field      String
   interests  String[]
+  communitySpaceId String?
+  communitySpace   CommunitySpace? @relation(fields: [communitySpaceId], references: [id], onDelete: SetNull)
   isPublished Boolean @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  @@index([communitySpaceId, createdAt])
   @@index([isPublished, createdAt])
   @@map("community_posts")
+}
+
+model CommunitySpace {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  description String
+  ownerId     String
+  owner       User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  joinPolicy  CommunityJoinPolicy @default(OPEN)
+  isFeatured  Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  posts        CommunityPost[]
+  memberships  CommunityMembership[]
+  invitations  CommunityInvitation[]
+
+  @@index([ownerId, joinPolicy, createdAt])
+  @@map("community_spaces")
+}
+
+model CommunityMembership {
+  id          String  @id @default(cuid())
+  spaceId     String
+  space       CommunitySpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        CommunityMemberRole @default(MEMBER)
+  status      CommunityMembershipStatus @default(PENDING)
+  invitedById String?
+  invitedBy   User?   @relation("CommunityMembershipInvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  requestedAt DateTime?
+  approvedAt  DateTime?
+  joinedAt    DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([spaceId, userId])
+  @@index([spaceId, status, createdAt])
+  @@index([userId, status])
+  @@map("community_memberships")
+}
+
+model CommunityInvitation {
+  id          String  @id @default(cuid())
+  spaceId     String
+  space       CommunitySpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  token       String  @unique
+  email       String?
+  invitedById String
+  invitedBy   User    @relation("CommunityInvitationSent", fields: [invitedById], references: [id], onDelete: Cascade)
+  inviteeUserId String?
+  inviteeUser User?   @relation("CommunityInvitationReceived", fields: [inviteeUserId], references: [id], onDelete: SetNull)
+  status      CommunityInvitationStatus @default(PENDING)
+  expiresAt   DateTime?
+  acceptedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([spaceId, status, createdAt])
+  @@index([email, status])
+  @@map("community_invitations")
 }
 
 model CommunityUpdate {
@@ -373,6 +444,32 @@ enum PaymentStatus {
 enum SubscriptionStatus {
   INACTIVE
   ACTIVE
+  EXPIRED
+}
+
+enum CommunityJoinPolicy {
+  OPEN
+  APPROVAL
+  INVITE_ONLY
+}
+
+enum CommunityMemberRole {
+  OWNER
+  MODERATOR
+  MEMBER
+}
+
+enum CommunityMembershipStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  INVITED
+}
+
+enum CommunityInvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
   EXPIRED
 }
 

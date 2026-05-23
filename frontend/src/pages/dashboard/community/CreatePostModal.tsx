@@ -19,10 +19,13 @@ import { Textarea } from '@/components/ui/textarea';
 type CreatePostModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  communitySpaceId?: string | null;
+  communitySpaceName?: string | null;
   onSubmit: (payload: {
     title: string;
     content: string;
     contentTypes: string[];
+    communitySpaceId?: string | null;
     scheduledAt: string;
     mediaFiles: File[];
     isLiveSession: boolean;
@@ -41,7 +44,7 @@ const contentChoices = [
   { id: 'document', label: 'Document', icon: FileText },
 ];
 
-const CreatePostModal = ({ open, onOpenChange, onSubmit }: CreatePostModalProps) => {
+const CreatePostModal = ({ open, onOpenChange, communitySpaceId, communitySpaceName, onSubmit }: CreatePostModalProps) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
@@ -93,6 +96,7 @@ const CreatePostModal = ({ open, onOpenChange, onSubmit }: CreatePostModalProps)
         title: title.trim(),
         content: content.trim(),
         contentTypes: selectedTypes,
+        communitySpaceId: communitySpaceId || null,
         scheduledAt,
         mediaFiles,
         isLiveSession,
@@ -157,6 +161,13 @@ const CreatePostModal = ({ open, onOpenChange, onSubmit }: CreatePostModalProps)
                 className="border-[#2A2D3C] bg-[#1A1D2B] text-slate-100 placeholder:text-slate-500"
               />
             </div>
+
+            {communitySpaceId && (
+              <div className="rounded-lg border border-[#2A2D3C] bg-[#121420] px-4 py-3">
+                <p className="text-xs uppercase tracking-[0.18em] text-[#BED234]">Posting in sub-community</p>
+                <p className="mt-1 text-sm font-semibold text-slate-100">{communitySpaceName || 'Selected community'}</p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="post-content" className="text-sm text-slate-300">Content</Label>

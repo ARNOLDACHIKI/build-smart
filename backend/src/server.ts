@@ -94,6 +94,35 @@ const prismaDynamic = prisma as typeof prisma & {
     create: (...args: any[]) => Promise<any>;
     findFirst: (...args: any[]) => Promise<any>;
   };
+  communitySpace: {
+    findMany: (...args: any[]) => Promise<any[]>;
+    findFirst: (...args: any[]) => Promise<any>;
+    findUnique: (...args: any[]) => Promise<any>;
+    count: (...args: any[]) => Promise<number>;
+    create: (...args: any[]) => Promise<any>;
+    createMany: (...args: any[]) => Promise<any>;
+    update: (...args: any[]) => Promise<any>;
+  };
+  communityMembership: {
+    findMany: (...args: any[]) => Promise<any[]>;
+    findFirst: (...args: any[]) => Promise<any>;
+    findUnique: (...args: any[]) => Promise<any>;
+    count: (...args: any[]) => Promise<number>;
+    create: (...args: any[]) => Promise<any>;
+    createMany: (...args: any[]) => Promise<any>;
+    update: (...args: any[]) => Promise<any>;
+    delete: (...args: any[]) => Promise<any>;
+    deleteMany: (...args: any[]) => Promise<any>;
+  };
+  communityInvitation: {
+    findMany: (...args: any[]) => Promise<any[]>;
+    findFirst: (...args: any[]) => Promise<any>;
+    findUnique: (...args: any[]) => Promise<any>;
+    count: (...args: any[]) => Promise<number>;
+    create: (...args: any[]) => Promise<any>;
+    createMany: (...args: any[]) => Promise<any>;
+    update: (...args: any[]) => Promise<any>;
+  };
 };
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me";
@@ -1082,6 +1111,7 @@ type CommunityPostRecord = {
   authorName: string;
   field: string;
   interests: string[];
+  communitySpaceId?: string | null;
   isPublished: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -1259,6 +1289,60 @@ type CommunityPostEngagement = {
   showLikes: boolean;
   showComments: boolean;
   showFollows: boolean;
+};
+
+type CommunitySpaceJoinPolicy = "OPEN" | "APPROVAL" | "INVITE_ONLY";
+
+type CommunityMembershipStatus = "PENDING" | "ACTIVE" | "REJECTED" | "INVITED";
+
+type CommunityMemberRole = "OWNER" | "MODERATOR" | "MEMBER";
+
+type CommunitySpaceViewerMembership = {
+  id: string;
+  role: CommunityMemberRole;
+  status: CommunityMembershipStatus;
+  requestedAt: string | null;
+  approvedAt: string | null;
+  joinedAt: string | null;
+};
+
+type CommunitySpacePendingRequest = {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  requestedAt: string | null;
+};
+
+type CommunitySpaceSummary = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  joinPolicy: CommunitySpaceJoinPolicy;
+  isFeatured: boolean;
+  owner: {
+    id: string;
+    name: string;
+    email: string;
+    role: AppUserRole;
+  };
+  memberCount: number;
+  viewerMembership: CommunitySpaceViewerMembership | null;
+  pendingRequests: CommunitySpacePendingRequest[];
+  pendingInvitationsCount: number;
+  isOwner: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type CommunitySpaceInviteSummary = {
+  id: string;
+  token: string;
+  email: string | null;
+  status: string;
+  expiresAt: string | null;
+  inviteUrl: string;
 };
 
 type CommunityInteractionAction =
@@ -2237,6 +2321,7 @@ const buildCommunityPostResponse = (
     author: post.authorName,
     field: post.field,
     interests: post.interests,
+    communitySpaceId: post.communitySpaceId || null,
     stats: resolvedContent.liveSession ? "Live session" : "Live discussion",
     media: resolvedContent.media,
     liveSession: resolvedContent.liveSession,
@@ -2245,6 +2330,171 @@ const buildCommunityPostResponse = (
     createdAt: post.createdAt,
   };
 };
+
+const COMMUNITY_SPACE_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+const normalizeCommunityJoinPolicy = (value: unknown): CommunitySpaceJoinPolicy => {
+  return value === "APPROVAL" || value === "INVITE_ONLY" ? value : "OPEN";
+};
+
+const normalizeCommunityMemberRole = (value: unknown): CommunityMemberRole => {
+  return value === "OWNER" || value === "MODERATOR" ? value : "MEMBER";
+};
+
+const normalizeCommunityMembershipStatus = (value: unknown): CommunityMembershipStatus => {
+  return value === "ACTIVE" || value === "REJECTED" || value === "INVITED" ? value : "PENDING";
+};
+
+const slugifyCommunitySpaceName = (name: string): string =>
+  name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 48) || `community-space-${Date.now()}`;
+
+const buildCommunitySpaceInviteUrl = (token: string): string => {
+  const communityBaseUrl = process.env.FRONTEND_URL || process.env.APP_URL || "http://localhost:5173";
+  return `${communityBaseUrl}/community?invite=${encodeURIComponent(token)}`;
+};
+
+const buildCommunitySpaceSummaryFromSpace = async (space: any, userId: string): Promise<CommunitySpaceSummary> => {
+  const isOwner = space.ownerId === userId;
+  const [memberCount, viewerMembership, pendingRequests, pendingInvitationsCount] = await Promise.all([
+    prismaDynamic.communityMembership.count({
+      where: { spaceId: space.id, status: "ACTIVE" },
+    }),
+    prismaDynamic.communityMembership.findFirst({
+      where: { spaceId: space.id, userId },
+      select: {
+        id: true,
+        role: true,
+        status: true,
+        requestedAt: true,
+        approvedAt: true,
+        joinedAt: true,
+      },
+    }),
+    isOwner
+      ? prismaDynamic.communityMembership.findMany({
+          where: { spaceId: space.id, status: "PENDING" },
+          include: {
+            user: {
+              select: { id: true, name: true, email: true },
+            },
+          },
+          orderBy: { requestedAt: "asc" },
+        })
+      : Promise.resolve([]),
+    isOwner
+      ? prismaDynamic.communityInvitation.count({
+          where: { spaceId: space.id, status: "PENDING" },
+        })
+      : Promise.resolve(0),
+  ]);
+
+  return {
+    id: space.id,
+    slug: space.slug,
+    name: space.name,
+    description: space.description,
+    joinPolicy: normalizeCommunityJoinPolicy(space.joinPolicy),
+    isFeatured: Boolean(space.isFeatured),
+    owner: {
+      id: space.owner.id,
+      name: space.owner.name || space.owner.email,
+      email: space.owner.email,
+      role: space.owner.role,
+    },
+    memberCount,
+    viewerMembership: viewerMembership
+      ? {
+          id: viewerMembership.id,
+          role: normalizeCommunityMemberRole(viewerMembership.role),
+          status: normalizeCommunityMembershipStatus(viewerMembership.status),
+          requestedAt: viewerMembership.requestedAt ? new Date(viewerMembership.requestedAt).toISOString() : null,
+          approvedAt: viewerMembership.approvedAt ? new Date(viewerMembership.approvedAt).toISOString() : null,
+          joinedAt: viewerMembership.joinedAt ? new Date(viewerMembership.joinedAt).toISOString() : null,
+        }
+      : null,
+    pendingRequests: pendingRequests.map((request: any) => ({
+      id: request.id,
+      userId: request.user.id,
+      userName: request.user.name || request.user.email,
+      userEmail: request.user.email,
+      requestedAt: request.requestedAt ? new Date(request.requestedAt).toISOString() : null,
+    })),
+    pendingInvitationsCount,
+    isOwner,
+    createdAt: new Date(space.createdAt).toISOString(),
+    updatedAt: new Date(space.updatedAt).toISOString(),
+  };
+};
+
+const loadCommunitySpaces = async (userId: string): Promise<CommunitySpaceSummary[]> => {
+  if (!dbAvailable) {
+    return FALLBACK_COMMUNITY_SPACES;
+  }
+
+  const spaces = await prismaDynamic.communitySpace.findMany({
+    include: {
+      owner: {
+        select: { id: true, name: true, email: true, role: true },
+      },
+    },
+    orderBy: [{ isFeatured: "desc" }, { createdAt: "desc" }],
+  });
+
+  if (spaces.length === 0) {
+    return [];
+  }
+
+  return Promise.all(spaces.map((space: any) => buildCommunitySpaceSummaryFromSpace(space, userId)));
+};
+
+const resolveCommunitySpaceById = async (spaceId: string, userId: string): Promise<CommunitySpaceSummary | null> => {
+  if (!dbAvailable) {
+    return FALLBACK_COMMUNITY_SPACES.find((space) => space.id === spaceId) || null;
+  }
+
+  const space = await prismaDynamic.communitySpace.findUnique({
+    where: { id: spaceId },
+    include: {
+      owner: {
+        select: { id: true, name: true, email: true, role: true },
+      },
+    },
+  });
+
+  if (!space) return null;
+  return buildCommunitySpaceSummaryFromSpace(space, userId);
+};
+
+const getUniqueCommunitySpaceSlug = async (name: string, excludeSpaceId?: string): Promise<string> => {
+  const baseSlug = slugifyCommunitySpaceName(name);
+  let candidate = baseSlug;
+  let attempt = 2;
+
+  while (true) {
+    const existing = await prismaDynamic.communitySpace.findFirst({
+      where: {
+        slug: candidate,
+        ...(excludeSpaceId ? { NOT: { id: excludeSpaceId } } : {}),
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return candidate;
+    }
+
+    candidate = `${baseSlug}-${attempt}`;
+    attempt += 1;
+  }
+};
+
+const createCommunityInviteToken = (): string => `invite-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 const storeCommunityPostFallback = (post: CommunityPostRecord): void => {
   communityPostCache.set(post.id, post);
@@ -2278,6 +2528,7 @@ const FALLBACK_COMMUNITY_POSTS: CommunityPostRecord[] = [
     authorName: "Samuel Otieno",
     field: "Project Management",
     interests: ["Planning", "Delivery"],
+    communitySpaceId: "community-space-project-management",
     isPublished: true,
     createdAt: new Date("2026-03-20T08:15:00Z"),
     updatedAt: new Date("2026-03-20T08:15:00Z"),
@@ -2291,6 +2542,7 @@ const FALLBACK_COMMUNITY_POSTS: CommunityPostRecord[] = [
     authorName: "Grace Mwikali",
     field: "Engineering",
     interests: ["Communication", "Quality"],
+    communitySpaceId: "community-space-engineering",
     isPublished: true,
     createdAt: new Date("2026-03-22T10:45:00Z"),
     updatedAt: new Date("2026-03-22T10:45:00Z"),
@@ -2304,6 +2556,7 @@ const FALLBACK_COMMUNITY_POSTS: CommunityPostRecord[] = [
     authorName: "Michael Njoroge",
     field: "Engineering",
     interests: ["Quality", "Safety"],
+    communitySpaceId: "community-space-engineering",
     isPublished: true,
     createdAt: new Date("2026-03-25T06:30:00Z"),
     updatedAt: new Date("2026-03-25T06:30:00Z"),
@@ -2371,6 +2624,91 @@ const FALLBACK_COMMUNITY_ADS: CommunityAdRecord[] = [
     updatedAt: new Date("2026-03-18T08:00:00Z"),
   },
 ];
+
+const COMMUNITY_SPACE_SEEDS = [
+  {
+    id: "community-space-engineering",
+    slug: "engineering-hub",
+    name: "Engineering Hub",
+    description: "Peer reviews, methods, and site lessons for civil and structural engineers.",
+    joinPolicy: "OPEN" as CommunitySpaceJoinPolicy,
+    isFeatured: true,
+    ownerName: "Michael Njoroge",
+    ownerEmail: "engineer@local.test",
+    ownerRole: "ENGINEER" as AppUserRole,
+    memberCount: 128,
+  },
+  {
+    id: "community-space-project-management",
+    slug: "project-management-circle",
+    name: "Project Management Circle",
+    description: "Scheduling, cost control, procurement sequencing, and stakeholder updates.",
+    joinPolicy: "APPROVAL" as CommunitySpaceJoinPolicy,
+    isFeatured: true,
+    ownerName: "Grace Mwikali",
+    ownerEmail: "pm@local.test",
+    ownerRole: "PROJECT_MANAGER" as AppUserRole,
+    memberCount: 84,
+  },
+  {
+    id: "community-space-safety",
+    slug: "safety-and-quality",
+    name: "Safety & Quality",
+    description: "Toolbox talks, inspections, snag closeout, and compliance checklists.",
+    joinPolicy: "APPROVAL" as CommunitySpaceJoinPolicy,
+    isFeatured: false,
+    ownerName: "Amina Wanjiku",
+    ownerEmail: "safety@local.test",
+    ownerRole: "REGULATOR" as AppUserRole,
+    memberCount: 61,
+  },
+  {
+    id: "community-space-architecture",
+    slug: "architecture-studio",
+    name: "Architecture Studio",
+    description: "Design reviews, facade systems, spatial planning, and sustainability discussions.",
+    joinPolicy: "OPEN" as CommunitySpaceJoinPolicy,
+    isFeatured: false,
+    ownerName: "Aisha Kamau",
+    ownerEmail: "architecture@local.test",
+    ownerRole: "DEVELOPER" as AppUserRole,
+    memberCount: 72,
+  },
+  {
+    id: "community-space-marketplace",
+    slug: "marketplace-trades",
+    name: "Marketplace & Trades",
+    description: "Supplier quotes, trade services, and invitations to specialist communities.",
+    joinPolicy: "INVITE_ONLY" as CommunitySpaceJoinPolicy,
+    isFeatured: false,
+    ownerName: "Mercy Otieno",
+    ownerEmail: "marketplace@local.test",
+    ownerRole: "CONTRACTOR" as AppUserRole,
+    memberCount: 49,
+  },
+] as const;
+
+const FALLBACK_COMMUNITY_SPACES: CommunitySpaceSummary[] = COMMUNITY_SPACE_SEEDS.map((seed, index) => ({
+  id: seed.id,
+  slug: seed.slug,
+  name: seed.name,
+  description: seed.description,
+  joinPolicy: seed.joinPolicy,
+  isFeatured: seed.isFeatured,
+  owner: {
+    id: `fallback-owner-${index + 1}`,
+    name: seed.ownerName,
+    email: seed.ownerEmail,
+    role: seed.ownerRole,
+  },
+  memberCount: seed.memberCount,
+  viewerMembership: null,
+  pendingRequests: [],
+  pendingInvitationsCount: 0,
+  isOwner: false,
+  createdAt: new Date(Date.now() - (index + 1) * 86_400_000).toISOString(),
+  updatedAt: new Date(Date.now() - (index + 1) * 43_200_000).toISOString(),
+}));
 
 const FALLBACK_COMMUNITY_RECOMMENDATIONS: CommunityRecommendation[] = [
   {
@@ -4593,11 +4931,46 @@ const seedDefaultProfiles = async () => {
 };
 
 const seedCommunityContent = async () => {
-  const [postCount, updateCount, adCount] = await Promise.all([
+  const [postCount, updateCount, adCount, spaceCount] = await Promise.all([
     prismaDynamic.communityPost.count(),
     prismaDynamic.communityUpdate.count(),
     prismaDynamic.communityAd.count(),
+    prismaDynamic.communitySpace.count(),
   ]);
+
+  if (spaceCount === 0) {
+    const adminUser = await prisma.user.findFirst({
+      where: { email: DEFAULT_ROLE_PROFILES[0]?.email || "admin@gmail.com" },
+      select: { id: true },
+    });
+
+    if (adminUser) {
+      for (const seed of COMMUNITY_SPACE_SEEDS) {
+        const space = await prismaDynamic.communitySpace.create({
+          data: {
+            slug: seed.slug,
+            name: seed.name,
+            description: seed.description,
+            ownerId: adminUser.id,
+            joinPolicy: seed.joinPolicy,
+            isFeatured: seed.isFeatured,
+          },
+        });
+
+        await prismaDynamic.communityMembership.create({
+          data: {
+            spaceId: space.id,
+            userId: adminUser.id,
+            role: "OWNER",
+            status: "ACTIVE",
+            requestedAt: new Date(),
+            approvedAt: new Date(),
+            joinedAt: new Date(),
+          },
+        });
+      }
+    }
+  }
 
   if (postCount === 0) {
     await prismaDynamic.communityPost.createMany({
@@ -4609,6 +4982,7 @@ const seedCommunityContent = async () => {
         authorName: post.authorName,
         field: post.field,
         interests: post.interests,
+        communitySpaceId: post.communitySpaceId || null,
         isPublished: post.isPublished,
       })),
     });
@@ -5545,6 +5919,7 @@ app.get("/api/community/feed", authMiddleware, async (req: AuthenticatedRequest,
 
   const q = String(req.query.q || "").trim().toLowerCase();
   const requestedField = String(req.query.field || "all").trim();
+  const requestedSpaceId = String(req.query.spaceId || "").trim();
 
   try {
     const state = await loadCommunityState(userId);
@@ -5579,6 +5954,7 @@ app.get("/api/community/feed", authMiddleware, async (req: AuthenticatedRequest,
     const postsRaw = await prismaDynamic.communityPost.findMany({
       where: {
         isPublished: true,
+        ...(requestedSpaceId ? { communitySpaceId: requestedSpaceId } : {}),
         ...(requestedField !== "all"
           ? {
               field: {
@@ -5684,6 +6060,9 @@ app.get("/api/community/feed", authMiddleware, async (req: AuthenticatedRequest,
     const inferredField = ROLE_FIELD_MAP[authRole] || "Engineering";
     const fallbackPosts = getCommunityFallbackPosts()
       .filter((post) => {
+        if (requestedSpaceId && post.communitySpaceId !== requestedSpaceId) {
+          return false;
+        }
         if (requestedField !== "all" && post.field.toLowerCase() !== requestedField.toLowerCase()) {
           return false;
         }
@@ -5726,6 +6105,584 @@ app.get("/api/community/feed", authMiddleware, async (req: AuthenticatedRequest,
       },
       mode: "fallback",
     });
+  }
+});
+
+app.get("/api/community/spaces", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const spaces = await loadCommunitySpaces(userId);
+    return res.status(200).json({ spaces });
+  } catch (error) {
+    console.error("Load community spaces error:", error);
+    return res.status(500).json({ error: "Unable to load communities right now." });
+  }
+});
+
+app.post("/api/community/spaces", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  const description = typeof req.body?.description === "string" ? req.body.description.trim() : "";
+  const joinPolicy = normalizeCommunityJoinPolicy(req.body?.joinPolicy);
+
+  if (!name) {
+    return res.status(400).json({ error: "Community name is required." });
+  }
+
+  if (!dbAvailable) {
+    return res.status(503).json({ error: "Community spaces are temporarily unavailable while offline." });
+  }
+
+  try {
+    const slug = await getUniqueCommunitySpaceSlug(name);
+    const space = await prismaDynamic.communitySpace.create({
+      data: {
+        slug,
+        name,
+        description: description || `${name} community space`,
+        ownerId: userId,
+        joinPolicy,
+        isFeatured: false,
+      },
+    });
+
+    await prismaDynamic.communityMembership.create({
+      data: {
+        spaceId: space.id,
+        userId,
+        role: "OWNER",
+        status: "ACTIVE",
+        requestedAt: new Date(),
+        approvedAt: new Date(),
+        joinedAt: new Date(),
+      },
+    });
+
+    const summary = await resolveCommunitySpaceById(space.id, userId);
+    return res.status(201).json({ space: summary });
+  } catch (error) {
+    console.error("Create community space error:", error);
+    return res.status(500).json({ error: "Unable to create the community right now." });
+  }
+});
+
+app.patch("/api/community/spaces/:spaceId", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  const spaceId = String(req.params.spaceId || "").trim();
+
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (!spaceId) {
+    return res.status(400).json({ error: "Community space id is required." });
+  }
+
+  if (!dbAvailable) {
+    return res.status(503).json({ error: "Community spaces are temporarily unavailable while offline." });
+  }
+
+  try {
+    const existing = await prismaDynamic.communitySpace.findUnique({
+      where: { id: spaceId },
+      include: {
+        owner: {
+          select: { id: true, name: true, email: true, role: true },
+        },
+      },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: "Community space not found." });
+    }
+
+    if (existing.ownerId !== userId) {
+      return res.status(403).json({ error: "Only the owner can update this community." });
+    }
+
+    const nextName = typeof req.body?.name === "string" ? req.body.name.trim() : existing.name;
+    const nextDescription = typeof req.body?.description === "string" ? req.body.description.trim() : existing.description;
+    const nextJoinPolicy = normalizeCommunityJoinPolicy(req.body?.joinPolicy || existing.joinPolicy);
+    const nextSlug = nextName !== existing.name ? await getUniqueCommunitySpaceSlug(nextName, existing.id) : existing.slug;
+
+    const updated = await prismaDynamic.communitySpace.update({
+      where: { id: existing.id },
+      data: {
+        name: nextName,
+        description: nextDescription,
+        joinPolicy: nextJoinPolicy,
+        slug: nextSlug,
+      },
+    });
+
+    const summary = await resolveCommunitySpaceById(updated.id, userId);
+    return res.status(200).json({ space: summary });
+  } catch (error) {
+    console.error("Update community space error:", error);
+    return res.status(500).json({ error: "Unable to update the community right now." });
+  }
+});
+
+app.post("/api/community/spaces/:spaceId/join", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  const userEmail = req.auth?.email || null;
+  const spaceId = String(req.params.spaceId || "").trim();
+  const inviteToken = typeof req.body?.inviteToken === "string" ? req.body.inviteToken.trim() : "";
+
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (!spaceId) {
+    return res.status(400).json({ error: "Community space id is required." });
+  }
+
+  if (!dbAvailable) {
+    return res.status(503).json({ error: "Community spaces are temporarily unavailable while offline." });
+  }
+
+  try {
+    const space = await prismaDynamic.communitySpace.findUnique({
+      where: { id: spaceId },
+      include: {
+        owner: {
+          select: { id: true, name: true, email: true, role: true },
+        },
+      },
+    });
+
+    if (!space) {
+      return res.status(404).json({ error: "Community space not found." });
+    }
+
+    const existingMembership = await prismaDynamic.communityMembership.findFirst({
+      where: { spaceId, userId },
+    });
+
+    const existingInvite = inviteToken
+      ? await prismaDynamic.communityInvitation.findUnique({ where: { token: inviteToken } })
+      : null;
+
+    const inviteMatchesSpace = existingInvite && existingInvite.spaceId === spaceId;
+    const inviteMatchesUser =
+      Boolean(existingInvite) &&
+      (!existingInvite?.email || !userEmail || existingInvite.email.toLowerCase() === userEmail.toLowerCase()) &&
+      (!existingInvite?.inviteeUserId || existingInvite.inviteeUserId === userId);
+    const hasValidInvite = Boolean(existingInvite) && inviteMatchesSpace && inviteMatchesUser;
+
+    if (space.joinPolicy === "INVITE_ONLY" && !hasValidInvite && space.ownerId !== userId) {
+      return res.status(403).json({ error: "This community is invite-only." });
+    }
+
+    if (existingMembership?.status === "ACTIVE") {
+      const summary = await resolveCommunitySpaceById(space.id, userId);
+      return res.status(200).json({ space: summary, membership: existingMembership });
+    }
+
+    if (space.ownerId === userId) {
+      const membership = existingMembership
+        ? await prismaDynamic.communityMembership.update({
+            where: { id: existingMembership.id },
+            data: {
+              role: "OWNER",
+              status: "ACTIVE",
+              requestedAt: existingMembership.requestedAt || new Date(),
+              approvedAt: new Date(),
+              joinedAt: existingMembership.joinedAt || new Date(),
+            },
+          })
+        : await prismaDynamic.communityMembership.create({
+            data: {
+              spaceId,
+              userId,
+              role: "OWNER",
+              status: "ACTIVE",
+              requestedAt: new Date(),
+              approvedAt: new Date(),
+              joinedAt: new Date(),
+            },
+          });
+
+      const summary = await resolveCommunitySpaceById(space.id, userId);
+      return res.status(200).json({ space: summary, membership });
+    }
+
+    if (space.joinPolicy === "OPEN" || hasValidInvite) {
+      const membership = existingMembership
+        ? await prismaDynamic.communityMembership.update({
+            where: { id: existingMembership.id },
+            data: {
+              role: existingMembership.role || "MEMBER",
+              status: "ACTIVE",
+              invitedById: existingMembership.invitedById || existingInvite?.invitedById || null,
+              requestedAt: existingMembership.requestedAt || new Date(),
+              approvedAt: new Date(),
+              joinedAt: existingMembership.joinedAt || new Date(),
+            },
+          })
+        : await prismaDynamic.communityMembership.create({
+            data: {
+              spaceId,
+              userId,
+              role: "MEMBER",
+              status: "ACTIVE",
+              invitedById: existingInvite?.invitedById || null,
+              requestedAt: new Date(),
+              approvedAt: new Date(),
+              joinedAt: new Date(),
+            },
+          });
+
+      if (existingInvite && existingInvite.status !== "ACCEPTED") {
+        await prismaDynamic.communityInvitation.update({
+          where: { id: existingInvite.id },
+          data: {
+            status: "ACCEPTED",
+            acceptedAt: new Date(),
+            inviteeUserId: userId,
+          },
+        });
+      }
+
+      const summary = await resolveCommunitySpaceById(space.id, userId);
+      return res.status(200).json({ space: summary, membership });
+    }
+
+    const pendingMembership = existingMembership
+      ? await prismaDynamic.communityMembership.update({
+          where: { id: existingMembership.id },
+          data: {
+            role: existingMembership.role || "MEMBER",
+            status: "PENDING",
+            requestedAt: existingMembership.requestedAt || new Date(),
+            approvedAt: null,
+            joinedAt: null,
+          },
+        })
+      : await prismaDynamic.communityMembership.create({
+          data: {
+            spaceId,
+            userId,
+            role: "MEMBER",
+            status: "PENDING",
+            requestedAt: new Date(),
+          },
+        });
+
+    const summary = await resolveCommunitySpaceById(space.id, userId);
+    return res.status(202).json({
+      space: summary,
+      membership: pendingMembership,
+      message: "Your request has been sent to the community owner.",
+    });
+  } catch (error) {
+    console.error("Join community space error:", error);
+    return res.status(500).json({ error: "Unable to join this community right now." });
+  }
+});
+
+app.post("/api/community/spaces/:spaceId/leave", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  const spaceId = String(req.params.spaceId || "").trim();
+
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (!spaceId) {
+    return res.status(400).json({ error: "Community space id is required." });
+  }
+
+  if (!dbAvailable) {
+    return res.status(503).json({ error: "Community spaces are temporarily unavailable while offline." });
+  }
+
+  try {
+    const space = await prismaDynamic.communitySpace.findUnique({ where: { id: spaceId } });
+    if (!space) {
+      return res.status(404).json({ error: "Community space not found." });
+    }
+
+    if (space.ownerId === userId) {
+      return res.status(400).json({ error: "The owner must transfer ownership before leaving the community." });
+    }
+
+    const membership = await prismaDynamic.communityMembership.findFirst({ where: { spaceId, userId } });
+    if (!membership) {
+      return res.status(404).json({ error: "You are not a member of this community." });
+    }
+
+    await prismaDynamic.communityMembership.delete({ where: { id: membership.id } });
+
+    const summary = await resolveCommunitySpaceById(space.id, userId);
+    return res.status(200).json({ space: summary, left: true });
+  } catch (error) {
+    console.error("Leave community space error:", error);
+    return res.status(500).json({ error: "Unable to leave the community right now." });
+  }
+});
+
+app.post("/api/community/spaces/:spaceId/requests/:membershipId/respond", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  const spaceId = String(req.params.spaceId || "").trim();
+  const membershipId = String(req.params.membershipId || "").trim();
+  const action = typeof req.body?.action === "string" ? req.body.action.trim() : "";
+
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (!spaceId || !membershipId) {
+    return res.status(400).json({ error: "Community space id and membership id are required." });
+  }
+
+  if (!dbAvailable) {
+    return res.status(503).json({ error: "Community spaces are temporarily unavailable while offline." });
+  }
+
+  try {
+    const space = await prismaDynamic.communitySpace.findUnique({ where: { id: spaceId } });
+    if (!space) {
+      return res.status(404).json({ error: "Community space not found." });
+    }
+
+    if (space.ownerId !== userId) {
+      return res.status(403).json({ error: "Only the owner can review requests." });
+    }
+
+    const membership = await prismaDynamic.communityMembership.findFirst({
+      where: { id: membershipId, spaceId },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    if (!membership) {
+      return res.status(404).json({ error: "Request not found." });
+    }
+
+    if (action === "approve") {
+      const approved = await prismaDynamic.communityMembership.update({
+        where: { id: membership.id },
+        data: {
+          status: "ACTIVE",
+          role: membership.role === "OWNER" ? "OWNER" : membership.role === "MODERATOR" ? "MODERATOR" : "MEMBER",
+          approvedAt: new Date(),
+          joinedAt: membership.joinedAt || new Date(),
+        },
+      });
+
+      const summary = await resolveCommunitySpaceById(space.id, userId);
+      return res.status(200).json({ space: summary, membership: approved });
+    }
+
+    if (action === "reject") {
+      const rejected = await prismaDynamic.communityMembership.update({
+        where: { id: membership.id },
+        data: {
+          status: "REJECTED",
+          approvedAt: null,
+          joinedAt: null,
+        },
+      });
+
+      const summary = await resolveCommunitySpaceById(space.id, userId);
+      return res.status(200).json({ space: summary, membership: rejected });
+    }
+
+    return res.status(400).json({ error: "Action must be approve or reject." });
+  } catch (error) {
+    console.error("Review community request error:", error);
+    return res.status(500).json({ error: "Unable to review the request right now." });
+  }
+});
+
+app.post("/api/community/spaces/:spaceId/invites", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  const spaceId = String(req.params.spaceId || "").trim();
+  const email = typeof req.body?.email === "string" ? req.body.email.trim() : "";
+
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (!spaceId) {
+    return res.status(400).json({ error: "Community space id is required." });
+  }
+
+  if (!dbAvailable) {
+    return res.status(503).json({ error: "Community spaces are temporarily unavailable while offline." });
+  }
+
+  try {
+    const space = await prismaDynamic.communitySpace.findUnique({ where: { id: spaceId } });
+    if (!space) {
+      return res.status(404).json({ error: "Community space not found." });
+    }
+
+    if (space.ownerId !== userId) {
+      return res.status(403).json({ error: "Only the owner can send invitations." });
+    }
+
+    const token = createCommunityInviteToken();
+    const expiresAt = new Date(Date.now() + COMMUNITY_SPACE_INVITE_TTL_MS);
+
+    const invitee = email
+      ? await prisma.user.findFirst({
+          where: { email },
+          select: { id: true },
+        })
+      : null;
+
+    const invite = await prismaDynamic.communityInvitation.create({
+      data: {
+        spaceId,
+        token,
+        email: email || null,
+        invitedById: userId,
+        inviteeUserId: invitee?.id || null,
+        status: "PENDING",
+        expiresAt,
+      },
+    });
+
+    const inviteUrl = buildCommunitySpaceInviteUrl(token);
+
+    if (email) {
+      void sendReminderEmail(
+        email,
+        `You're invited to join ${space.name}`,
+          authUserDisplayName(req.auth),
+        `You were invited to join the ${space.name} community. Open the link below to accept the invitation.`,
+        inviteUrl
+      ).catch((error) => {
+        console.error("Failed to send community invite email:", error);
+      });
+    }
+
+    const response: CommunitySpaceInviteSummary = {
+      id: invite.id,
+      token: invite.token,
+      email: invite.email,
+      status: invite.status,
+      expiresAt: invite.expiresAt ? new Date(invite.expiresAt).toISOString() : null,
+      inviteUrl,
+    };
+
+    return res.status(201).json({ invite: response });
+  } catch (error) {
+    console.error("Create community invite error:", error);
+    return res.status(500).json({ error: "Unable to create the invitation right now." });
+  }
+});
+
+app.post("/api/community/spaces/invites/:token/accept", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const userId = req.auth?.userId;
+  const token = String(req.params.token || "").trim();
+
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (!token) {
+    return res.status(400).json({ error: "Invite token is required." });
+  }
+
+  if (!dbAvailable) {
+    return res.status(503).json({ error: "Community spaces are temporarily unavailable while offline." });
+  }
+
+  try {
+    const invite = await prismaDynamic.communityInvitation.findUnique({
+      where: { token },
+      include: {
+        space: {
+          include: {
+            owner: { select: { id: true, name: true, email: true, role: true } },
+          },
+        },
+      },
+    });
+
+    if (!invite) {
+      return res.status(404).json({ error: "Invitation not found." });
+    }
+
+    if (invite.status !== "PENDING") {
+      return res.status(400).json({ error: "Invitation is no longer valid." });
+    }
+
+    if (invite.expiresAt && new Date() > new Date(invite.expiresAt)) {
+      await prismaDynamic.communityInvitation.update({
+        where: { id: invite.id },
+        data: { status: "EXPIRED" },
+      });
+      return res.status(400).json({ error: "Invitation has expired." });
+    }
+
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true },
+    });
+
+    if (!currentUser) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    if (invite.email && invite.email.toLowerCase() !== currentUser.email.toLowerCase()) {
+      return res.status(403).json({ error: "This invitation was sent to a different email address." });
+    }
+
+    const membership = await prismaDynamic.communityMembership.findFirst({
+      where: { spaceId: invite.spaceId, userId },
+    });
+
+    const nextMembership = membership
+      ? await prismaDynamic.communityMembership.update({
+          where: { id: membership.id },
+          data: {
+            status: "ACTIVE",
+            role: membership.role === "OWNER" ? "OWNER" : "MEMBER",
+            invitedById: invite.invitedById,
+            approvedAt: new Date(),
+            joinedAt: membership.joinedAt || new Date(),
+          },
+        })
+      : await prismaDynamic.communityMembership.create({
+          data: {
+            spaceId: invite.spaceId,
+            userId,
+            role: "MEMBER",
+            status: "ACTIVE",
+            invitedById: invite.invitedById,
+            requestedAt: new Date(),
+            approvedAt: new Date(),
+            joinedAt: new Date(),
+          },
+        });
+
+    await prismaDynamic.communityInvitation.update({
+      where: { id: invite.id },
+      data: {
+        status: "ACCEPTED",
+        acceptedAt: new Date(),
+        inviteeUserId: userId,
+      },
+    });
+
+    const summary = await resolveCommunitySpaceById(invite.spaceId, userId);
+    return res.status(200).json({ space: summary, membership: nextMembership });
+  } catch (error) {
+    console.error("Accept community invite error:", error);
+    return res.status(500).json({ error: "Unable to accept the invitation right now." });
   }
 });
 
@@ -6197,6 +7154,7 @@ app.post(
     const liveStartsAtRaw = String(req.body?.liveStartsAt || "").trim();
     const liveRoomUrlRaw = String(req.body?.liveRoomUrl || "").trim();
     const liveDescription = String(req.body?.liveDescription || "").trim();
+    const communitySpaceId = String(req.body?.communitySpaceId || "").trim();
 
     if (!title || !content) {
       return res.status(400).json({ error: "Title and content are required." });
@@ -6285,6 +7243,28 @@ app.post(
           ? "Image"
           : "Discussion";
 
+    if (communitySpaceId) {
+      if (!dbAvailable) {
+        return res.status(503).json({ error: "Community spaces are temporarily unavailable while offline." });
+      }
+
+      const space = await prismaDynamic.communitySpace.findUnique({
+        where: { id: communitySpaceId },
+      });
+
+      if (!space) {
+        return res.status(404).json({ error: "Selected community space not found." });
+      }
+
+      const membership = await prismaDynamic.communityMembership.findFirst({
+        where: { spaceId: communitySpaceId, userId },
+      });
+
+      if (space.ownerId !== userId && membership?.status !== "ACTIVE") {
+        return res.status(403).json({ error: "Join the community before posting inside it." });
+      }
+    }
+
     try {
       const created = (await prismaDynamic.communityPost.create({
         data: {
@@ -6295,6 +7275,7 @@ app.post(
           authorName: authUserDisplayName(req.auth),
           field: roleField,
           interests,
+          communitySpaceId: communitySpaceId || null,
           isPublished: true,
         },
       })) as CommunityPostRecord;
@@ -6317,6 +7298,7 @@ app.post(
         authorName: created.authorName,
         field: created.field,
         interests: created.interests,
+        communitySpaceId: created.communitySpaceId || null,
         isPublished: created.isPublished,
         createdAt: created.createdAt,
         updatedAt: created.updatedAt,
@@ -6339,6 +7321,7 @@ app.post(
           author: created.authorName,
           field: created.field,
           interests: created.interests,
+          communitySpaceId: created.communitySpaceId || null,
           stats: liveSession ? "Live session" : "Live discussion",
           media: mediaAssets,
           liveSession,
@@ -6363,6 +7346,7 @@ app.post(
           authorName: authUserDisplayName(req.auth),
           field: roleField,
           interests,
+          communitySpaceId: communitySpaceId || null,
           isPublished: true,
           createdAt: fallbackCreatedAt,
           updatedAt: fallbackCreatedAt,

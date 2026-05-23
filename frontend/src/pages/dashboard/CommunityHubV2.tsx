@@ -3,6 +3,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivity } from '@/contexts/ActivityContext';
 // import { useSimulation } from '@/contexts/SimulationContext';
 import {
+  acceptCommunitySpaceInvite,
   castCommunityVote,
   buildCommunityShareUrl,
   createCommunityPost,
@@ -23,6 +24,7 @@ import {
 import CommentModal from './community/CommentModal';
 import ActivityDrawer from './community/ActivityDrawer';
 import CommunityLayout from './community/CommunityLayout';
+import CommunitySpacesPanel from './community/CommunitySpacesPanel';
 import CreatePostModal from './community/CreatePostModal';
 import Feed from './community/Feed';
 import LiveRoomModal from './community/LiveRoomModal';
@@ -74,6 +76,8 @@ const CommunityHubV2 = () => {
   const [feed, setFeed] = useState<CommunityFeedResponse>(initialFeed);
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<'feed' | 'reels'>('feed');
+  const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
+  const [selectedSpaceName, setSelectedSpaceName] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
@@ -109,6 +113,7 @@ const CommunityHubV2 = () => {
   const [follows, setFollows] = useState<Record<string, boolean>>({});
   const [votes, setVotes] = useState<Record<string, 'up' | 'down' | null>>({});
   const [highlightedPostId, setHighlightedPostId] = useState<string | null>(null);
+  const inviteHandledRef = useRef(false);
 
   const loadIdRef = useRef(0);
 
@@ -148,7 +153,10 @@ const CommunityHubV2 = () => {
     if (!silent) setIsLoading(true);
 
     try {
-      const data = await getCommunityFeed({ q: search.trim() || undefined });
+      const data = await getCommunityFeed({
+        q: search.trim() || undefined,
+        spaceId: selectedSpaceId || undefined,
+      });
       if (currentLoadId !== loadIdRef.current) return;
       // Merge API posts with expanded mock posts for demo/fallback purposes
       const mergedData = {
@@ -172,7 +180,7 @@ const CommunityHubV2 = () => {
     } finally {
       if (!silent && currentLoadId === loadIdRef.current) setIsLoading(false);
     }
-  }, [search, toast]);
+  }, [search, selectedSpaceId, toast]);
 
   useEffect(() => {
     try {
@@ -200,6 +208,39 @@ const CommunityHubV2 = () => {
 
     return () => window.clearTimeout(timer);
   }, [refreshFeed]);
+
+  useEffect(() => {
+    if (inviteHandledRef.current) return;
+
+    const url = new URL(window.location.href);
+    const inviteToken = url.searchParams.get('invite');
+    if (!inviteToken) return;
+
+    inviteHandledRef.current = true;
+
+    const handleInvite = async () => {
+      try {
+        setIsMutating(true);
+        const response = await acceptCommunitySpaceInvite(inviteToken);
+        setSelectedSpaceId(response.space.id);
+        setSelectedSpaceName(response.space.name);
+        toast({ title: 'Invite accepted', description: `You joined ${response.space.name}.` });
+      } catch (error) {
+        toast({
+          title: 'Unable to accept invite',
+          description: error instanceof Error ? error.message : 'Please try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsMutating(false);
+        url.searchParams.delete('invite');
+        const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+        window.history.replaceState({}, '', nextUrl);
+      }
+    };
+
+    void handleInvite();
+  }, [toast]);
 
   useEffect(() => {
     void loadActivity();
@@ -593,6 +634,7 @@ const CommunityHubV2 = () => {
     title: string;
     content: string;
     contentTypes: string[];
+    communitySpaceId?: string | null;
     scheduledAt: string;
     mediaFiles: File[];
     isLiveSession: boolean;
@@ -708,7 +750,16 @@ const CommunityHubV2 = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-5 pt-32 xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-4">
+          <div className="space-y-5 pt-32">
+            <CommunitySpacesPanel
+              selectedSpaceId={selectedSpaceId}
+              onSelectSpace={(spaceId, spaceName) => {
+                setSelectedSpaceId(spaceId);
+                setSelectedSpaceName(spaceName || null);
+              }}
+            />
+
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-4">
             <div className="min-w-0">
               <Feed
                 posts={visibleFeedItems}
@@ -765,6 +816,7 @@ const CommunityHubV2 = () => {
               </div>
             </aside>
           </div>
+          </div>
         </CommunityLayout>
       )}
 
@@ -786,7 +838,13 @@ const CommunityHubV2 = () => {
         }}
       />
 
-      <CreatePostModal open={isCreateOpen} onOpenChange={setIsCreateOpen} onSubmit={submitPost} />
+      <CreatePostModal
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+        onSubmit={submitPost}
+        communitySpaceId={selectedSpaceId}
+        communitySpaceName={selectedSpaceName}
+      />
 
       <LiveRoomModal
         open={isLiveRoomOpen}
