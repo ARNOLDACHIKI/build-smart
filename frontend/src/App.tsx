@@ -10,6 +10,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ActivityProvider } from "@/contexts/ActivityContext";
 // import { SimulationProvider } from '@/contexts/SimulationContext';
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { Navigate } from "react-router-dom";
 
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -46,7 +47,6 @@ import MyMessages from "./pages/dashboard/MyMessages";
 const CommunityHub = lazy(() => import("./pages/dashboard/CommunityHubV3"));
 const RedditCommunity = lazy(() => import("./pages/dashboard/community/CommunityPage"));
 const CommunityPostDetail = lazy(() => import("./components/community/PostDetail"));
-const CommunitySpaceFeed = lazy(() => import("./pages/dashboard/community/CommunitySpaceFeed"));
 
 import AdminLayout from "./components/admin/AdminLayout";
 const MilestoneProjectDetail = lazy(() => import("./pages/ProjectDetail"));
@@ -243,13 +243,7 @@ const App = () => (
                   </ProtectedRoute>
                 } />
                 
-                  <Route path="/community/space/:spaceId/feed" element={
-                    <ProtectedRoute allowedRoles={["USER"]}>
-                      <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading feed...</div>}>
-                        <CommunitySpaceFeed />
-                      </Suspense>
-                    </ProtectedRoute>
-                  } />
+                  <Route path="/community/space/:spaceId/feed" element={<Navigate to="/community" replace />} />
 
                 <Route path="*" element={<NotFound />} />
               </Routes>
