@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable corepack and prepare pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@latest --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        run: pnpm --filter ./frontend build
+
+      - name: Build backend
+        run: pnpm --filter ./backend build
+
+      - name: Start services and run verification
+        # Starts backend and serves built frontend, waits for endpoints, runs verify:all
+        run: |
+          set -euo pipefail
+          # start backend (dev mode) in background and capture pid/log
+          pnpm --filter ./backend dev > backend.log 2>&1 &
+          echo $! > backend.pid
+
+          # serve built frontend for smoke checks
+          pnpm --filter ./frontend preview -- --port 8080 > frontend.log 2>&1 &
+          echo $! > frontend.pid
+
+          # wait for both services to become healthy
+          npx wait-on http://localhost:3000/health http://localhost:8080 -t 120000
+
+          # run repo verification (lint, tests, smoke checks)
+          npm run verify:all
+
+        env:
+          CI: 'true'
+
+      - name: Upload logs (on failure)
+        if: failure()
+        run: |
+          echo '=== Backend log ==='
+          tail -n 200 backend.log || true
+          echo '=== Frontend log ==='
+          tail -n 200 frontend.log || true
+
+      - name: Cleanup background processes
+        if: always()
+        run: |
+          if [ -f backend.pid ]; then kill "$(cat backend.pid)" || true; fi
+          if [ -f frontend.pid ]; then kill "$(cat frontend.pid)" || true; fi
