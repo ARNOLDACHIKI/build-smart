@@ -121,7 +121,7 @@ const Solutions = () => {
               {' '}for Every Role
             </h1>
             <p className="text-xl text-muted-foreground mb-8">
-              Comprehensive tools designed specifically for the construction industry. From project managers to suppliers, Build Smart has the right solution for your needs.
+              Comprehensive tools designed specifically for the construction industry. From project managers to suppliers, JengoPro has the right solution for your needs.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/register" className="px-8 py-3 rounded-lg gradient-primary text-primary-foreground font-semibold hover:shadow-lg transition-shadow">

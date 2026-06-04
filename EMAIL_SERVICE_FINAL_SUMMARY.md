@@ -92,7 +92,7 @@ User Enters Code → Validate → Mark Verified → Welcome Email
 ## 📁 File Structure
 
 ```
-build-buddy-ai-37/
+jengopro-37/
 ├── backend/
 │   ├── src/
 │   │   ├── server.ts ............ (modified - added email endpoints)

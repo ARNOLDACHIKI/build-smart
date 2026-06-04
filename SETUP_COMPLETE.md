@@ -56,7 +56,7 @@ Both servers start automatically and watch for file changes.
 ## Database Migration History
 
 **Applied Migrations**:
-- `20260306060008_buildsmart` - Initial schema with Users table
+- `20260306060008_jengopro` - Initial schema with Users table
 
 Location: `/backend/prisma/migrations/`
 

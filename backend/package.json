@@ -1,7 +1,7 @@
 {
-  "name": "build-buddy-backend",
+  "name": "jengopro-backend",
   "version": "0.0.1",
-  "description": "Build Buddy AI Backend",
+  "description": "JengoPro Backend",
   "main": "src/server.ts",
   "type": "module",
   "scripts": {

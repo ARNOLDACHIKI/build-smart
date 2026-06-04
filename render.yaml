@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: build-buddy-backend
+    name: jengopro-backend
     runtime: node
     rootDir: .
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter ./backend build && cd backend && pnpm prisma generate && pnpm prisma migrate deploy

@@ -55,7 +55,7 @@ Comprehensive construction project milestone tracking system with auto-project c
 5. `sendProjectCompletedEmail()` - Project completion celebration (gold/red theme)
 
 **Templates**:
-- 5 branded HTML email templates with Build Buddy AI colors (#b7d52a primary, #8fa51f secondary)
+- 5 branded HTML email templates with JengoPro colors (#b7d52a primary, #8fa51f secondary)
 - All templates include project/milestone links back to dashboard
 - Professional headers and footers with company branding
 

@@ -3,7 +3,7 @@
 ## Start the Application (5 seconds)
 
 ```bash
-cd /home/lod/Documents/build-buddy-ai-37
+cd /home/lod/Documents/jengopro-37
 npm run dev
 ```
 
@@ -61,7 +61,7 @@ npm run backend:migrate
 ## Project Layout
 
 ```
-Root Directory: /home/lod/Documents/build-buddy-ai-37
+Root Directory: /home/lod/Documents/jengopro-37
 
 ├── frontend/              ← React app (port 8080)
 │   └── src/              

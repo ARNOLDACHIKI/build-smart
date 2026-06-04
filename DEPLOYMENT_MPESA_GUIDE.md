@@ -67,7 +67,7 @@ vercel --prod --env-file frontend/.env.production
 # render.yaml (already exists in repo)
 services:
   - type: web
-    name: build-smart-backend
+    name: jengopro-backend
     runtime: node
     plan: standard
     buildCommand: pnpm install && pnpm build -w backend

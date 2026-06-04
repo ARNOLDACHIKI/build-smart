@@ -7,7 +7,7 @@ Get up and running with the new navigation and dashboard features in seconds.
 ## ⚡ Start Development Server
 
 ```bash
-cd /home/lod/Documents/build-buddy-ai-37/frontend
+cd /home/lod/Documents/jengopro-37/frontend
 pnpm run dev
 ```
 

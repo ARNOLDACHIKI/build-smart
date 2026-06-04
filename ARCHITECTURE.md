@@ -1,4 +1,4 @@
-# Build Buddy AI - Architecture Overview
+# JengoPro - Architecture Overview
 
 ## System Architecture Diagram
 
@@ -125,7 +125,7 @@ UI Re-render
 ## File Organization
 
 ```
-build-buddy-ai-37/
+jengopro-37/
 │
 ├── 📁 frontend/                  (React App)
 │   ├── src/

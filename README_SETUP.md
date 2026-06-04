@@ -1,4 +1,4 @@
-# ✅ Build Buddy AI - Complete Project Setup Summary
+# ✅ JengoPro - Complete Project Setup Summary
 
 ## 🎯 Mission Accomplished
 
@@ -42,7 +42,7 @@ Your full-stack application is **fully configured and ready to run**! The projec
 - `/backend/prisma/schema.prisma` - Database schema definition
 - Users table created with: id, email, password, name, role, timestamps
 - Prisma Client auto-generated for type-safe queries
-- Migration applied: `20260306060008_buildsmart`
+- Migration applied: `20260306060008_jengopro`
 
 ### ✅ 4. API Endpoints Created
 **Health Check Endpoints**:
@@ -81,7 +81,7 @@ npm run dev
 
 ### Quick Start (Recommended)
 ```bash
-cd /home/lod/Documents/build-buddy-ai-37
+cd /home/lod/Documents/jengopro-37
 npm run dev
 ```
 
@@ -104,7 +104,7 @@ npm run backend:dev
 ## 📁 Final Project Structure
 
 ```
-build-buddy-ai-37/
+jengopro-37/
 │
 ├── backend/                        # Node.js + Express Server
 │   ├── src/

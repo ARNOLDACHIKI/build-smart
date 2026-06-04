@@ -1,11 +1,11 @@
-# Build Buddy AI - Full Stack Application
+# JengoPro - Full Stack Application
 
 A modern full-stack application with React frontend and Node.js/Express backend with PostgreSQL database.
 
 ## Project Structure
 
 ```
-build-buddy-ai-37/
+jengopro-37/
 ├── frontend/                 # React + Vite + TypeScript
 │   ├── src/
 │   ├── public/
@@ -48,7 +48,7 @@ build-buddy-ai-37/
 #### Option 1: Run Both Frontend and Backend (Recommended)
 
 ```bash
-cd /home/lod/Documents/build-buddy-ai-37
+cd /home/lod/Documents/jengopro-37
 npm run dev
 # or
 pnpm dev

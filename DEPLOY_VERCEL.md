@@ -20,7 +20,7 @@ Without this, frontend API calls default to same-origin `/api`, which will not w
 
 ## Steps
 1. Push repository to GitHub (already done).
-2. In Vercel, import repo: `ARNOLDACHIKI/build-smart`.
+2. In Vercel, import repo: `ARNOLDACHIKI/jengopro`.
 3. Keep root settings; `vercel.json` handles install/build/output.
 4. Add `VITE_API_BASE_URL`.
 5. Deploy.

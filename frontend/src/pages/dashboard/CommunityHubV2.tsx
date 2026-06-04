@@ -379,7 +379,7 @@ const CommunityHubV2 = () => {
   const sharePost = async (id: string, target: CommunityShareTarget = 'native') => {
     const link = `${window.location.origin}/community?post=${encodeURIComponent(id)}`;
     const post = feed.posts.find((item) => item.id === id);
-    const title = post?.title || 'BuildSmart Community Post';
+    const title = post?.title || 'JengoPro Community Post';
     const shareText = `${title}\n${link}`;
 
     try {

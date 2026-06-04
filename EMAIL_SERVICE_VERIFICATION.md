@@ -316,7 +316,7 @@ Frontend: No errors ✅
 
 ### 1. Start Dev Servers
 ```bash
-cd /home/lod/Documents/build-buddy-ai-37
+cd /home/lod/Documents/jengopro-37
 pnpm dev
 ```
 

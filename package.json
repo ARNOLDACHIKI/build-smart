@@ -1,7 +1,7 @@
 {
-  "name": "build-buddy-ai",
+  "name": "jengopro",
   "version": "1.0.0",
-  "description": "Build Buddy AI - Full Stack Application",
+  "description": "JengoPro - Full Stack Application",
   "private": true,
   "packageManager": "pnpm@10.15.1",
   "scripts": {
@@ -22,6 +22,7 @@
     "backend"
   ],
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "wait-on": "^9.0.10"
   }
 }

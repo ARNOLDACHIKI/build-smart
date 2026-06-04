@@ -52,7 +52,7 @@ Shows how video content integrates into the feed with proper playback controls a
 ## Use Case 3: Audio Discussion/Podcast
 **Post ID:** `mock-post-3`  
 **Type:** Audio Discussion  
-**Author:** BuildSmart Podcast  
+**Author:** JengoPro Podcast  
 **Field:** Project Management  
 
 ### Description:
@@ -180,7 +180,7 @@ Shows how regulatory/news updates with multiple visual references can effectivel
 ## Use Case 9: Live Session/Event
 **Post ID:** `mock-post-9`  
 **Type:** Live Session  
-**Author:** BuildSmart Academy  
+**Author:** JengoPro Academy  
 **Field:** Engineering  
 
 ### Description:
@@ -191,7 +191,7 @@ Scheduled weekly Q&A session on site safety, regulations, and compliance.
 - **Live Room Details:**
   - Room ID: `room-safety-qa-weekly`
   - Start Time: April 16, 2026 at 3:00 PM
-  - Room URL: `https://meet.google.com/buildsmart-safety-qa`
+  - Room URL: `https://meet.google.com/jengopro-safety-qa`
   - Description: Expert panel discussion on safety and compliance
 - **Stats:** Starting in 2 hours, 128 registered
 

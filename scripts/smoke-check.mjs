@@ -60,17 +60,49 @@ for (const api of requiredApiChecks) {
 
 let token = "";
 await check("backend login", async () => {
-  const response = await expectOk(`${backendBase}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: loginEmail, password: loginPassword }),
-  });
+  // Try to login. If login fails (user not found), attempt to register the smoke user and retry.
+  const tryLogin = async () => {
+    const response = await expectOk(`${backendBase}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+    });
+    const body = await response.json();
+    if (!body?.token) throw new Error("No token in login response");
+    return body.token;
+  };
 
-  const body = await response.json();
-  if (!body?.token) {
-    throw new Error("No token in login response");
+  try {
+    token = await tryLogin();
+  } catch (err) {
+    console.log("Login failed, attempting to register smoke user and retry...");
+    // Attempt to register the smoke user, ignore if it already exists or registration fails.
+    try {
+      const regRes = await fetch(`${backendBase}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword, name: "Smoke Test" }),
+      });
+      const regBody = await regRes.json().catch(() => ({}));
+      // If server returned a debug verification code (non-production), verify the email immediately.
+      if (regBody?.debugVerificationCode) {
+        try {
+          await fetch(`${backendBase}/api/auth/verify-email`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: loginEmail, code: regBody.debugVerificationCode }),
+          });
+        } catch (e) {
+          // ignore verification errors; we'll retry login below
+        }
+      }
+    } catch (e) {
+      // ignore registration errors
+    }
+
+    // Retry login once
+    token = await tryLogin();
   }
-  token = body.token;
 });
 
 if (token) {

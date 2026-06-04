@@ -1,4 +1,4 @@
-# Build Buddy AI — User Guide & Mock Login Accounts
+# JengoPro — User Guide & Mock Login Accounts
 
 This guide explains how a user can run and use the website end-to-end, including test accounts for each role.
 

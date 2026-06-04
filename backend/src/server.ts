@@ -5098,7 +5098,7 @@ app.get("/health", (_req, res) => {
 app.get("/", (_req, res) => {
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:8080";
   res.status(200).send(
-    `Build Buddy API is running. Open the frontend at ${frontendUrl}. Health check: /health`
+    `JengoPro API is running. Open the frontend at ${frontendUrl}. Health check: /health`
   );
 });
 
@@ -5154,7 +5154,7 @@ app.post("/api/payments/mpesa/stk-push", async (req, res) => {
     }
   }
 
-  const accountReference = `Build Buddy ${resolvedPlan.plan.name} ${resolvedPlan.cycle}`;
+  const accountReference = `JengoPro ${resolvedPlan.plan.name} ${resolvedPlan.cycle}`;
   const transactionDesc = `Subscription payment for ${resolvedPlan.plan.name} plan`;
   let paymentRecord: { id: string } | null = null;
 

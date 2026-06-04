@@ -25,7 +25,7 @@ const AFRICAN_LAST_NAMES = [
 ];
 
 const COMPANIES = [
-  'BuildSmart Solutions',
+  'JengoPro Solutions',
   'Apex Construction',
   'EcoStructures Ltd',
   'Digital Build Co',

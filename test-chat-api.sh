@@ -4,7 +4,7 @@
 BASE_URL="http://localhost:3000"
 
 echo "========================================="
-echo "Testing Build Buddy Chat API Endpoints"
+echo "Testing JengoPro Chat API Endpoints"
 echo "========================================="
 
 # Health check

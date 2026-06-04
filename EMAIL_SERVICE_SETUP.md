@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Build Buddy AI platform now has a comprehensive email service that sends:
+The JengoPro platform now has a comprehensive email service that sends:
 - **Email verification codes** during user registration
 - **Welcome emails** after email verification
 - **Password reset emails** for account recovery

@@ -95,7 +95,7 @@ const Register = () => {
         return;
       }
 
-      toast({ title: 'Account created', description: 'Welcome to Build Buddy AI.' });
+      toast({ title: 'Account created', description: 'Welcome to JengoPro.' });
       navigate(resolveHomeRoute(role), { replace: true });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unable to create account.';

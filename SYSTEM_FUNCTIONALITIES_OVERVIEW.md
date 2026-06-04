@@ -1,8 +1,8 @@
-# Build Buddy AI - System Functionalities Overview
+# JengoPro - System Functionalities Overview
 
 ## Purpose
 
-This document summarizes the main features and user-facing functionalities of the Build Buddy AI system in one place. It is meant to be the handoff document for stakeholders, reviewers, or anyone who needs a quick but complete view of the product.
+This document summarizes the main features and user-facing functionalities of the JengoPro system in one place. It is meant to be the handoff document for stakeholders, reviewers, or anyone who needs a quick but complete view of the product.
 
 ## 1) Public Site Features
 

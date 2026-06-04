@@ -65,7 +65,7 @@ export const mockPosts: CommunityPost[] = [
     title: 'Construction best practices podcast - Episode 47: Cost control strategies',
     summary:
       'In-depth discussion on cost management in commercial construction projects. Features expert contractor insights, case studies, and Q&A. Duration: 42 minutes. Key topics: budget tracking, material sourcing, labor efficiency.',
-    author: 'BuildSmart Podcast',
+    author: 'JengoPro Podcast',
     field: 'Project Management',
     interests: ['podcast', 'best-practices', 'cost-control'],
     stats: '486 plays • 22 shares',
@@ -226,14 +226,14 @@ export const mockPosts: CommunityPost[] = [
     title: 'Weekly contractor Q&A - Site safety, regulations & compliance',
     summary:
       'Join our weekly live discussion with safety inspectors and compliance officers. Real-time Q&A about site safety protocols, regulatory updates, accident prevention, and common violations. This week: Focus on electrical safety and fall prevention.',
-    author: 'BuildSmart Academy',
+    author: 'JengoPro Academy',
     field: 'Engineering',
     interests: ['safety', 'compliance', 'training'],
     stats: 'Starting in 2 hours • 128 registered',
     liveSession: {
       title: 'Weekly Contractor Q&A - Safety & Compliance',
       startsAt: '2026-04-16T15:00:00Z',
-      roomUrl: 'https://meet.google.com/buildsmart-safety-qa',
+      roomUrl: 'https://meet.google.com/jengopro-safety-qa',
       roomId: 'room-safety-qa-weekly',
       description: 'Expert panel discussion on site safety, regulations, and compliance best practices.',
     },

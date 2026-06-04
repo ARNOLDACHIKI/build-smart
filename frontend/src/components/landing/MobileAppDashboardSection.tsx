@@ -225,7 +225,7 @@ const MobileAppDashboardSection = () => {
                       {/* Testimonials and CTA */}
                       <div className="rounded-xl border border-slate-200 bg-white p-2.5">
                         <p className="text-[9px] font-semibold text-slate-800">Trusted by builders</p>
-                        <p className="text-[8px] text-slate-600 mt-1 leading-tight">"We reduced project delays by 38% in one quarter using Build Smart workflows."</p>
+                        <p className="text-[8px] text-slate-600 mt-1 leading-tight">"We reduced project delays by 38% in one quarter using JengoPro workflows."</p>
                         <div className="mt-2 flex items-center gap-0.5">
                           {[...Array(5)].map((_, i) => (
                             <Star key={i} className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
@@ -235,7 +235,7 @@ const MobileAppDashboardSection = () => {
 
                       <div className="rounded-xl gradient-primary text-white px-2.5 py-2.5 shadow-sm">
                         <p className="text-[9px] font-semibold">Start your next project today</p>
-                        <p className="text-[8px] opacity-90 mt-1">Join teams using the mobile-first Build Smart platform.</p>
+                        <p className="text-[8px] opacity-90 mt-1">Join teams using the mobile-first JengoPro platform.</p>
                         <div className="mt-2">
                           <Link to="/register" onClick={() => trackPreviewClick('cta_start_now')} className="inline-block text-[7px] rounded-full bg-white/20 px-2 py-0.5 hover:bg-white/30 transition-colors">Start now</Link>
                         </div>

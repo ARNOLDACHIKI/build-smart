@@ -274,7 +274,7 @@ export const marketplaceItems: LocalItem[] = [
     tags: ['bid', 'marketplace', 'office'],
     location: 'Nairobi',
     contentTypes: ['text', 'documents'],
-    author: 'BuildSmart Client',
+    author: 'JengoPro Client',
     metrics: 'KES 8.6M budget',
     createdAt: '2026-04-01T13:00:00Z',
     kind: 'Marketplace',

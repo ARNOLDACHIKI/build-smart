@@ -27,7 +27,7 @@ Conclusion: backend (Render target) and frontend (Vercel target) are verified de
 
 **Date**: March 19, 2026  
 **Status**: ✅ Production Ready  
-**GitHub**: Pushed to `https://github.com/ARNOLDACHIKI/build-smart`  
+**GitHub**: Pushed to `https://github.com/ARNOLDACHIKI/jengopro`  
 **Branch**: `main` (b6b46f4..6c39c87)  
 
 ---
@@ -133,7 +133,7 @@ b46961b Add Render backend deployment guide
 
 ### For Vercel Deployment
 1. Go to: https://vercel.com/dashboard
-2. Select project: `build-smart`
+2. Select project: `jengopro`
 3. Vercel will detect the push
 4. Auto-trigger deployment from `main` branch
 5. Build will use `vercel.json` configuration
@@ -175,14 +175,14 @@ JWT_SECRET=your-secret-key
 
 ## 🔗 GitHub Repository
 
-**URL**: https://github.com/ARNOLDACHIKI/build-smart  
+**URL**: https://github.com/ARNOLDACHIKI/jengopro  
 **Branch**: main  
 **Latest Commit**: 6c39c87  
 **Status**: ✅ All checks passing  
 
 ### View Changes on GitHub
 ```
-https://github.com/ARNOLDACHIKI/build-smart/commit/6c39c87
+https://github.com/ARNOLDACHIKI/jengopro/commit/6c39c87
 ```
 
 ---

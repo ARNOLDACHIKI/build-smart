@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **Simulation Mode** is a comprehensive demo and testing system for the BuildSmart Community platform. It generates 150+ realistic, construction-focused posts with diverse African user profiles, realistic engagement metrics, and clearly labeled demo content. The system is designed for demos, testing, and development without mixing with real user data.
+The **Simulation Mode** is a comprehensive demo and testing system for the JengoPro Community platform. It generates 150+ realistic, construction-focused posts with diverse African user profiles, realistic engagement metrics, and clearly labeled demo content. The system is designed for demos, testing, and development without mixing with real user data.
 
 ---
 
@@ -143,7 +143,7 @@ When enabled:
   role: "Engineer",
   avatar: "https://ui-avatars.com/api/?name=Kwame+Okafor...",
   verified: true/false,
-  company: "BuildSmart Solutions"
+  company: "JengoPro Solutions"
 }
 ```
 

@@ -1,6 +1,6 @@
-# Build Smart Frontend (ICDBO)
+# JengoPro Frontend (ICDBO)
 
-This frontend powers the Build Smart experience for ICDBO.
+This frontend powers the JengoPro experience for ICDBO.
 
 ## Stack
 
